@@ -3,11 +3,43 @@ extends RefCounted
 
 ## Silhouettes and material panels, in the actor's local facing transform.
 ## All animation is presentation-only and never changes the supplied snapshot.
+const Atlas = preload("res://scripts/sprite_atlas.gd")
+const CACHE_META: StringName = &"someside_enemy_atlas"
+const CACHE_MAX_BYTES: int = 28 * 1024 * 1024
+const ANIMATION_FRAMES: int = 16
+const FREQUENCIES: Dictionary = {"crawler": 1.4, "spitter": 0.45, "spore_moth": 1.25, "drone": 1.0, "charger": 1.0, "burrower": 0.4, "sentinel": 0.0, "skirmisher": 1.0, "conductor": 0.4}
+
 const INK: Color = Color("081920")
 const BONE: Color = Color("e0dcc1")
 const HOT: Color = Color("ffaf78")
 const WHITE: Color = Color("edf4e4")
 const KINDS: Array[String] = ["crawler","spitter","spore_moth","drone","charger","burrower","sentinel","skirmisher","conductor"]
+
+static func prepare(canvas: Node2D) -> void:
+	if DisplayServer.get_name() == "headless" or canvas.has_meta(CACHE_META):
+		return
+	Atlas.prepare(canvas, CACHE_META, atlas_entries(), _paint_atlas_entry, CACHE_MAX_BYTES)
+
+static func cache_info(canvas: Node2D) -> Dictionary:
+	return Atlas.stats(canvas, CACHE_META)
+
+static func atlas_entries() -> Array:
+	var entries: Array = []
+	for kind: String in KINDS:
+		var frequency: float = float(FREQUENCIES[kind])
+		var frames: int = ANIMATION_FRAMES if frequency > 0.0 else 1
+		for variant: int in range(8 if kind == "charger" else 4):
+			var state: Dictionary = {"kind": kind, "id": 0, "elite": (variant & 1) != 0, "flash": 0.1 if (variant & 2) != 0 else 0.0, "telegraph": 0.5 if (variant & 4) != 0 else 0.0}
+			var bounds: Rect2 = enemy_bounds(state)
+			# The elite crown extends seven pixels above the base art bounds.
+			bounds = Rect2(bounds.position - Vector2(4, 10), bounds.size + Vector2(8, 14))
+			for frame: int in range(frames):
+				var phase: float = float(frame) / float(frames) * TAU / frequency if frequency > 0.0 else 0.0
+				entries.append({"key": "%s/%d/%d" % [kind, variant, frame], "bounds": bounds, "data": {"state": state, "clock": phase / 9.0}})
+	return entries
+
+static func _paint_atlas_entry(canvas: Node2D, data: Dictionary) -> void:
+	_enemy_vector(canvas, data.state, float(data.clock))
 
 static func enemy_kinds() -> Array[String]:
 	return KINDS.duplicate()
@@ -118,6 +150,23 @@ static func player_body(c: Node2D, player: Dictionary, clock: float) -> void:
 		c.draw_circle(Vector2(-10,-28),1.1,signal_color,true,-1,true)
 
 static func enemy(c: Node2D, state: Dictionary, clock: float) -> void:
+	var kind: String = str(state.get("kind", "crawler"))
+	# Large bosses retain the full vector animation. Ordinary silhouettes are
+	# sampled at subpixel resolution; position, facing and warning stay live.
+	if FREQUENCIES.has(kind):
+		var cached: Dictionary = Atlas.cache(c, CACHE_META)
+		if not cached.is_empty():
+			var frequency: float = float(FREQUENCIES[kind])
+			var phase: float = (clock * 9.0 + float(state.get("id", 0)) * 1.7) * frequency
+			var frame: int = int(floor(fposmod(phase, TAU) / TAU * ANIMATION_FRAMES)) if frequency > 0.0 else 0
+			var variant: int = (1 if state.get("elite", false) else 0) | (2 if float(state.get("flash", 0.0)) > 0.0 else 0)
+			if kind == "charger" and float(state.get("telegraph", 0.0)) > 0.0:
+				variant |= 4
+			if Atlas.draw_region(c, cached, "%s/%d/%d" % [kind, variant, frame]):
+				return
+	_enemy_vector(c, state, clock)
+
+static func _enemy_vector(c: Node2D, state: Dictionary, clock: float) -> void:
 	var kind: String = str(state.get("kind","crawler"))
 	var phase: float = clock*9.0+float(state.get("id",0))*1.7
 	var flash: float = 0.5 if float(state.get("flash",0.0))>0 else 0.0

@@ -249,6 +249,17 @@ func _test_compact_hud(simulation) -> void:
 	_check(card.warning.visible and card.warning.text.contains(str(simulation.call("loot_definition", "glass").warning)), "Loot inspection visibly warns about maximum-health loss before selection")
 	_check(card.action.text.contains("E"), "The ground loot panel explicitly asks for E")
 	_check(card.description.max_lines_visible == 2 and card.category.visible and card.category.text.contains(Content.rarity_name("rare")) and card.warning.max_lines_visible == -1 and card.alternatives.text.contains("Alt"), "Compact loot cards show rarity and retain the full harm warning while ordinary detail stays brief")
+	var theme_changes: Dictionary = {"count": 0}
+	card.name.theme_changed.connect(func(): theme_changes.count += 1)
+	for frame in range(30):
+		game.call("_process", 1.0 / 120.0)
+	await _layout()
+	_check(theme_changes.count == 0, "Reading an unchanged loot card does not repeatedly invalidate its font/theme layout")
+	var cached_warning: String = card.warning.text
+	player.pos.x += 1.0
+	game.call("_process", 1.0 / 120.0)
+	await _layout()
+	_check(theme_changes.count == 0 and card.warning.text == cached_warning, "Small movement preserves the cached card and its full risk warning")
 	_check_hud_bounds()
 	alt_event.pressed = true
 	Input.parse_input_event(alt_event)

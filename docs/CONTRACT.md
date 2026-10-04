@@ -8,7 +8,8 @@ Pure dictionary state, world units equal pixels. Fixed 60 Hz. Origin top left. A
 
 Public fields: `state: Dictionary`, `events: Array` (last step events). API:
 - `start_run(roster: Array, seed_value: int = 1)` roster records `{id: int, name: String, character: String}`; character `ranger` or `vanguard`.
-- `step(delta: float, commands: Dictionary)` peer ID -> command `{move: float, jump: bool, drop: bool, aim: Vector2, fire: bool, skill: bool, dash: bool, interact: bool}`. aim is normalized world direction. All actions except fire and move are rising-edge input. Store last aim if near zero.
+- `step(delta: float, commands: Dictionary)` peer ID -> command `{move: float, jump: bool, jump_held: bool, drop: bool, aim: Vector2, fire: bool, skill: bool, dash: bool, interact: bool}`. aim is normalized world direction. `move`, `aim`, `fire` and `jump_held` are sustained samples; the other actions are rising edges. Store last aim if near zero. A missing `jump_held` defaults to true for legacy commands. RPC batches preserve pending edges but take held state from the newest accepted sequence; commands older than 350 ms release move/fire/jump_held.
+- Variable height applies only while `player.jump_rising` belongs to an intentional jump. Releasing caps upward speed to 260 px/s and consumes height control for that jump; pressing again cannot restore it without spending a valid air jump. Full holds preserve the original 665 px/s launch and 1750 px/s² gravity. Landing, dash, knockback, revival and stage transitions clear the control flag.
 - `add_player(id: int, name: String, character: String)` / `remove_player(id: int)`.
 - `get_snapshot() -> Dictionary` returns full deep copy.
 - `apply_snapshot(snapshot: Dictionary)` replaces state with deep copy.

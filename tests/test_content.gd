@@ -8,6 +8,7 @@ var failed: int = 0
 var exercised: Dictionary = {}
 
 func _initialize() -> void:
+	_test_definition_isolation()
 	_test_rarity_contract()
 	_test_core_relics()
 	_test_utility_relics()
@@ -22,6 +23,18 @@ func _initialize() -> void:
 	_check(missing.is_empty(), "Every one of the forty catalog IDs has an exercised gameplay effect: missing=%s" % [missing])
 	print("CONTENT_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
+
+func _test_definition_isolation() -> void:
+	var original: Dictionary = Content.definition("pulse_rifle")
+	var changed: Dictionary = Content.definition("pulse_rifle")
+	changed.fire_interval = 99.0
+	changed.name = "Changed by caller"
+	changed.erase("rarity")
+	_check(Content.definition("pulse_rifle") == original, "Editing a returned definition cannot corrupt later gameplay lookups")
+	var catalog: Array = Content.weapons()
+	catalog[0].fire_interval = 88.0
+	_check(Content.definition("pulse_rifle") == original, "Editing a catalog cannot corrupt indexed item definitions")
+	_check(Content.definition("not-an-item").is_empty(), "Unknown item definitions remain empty")
 
 func _check(condition: bool, message: String) -> void:
 	if condition:

@@ -3,9 +3,34 @@ extends RefCounted
 
 ## A white, tapered core identifies friendly fire. Hostile ammunition uses a
 ## closed warm shell around a dark centre, so allegiance also reads in shape.
+const Atlas = preload("res://scripts/sprite_atlas.gd")
+const CACHE_META: StringName = &"someside_projectile_atlas"
+const CACHE_MAX_BYTES: int = 4 * 1024 * 1024
+const ORB_FRAMES: int = 16
 const INK: Color = Color("101b23")
 const CORE: Color = Color("f4f7df")
 const HOT: Color = Color("ffb180")
+
+static func prepare(canvas: Node2D) -> void:
+	if DisplayServer.get_name() == "headless" or canvas.has_meta(CACHE_META):
+		return
+	Atlas.prepare(canvas, CACHE_META, atlas_entries(), _paint_atlas_entry, CACHE_MAX_BYTES, 1024)
+
+static func cache_info(canvas: Node2D) -> Dictionary:
+	return Atlas.stats(canvas, CACHE_META)
+
+static func atlas_entries() -> Array:
+	var entries: Array = []
+	for kind: String in ["spit", "crystal", "energy", "boss_spore_orb"]:
+		for radius: int in range(4, 13):
+			var left: float = minf(-radius * 1.8 - 4, -radius - 11)
+			var bounds := Rect2(left, -radius - 7, radius + 7 - left, radius * 2 + 14)
+			for frame: int in range(ORB_FRAMES if kind == "boss_spore_orb" else 1):
+				entries.append({"key": "enemy/%s/%d/%d" % [kind, radius, frame], "bounds": bounds, "data": {"kind": kind, "radius": radius, "clock": float(frame) / ORB_FRAMES * TAU / 1.3}})
+	return entries
+
+static func _paint_atlas_entry(canvas: Node2D, data: Dictionary) -> void:
+	_enemy_vector(canvas, str(data.kind), float(data.radius), float(data.clock))
 
 static func draw(c: Node2D, shot: Dictionary, position: Vector2, clock: float, strength: float, tail: float) -> void:
 	var velocity: Vector2 = shot.get("vel",Vector2.RIGHT)
@@ -27,7 +52,7 @@ static func _poly(c: Node2D, points: Array, fill: Color, outline: float = 0.0, o
 		c.draw_polyline(shape,outline_color,outline,true)
 
 static func _taper(c: Node2D, tail: float, width: float, tint: Color) -> void:
-	if tail<=0.01: return
+	if tail <= 0.01: return
 	_poly(c,[Vector2(-tail,0),Vector2(-tail*0.4,-width),Vector2(0,-width*0.6),Vector2(0,width*0.6),Vector2(-tail*0.4,width)],Color(tint,0.13))
 	c.draw_line(Vector2(-tail*0.72,0),Vector2.ZERO,Color(tint,0.76),1.0,true)
 	c.draw_line(Vector2(-tail*0.28,0),Vector2.ZERO,CORE,1.0,true)
@@ -88,6 +113,19 @@ static func _friendly(c: Node2D, kind: String, radius: float, strength: float, t
 		c.draw_line(Vector2(-length*0.8,-3),Vector2(-length*0.2,-2),Color(tint,0.45),0.8,true)
 
 static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
+	var r: float = maxf(4.0, radius)
+	var cached: Dictionary = Atlas.cache(c, CACHE_META)
+	if not cached.is_empty() and is_equal_approx(r, roundf(r)) and r >= 4.0 and r <= 12.0:
+		var family: String = "energy"
+		if kind in ["spit", "spore", "acid", "poison"]: family = "spit"
+		elif kind in ["crystal", "pulse"]: family = "crystal"
+		elif kind in ["boss_spore_orb", "boss_orb"]: family = "boss_spore_orb"
+		var frame: int = int(floor(fposmod(clock * 1.3, TAU) / TAU * ORB_FRAMES)) if family == "boss_spore_orb" else 0
+		if Atlas.draw_region(c, cached, "enemy/%s/%d/%d" % [family, int(r), frame]):
+			return
+	_enemy_vector(c, kind, radius, clock)
+
+static func _enemy_vector(c: Node2D, kind: String, radius: float, clock: float) -> void:
 	var r: float = maxf(4.0,radius)
 	if kind in ["spit","spore","acid","poison"]:
 		_poly(c,[Vector2(r+2,0),Vector2(r*0.25,-r),Vector2(-r,-r*0.45),Vector2(-r*1.8,0),Vector2(-r,r*0.5),Vector2(r*0.2,r)],Color("ba8e61"),1.4)

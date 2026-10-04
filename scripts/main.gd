@@ -9,7 +9,8 @@ const Content = preload("res://scripts/content.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
-const VERSION: String = "0.8.0"
+const PlayerInput = preload("res://scripts/player_input.gd")
+const VERSION: String = "0.9.0"
 const DEFAULT_PORT: int = 27841
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
@@ -90,6 +91,9 @@ var _settings_in_game: bool = false
 var _coin_panel: PanelContainer
 var _last_coin_balance: int = -1
 var _coin_feedback: float = 0.0
+var _player_input = PlayerInput.new()
+var _controls_focused: bool = true
+var _loot_signature: Array = []
 
 func _ready() -> void:
 	Engine.max_fps = 120
@@ -144,8 +148,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_elapsed += delta
+	var was_coin_feedback: bool = _coin_feedback > 0.0
 	_coin_feedback = maxf(0.0, _coin_feedback - delta)
-	if _hud_labels.has("coins") and is_instance_valid(_hud_labels.coins):
+	if was_coin_feedback and _hud_labels.has("coins") and is_instance_valid(_hud_labels.coins):
 		_hud_labels.coins.add_theme_color_override("font_color", AMBER.lerp(Color("fff2bc"), _coin_feedback / 0.55))
 	_visual_error = _visual_error.lerp(Vector2.ZERO, 1.0 - exp(-18.0 * delta))
 	var render_state: Dictionary = sim.state
@@ -218,6 +223,7 @@ func _physics_process(delta: float) -> void:
 		if Time.get_ticks_msec() - int(_command_times.get(peer_id, 0)) > 350:
 			frame[peer_id]["move"] = 0.0
 			frame[peer_id]["fire"] = false
+			frame[peer_id]["jump_held"] = false
 		_ack[peer_id] = _received.get(peer_id, 0)
 		for edge in ["jump", "drop", "skill", "dash", "interact"]:
 			_commands[peer_id][edge] = false
@@ -241,11 +247,12 @@ func _physics_process(delta: float) -> void:
 		_event_buffer.clear()
 
 func _get_command() -> Dictionary:
-	var command: Dictionary = {"move": 0.0, "jump": false, "drop": false, "aim": Vector2.RIGHT, "fire": false, "skill": false, "dash": false, "interact": false}
+	var command: Dictionary = {"move": 0.0, "jump": false, "jump_held": false, "drop": false, "aim": Vector2.RIGHT, "fire": false, "skill": false, "dash": false, "interact": false}
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
 	if player.is_empty():
 		return command
 	if not _smoke.is_empty() or _options.has("demo"):
+		command.jump_held = true
 		var position: Vector2 = player.get("pos", Vector2.ZERO)
 		var aim: Vector2 = Vector2.RIGHT
 		var best: float = INF
@@ -264,15 +271,16 @@ func _get_command() -> Dictionary:
 			var gate_position: Vector2 = sim.state.get("gate", {}).get("pos", Vector2(2800, 999))
 			command.move = signf(gate_position.x - position.x) if absf(gate_position.x - position.x) > 90.0 else sin(_elapsed * 1.6) * 0.45
 		return command
-	if paused:
+	if paused or not _controls_focused:
 		command.aim = player.get("aim", Vector2.RIGHT)
 		return command
 	var aiming_player: Dictionary = player.duplicate(false)
 	if online and not hosting:
 		aiming_player.pos = Vector2(player.pos) + _visual_error
 	command.aim = WeaponPose.aim_at(aiming_player, world.screen_to_world(get_viewport().get_mouse_position()))
-	command.move = Input.get_axis("move_left", "move_right")
+	command.move = _player_input.movement_axis()
 	command.jump = Input.is_action_just_pressed("jump")
+	command.jump_held = _player_input.jump_held()
 	command.drop = Input.is_action_pressed("down") and command.jump
 	command.fire = Input.is_action_pressed("fire")
 	command.skill = Input.is_action_just_pressed("skill")
@@ -291,13 +299,15 @@ func _setup_inputs() -> void:
 		for key in keys[action]:
 			var event := InputEventKey.new()
 			event.physical_keycode = key
-			InputMap.action_add_event(action, event)
+			if not InputMap.action_has_event(action, event):
+				InputMap.action_add_event(action, event)
 	for binding in [["fire", MOUSE_BUTTON_LEFT], ["skill", MOUSE_BUTTON_RIGHT]]:
 		if not InputMap.has_action(binding[0]):
 			InputMap.add_action(binding[0])
 		var event := InputEventMouseButton.new()
 		event.button_index = binding[1]
-		InputMap.action_add_event(binding[0], event)
+		if not InputMap.action_has_event(binding[0], event):
+			InputMap.action_add_event(binding[0], event)
 
 func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 	_local_fire_timer = maxf(0.0, _local_fire_timer - delta)
@@ -322,6 +332,17 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 	event.merge(sim._visual_data(local_id), false)
 	world.push_events([event])
 	sound.play_event(str(event.type))
+
+func _input(event: InputEvent) -> void:
+	# Observe releases before GUI controls can consume them.
+	if screen == "playing" and not paused and _controls_focused:
+		_player_input.handle_event(event)
+
+func _reset_controls() -> void:
+	_player_input.reset()
+	for action in ["move_left", "move_right", "jump", "down", "fire", "skill", "dash", "interact"]:
+		if InputMap.has_action(action):
+			Input.action_release(action)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -352,6 +373,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_show_map()
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
+		_controls_focused = false
+		_reset_controls()
+	elif what in [NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_WM_WINDOW_FOCUS_IN]:
+		_controls_focused = true
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_quit_game()
 
@@ -593,7 +619,8 @@ func _submit_inputs(batch: Array) -> void:
 		var movement: float = float(record.get("move", 0.0))
 		if not is_finite(movement):
 			movement = 0.0
-		var command: Dictionary = {"move": clampf(movement, -1.0, 1.0), "aim": aim.normalized(), "fire": bool(record.get("fire", false))}
+		# Held state is the latest sample, not an accumulated button edge.
+		var command: Dictionary = {"move": clampf(movement, -1.0, 1.0), "aim": aim.normalized(), "fire": bool(record.get("fire", false)), "jump_held": bool(record.get("jump_held", true))}
 		# Preserve the exact displayed target for the first pending E press.
 		# Later movement samples must not retarget a deliberate loot choice.
 		if bool(_commands.get(id, {}).get("interact", false)):
@@ -912,6 +939,8 @@ func _gap(parent: Node, height: float = 12.0) -> void:
 	parent.add_child(gap)
 
 func _clear_ui() -> void:
+	_reset_controls()
+	_loot_signature.clear()
 	for child in ui.get_children():
 		ui.remove_child(child)
 		child.queue_free()
@@ -1206,8 +1235,8 @@ func _show_guide() -> void:
 	var column: VBoxContainer = _page("生还手册", "保持移动。瞄准弱点。让遗物产生共鸣。", guide_width)
 	column.add_theme_constant_override("separation", 9)
 	var guide: Array = [
-		["A / D   或   ← / →", "移动；方向与瞄准完全独立"],
-		["Space / W", "基础一段跳；跃迁羽翼增加空中跳跃"],
+		["A / D   或   ← / →", "移动；相反方向同时按住时，后按优先"],
+		["Space / W / ↑", "短按低跳，长按高跳；羽翼增加空跳"],
 		["S + Space", "穿过脚下的平台"],
 		["鼠标左键", "使用当前主武器，跟随鼠标瞄准"],
 		["鼠标右键 / Q", "使用当前主动装备；下方显示冷却"],
@@ -1396,6 +1425,8 @@ func _build_coin_hud() -> void:
 func _update_coins(balance: int) -> void:
 	if not is_instance_valid(_coin_panel):
 		return
+	if balance == _last_coin_balance:
+		return
 	if _last_coin_balance >= 0 and balance != _last_coin_balance:
 		_coin_feedback = 0.55
 	_last_coin_balance = balance
@@ -1413,10 +1444,9 @@ func _update_inspection_visibility() -> void:
 	_relic_strip.visible = not _relic_tiles.is_empty()
 	_hud_labels.relics.visible = expanded and _relic_strip.visible
 	_hud_labels.hint.visible = expanded
-	_hud_labels.hint.text = Locale.text("[Tab] 构筑 / 图鉴  ·  [F] 切换目标  ·  悬停图标查看效果")
-	_hud_labels.hint.text += Locale.text("  ·  [M] 地图")
+	var hint: String = Locale.text("[Tab] 构筑 / 图鉴  ·  [F] 切换目标  ·  悬停图标查看效果") + Locale.text("  ·  [M] 地图")
 	var mode: String = str(sim.state.get("director", {}).get("mode", "rest"))
-	_hud_labels.hint.text += "   /   " + Locale.text({"rest": "停留 · 环境怪不再补充", "exploring": "探索中", "event": "事件战斗中"}.get(mode, ""))
+	_hud_labels.hint.text = hint + "   /   " + Locale.text({"rest": "停留 · 环境怪不再补充", "exploring": "探索中", "event": "事件战斗中"}.get(mode, ""))
 
 
 func _build_loot_panel() -> void:
@@ -1539,7 +1569,7 @@ func _update_hud() -> void:
 	var difficulty: float = float(sim.state.get("difficulty", 1.0))
 	_hud_labels.expedition.text = Locale.format("%02d/03  %02d:%02d  威胁%.1f", [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, difficulty])
 	_update_coins(int(player.coins))
-	_hud_labels.expedition.add_theme_color_override("font_color", Color("ee9488") if difficulty >= 4 else (AMBER if difficulty >= 2 else MUTED))
+	_set_label_color(_hud_labels.expedition, Color("ee9488") if difficulty >= 4 else (AMBER if difficulty >= 2 else MUTED))
 	var gate: Dictionary = sim.state.get("gate", {})
 	_objective_panel.visible = bool(gate.get("active", false)) or bool(player.dead)
 	_hud_labels.objective.text = Locale.format("裂隙 %d%%  ·  %s", [int(float(gate.get("charge", 0.0)) * 100.0), Locale.text("击败守卫" if sim.state.get("boss_alive", false) else "留在附近充能")])
@@ -1618,6 +1648,18 @@ func _update_interaction_panel(player: Dictionary) -> void:
 	_loot_panel.visible = not target.is_empty()
 	if target.is_empty():
 		return
+	# Geometry/distance vary every frame; only presentation changes rebuild text,
+	# theme resources and container minimum sizes. Price, risks and selection are
+	# included so a purchase or F/Alt press is reflected immediately.
+	var signature: Array = [expanded, Locale.current_language, player.get("weapon"), player.get("equipment"), not hovered.is_empty(), _interaction_options.size()]
+	for key in ["kind", "id", "item", "title", "description", "warning", "category", "prompt", "affordable", "facility_type"]:
+		signature.append(target.get(key))
+	for option in _interaction_options:
+		signature.append([option.get("kind"), option.get("id")])
+	if signature == _loot_signature:
+		_position_loot_panel(player)
+		return
+	_loot_signature = signature
 	var id: String = str(target.get("item", ""))
 	var category: String = str(target.get("category", ""))
 	var definition: Dictionary = Simulation.loot_definition(id)
@@ -1662,13 +1704,20 @@ func _update_interaction_panel(player: Dictionary) -> void:
 	_loot_ui.alternatives.text = Locale.text("移开鼠标收起  ·  Tab 查看构筑" if not hovered.is_empty() else ("松开 Alt 收起" if expanded else "按住 Alt 查看完整说明"))
 	if _interaction_options.size() > 1 and str(target.get("kind", "")) != "inspect":
 		_loot_ui.alternatives.text += "  ·  [F] %d/%d" % [selection_index + 1, _interaction_options.size()]
-	var actor_x: float = world.world_to_screen(player.pos).x
 	_loot_panel.custom_minimum_size.x = 346 if expanded else 306
 	for key in ["description", "warning", "replace", "action", "alternatives"]:
 		_loot_ui[key].custom_minimum_size.x = 322 if expanded else 280
 	_loot_panel.reset_size()
+	_position_loot_panel(player)
+
+func _position_loot_panel(player: Dictionary) -> void:
+	var actor_x: float = world.world_to_screen(player.pos).x
 	_loot_panel.position.x = 18.0 if actor_x > 815.0 else 1262.0 - _loot_panel.size.x
 	_loot_panel.position.y = maxf(100.0, 622.0 - _loot_panel.size.y)
+
+func _set_label_color(label: Label, color: Color) -> void:
+	if label.get_theme_color("font_color") != color:
+		label.add_theme_color_override("font_color", color)
 
 func _item_total(items: Dictionary) -> int:
 	var count: int = 0
@@ -1713,6 +1762,7 @@ func _inventory_card(parent: Node, definition: Dictionary, count: int, equipped:
 		downside.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _show_inventory() -> void:
+	_reset_controls()
 	paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	overlay = Control.new()
@@ -1800,6 +1850,7 @@ func _populate_inventory(filter_key: String) -> void:
 	scroll.scroll_vertical = 0
 
 func _show_map() -> void:
+	_reset_controls()
 	paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	overlay = Control.new()
@@ -1835,6 +1886,7 @@ func _notify(message: String, duration: float = 3.5) -> void:
 		_notice_time = duration
 
 func _show_pause() -> void:
+	_reset_controls()
 	paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	overlay = Control.new()
@@ -1858,6 +1910,7 @@ func _show_pause() -> void:
 	_label(panel, "Esc 返回  ·  F11 全屏", 13, MUTED)
 
 func _resume() -> void:
+	_reset_controls()
 	paused = false
 	_settings_in_game = false
 	_map_view = null

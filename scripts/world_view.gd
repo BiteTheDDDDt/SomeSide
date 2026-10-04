@@ -11,6 +11,9 @@ var fx_scale: float = 1.0
 var shake_enabled: bool = true
 var interpolate_remote_entities: bool = false
 var interaction_target: Dictionary = {}
+## Native scenery textures remove repeated triangulation/material draws.
+## This switch exists for fidelity/performance regression captures.
+var scenery_cache_enabled: bool = true
 
 const ItemIcons = preload("res://scripts/item_icons.gd")
 const Biomes = preload("res://scripts/biome_renderer.gd")
@@ -46,6 +49,36 @@ var _last_snapshot_time: float = -1.0
 var _snapshot_age: float = 0.0
 var _current_biome: String = "rainforest"
 var _camera_stage: int = -1
+const SCENERY_CACHE_BYTES: int = 48*1024*1024
+const SCENERY_CACHE_ENTRIES: int = 40
+var _scenery_cache: Dictionary = {}
+var _scenery_bytes: int = 0
+var _background_cache: Dictionary = {}
+var _background_camera: Vector2 = Vector2.INF
+var _background_clock: float = -1.0
+var _cache_builds_this_frame: int = 0
+var _scenery_layout_signature: int = 0
+var _background_live: bool = true
+
+class SceneryBake:
+	extends Node2D
+	const Art = preload("res://scripts/biome_renderer.gd")
+	var mode: String = "terrain"
+	var screen_size: Vector2
+	var offset: Vector2
+	var camera: Vector2
+	var biome: String
+	var world: Vector2
+	var rectangle: Rect2
+	var platform_index: int
+	var landmark: Dictionary
+	var clock_value: float
+	func world_to_screen(p: Vector2) -> Vector2:
+		return p-offset
+	func _draw() -> void:
+		if mode=="background": Art.background(self,biome,camera,screen_size,world,clock_value)
+		elif mode=="landmark": Art.landmarks(self,[landmark],biome,clock_value)
+		else: Art.platform(self,rectangle,platform_index,biome,clock_value,screen_size,world,true)
 
 
 func _ready() -> void:
@@ -58,6 +91,8 @@ func _ready() -> void:
 	_rng.seed = 720451
 	for index: int in range(84):
 		_stars.append(Vector3(_rng.randf_range(0.0, 1500.0), _rng.randf_range(15.0, 510.0), _rng.randf_range(0.3, 1.35)))
+	Entities.prepare(self)
+	ProjectileArt.prepare(self)
 	set_process(true)
 
 
@@ -66,11 +101,16 @@ func set_frame(snapshot: Dictionary, local_id: int, delta: float) -> void:
 	_local_id = local_id
 	var stage: int = int(_frame.get("stage", 1))
 	_current_biome = str(_frame.get("biome", ["rainforest", "canyon", "ruins"][clampi(stage - 1, 0, 2)]))
+	var layout_signature: int=hash([_current_biome,_frame.get("world_size",Vector2.ZERO),_frame.get("platforms",[]),_frame.get("landmarks",[])])
+	if layout_signature!=_scenery_layout_signature:
+		_clear_scenery_cache()
+		_scenery_layout_signature=layout_signature
 	if stage != _camera_stage:
 		_camera_ready = false
 		_camera_stage = stage
 		_effects.clear()
 		_numbers.clear()
+		_clear_scenery_cache()
 	_update_render_positions(maxf(delta, 0.0))
 	var target: Vector2 = camera_position
 	var players: Dictionary = _frame.get("players", {})
@@ -96,7 +136,128 @@ func set_frame(snapshot: Dictionary, local_id: int, delta: float) -> void:
 		_camera_ready = true
 	else:
 		camera_position = camera_position.lerp(target, 1.0 - exp(-maxf(delta, 0.0) * 5.5))
+	_prepare_scenery_cache()
 	queue_redraw()
+
+
+func _clear_scenery_cache() -> void:
+	for entry: Dictionary in _scenery_cache.values(): entry.viewport.queue_free()
+	_scenery_cache.clear()
+	_scenery_bytes=0
+	if not _background_cache.is_empty(): _background_cache.viewport.queue_free()
+	_background_cache.clear()
+	_background_camera=Vector2.INF
+	_background_clock=-1.0
+
+
+func scenery_cache_stats() -> Dictionary:
+	return {"entries":_scenery_cache.size(),"bytes":_scenery_bytes,"max_entries":SCENERY_CACHE_ENTRIES,"max_bytes":SCENERY_CACHE_BYTES}
+
+
+func _new_scenery_bake(size_value: Vector2i, origin: Vector2, mode: String) -> Dictionary:
+	var viewport: SubViewport=SubViewport.new()
+	viewport.size=size_value
+	viewport.transparent_bg=mode!="background"
+	viewport.disable_3d=true
+	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
+	add_child(viewport)
+	var painter: SceneryBake=SceneryBake.new()
+	painter.mode=mode
+	painter.offset=origin
+	painter.screen_size=Vector2(size_value)
+	painter.biome=_current_biome
+	painter.world=_frame.get("world_size",Vector2(3200,1100))
+	viewport.add_child(painter)
+	return {"viewport":viewport,"painter":painter,"texture":viewport.get_texture(),"ready":Engine.get_process_frames()+2,"last":Engine.get_process_frames(),"bytes":size_value.x*size_value.y*4,"origin":origin}
+
+
+func _cached_scenery(key: String, size_value: Vector2i, origin: Vector2, mode: String) -> Dictionary:
+	if _scenery_cache.has(key):
+		_scenery_cache[key].last=Engine.get_process_frames()
+		return _scenery_cache[key]
+	if _cache_builds_this_frame>=2: return {}
+	var cost: int=size_value.x*size_value.y*4
+	while _scenery_cache.size()>=SCENERY_CACHE_ENTRIES or _scenery_bytes+cost>SCENERY_CACHE_BYTES:
+		var oldest: String=""
+		var oldest_frame: int=Engine.get_process_frames()
+		for candidate: String in _scenery_cache:
+			if int(_scenery_cache[candidate].last)<oldest_frame:
+				oldest=candidate
+				oldest_frame=int(_scenery_cache[candidate].last)
+		if oldest.is_empty(): return {}
+		_scenery_bytes-=int(_scenery_cache[oldest].bytes)
+		_scenery_cache[oldest].viewport.queue_free()
+		_scenery_cache.erase(oldest)
+	var entry: Dictionary=_new_scenery_bake(size_value,origin,mode)
+	_scenery_cache[key]=entry
+	_scenery_bytes+=cost
+	_cache_builds_this_frame+=1
+	return entry
+
+
+func _terrain_tiles(rectangle: Rect2) -> Vector2i:
+	# Ground depth is screen-dependent; retaining its original draw prevents
+	# cropped strata at low cameras and avoids allocating world-sized textures.
+	var world_size: Vector2=_frame.get("world_size",Vector2(3200,1100))
+	if rectangle.size.y>60 or rectangle.position.y>=world_size.y-160: return Vector2i(-1,-1)
+	var p: Vector2=world_to_screen(rectangle.position)
+	if p.x+rectangle.size.x < -100 or p.x>screen_size.x+100 or p.y>screen_size.y+110 or p.y < -140: return Vector2i(-1,-1)
+	return Vector2i(maxi(0,int(floor((-80-p.x)/512.0))),mini(int(ceil(rectangle.size.x/512.0)),int(ceil((screen_size.x+80-p.x)/512.0))))
+
+
+func _static_landmark(landmark: Dictionary) -> bool:
+	var kind: String=str(landmark.get("kind",""))
+	return not (_current_biome=="rainforest" and kind=="waterfall") and not (_current_biome=="ruins" and kind not in ["archive","crypt","reactor"])
+
+
+func _prepare_scenery_cache() -> void:
+	if not scenery_cache_enabled or not is_inside_tree(): return
+	_cache_builds_this_frame=0
+	if _background_cache.is_empty() or Vector2(_background_cache.painter.screen_size)!=screen_size:
+		if not _background_cache.is_empty(): _background_cache.viewport.queue_free()
+		_background_cache=_new_scenery_bake(Vector2i(screen_size),Vector2.ZERO,"background")
+		_background_camera=Vector2.INF
+	# Parallax is updated on every visible camera change. The only autonomous
+	# movement in this layer is a very slow vine (<0.12 px per refresh).
+	_background_live=not _background_camera.is_finite() or _background_camera.distance_squared_to(camera_position)>0.0025
+	if not _background_live and (_background_clock<0 or _background_cache.painter.camera.distance_squared_to(camera_position)>0.0025 or (_current_biome=="rainforest" and _clock-_background_clock>1.0/30.0)):
+		_background_cache.painter.camera=camera_position
+		_background_cache.painter.clock_value=_clock
+		_background_cache.painter.queue_redraw()
+		_background_cache.viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
+		_background_clock=_clock
+	if _background_live: _background_clock=-1.0
+	_background_camera=camera_position
+	var platforms: Array=_frame.get("platforms",[])
+	for index: int in range(platforms.size()):
+		var rectangle: Rect2=platforms[index]
+		var tiles: Vector2i=_terrain_tiles(rectangle)
+		if tiles.x<0: continue
+		for tile: int in range(tiles.x,tiles.y):
+			var origin: Vector2=rectangle.position+Vector2(tile*512-96,-64)
+			var entry: Dictionary=_cached_scenery("t%d:%d"%[index,tile],Vector2i(704,256),origin,"terrain")
+			if not entry.is_empty():
+				entry.painter.rectangle=rectangle
+				entry.painter.platform_index=index
+	for index: int in range(Array(_frame.get("landmarks",[])).size()):
+		var landmark: Dictionary=_frame.landmarks[index]
+		if not _static_landmark(landmark): continue
+		var scale_value: float=clampf(float(landmark.get("scale",1.0)),0.5,3.0)
+		var p: Vector2=world_to_screen(landmark.pos)
+		if not Rect2(p-Vector2(400,500)*scale_value,Vector2(800,900)*scale_value).intersects(Rect2(Vector2.ZERO,screen_size)): continue
+		var origin: Vector2=Vector2(landmark.pos)-Vector2(400,500)*scale_value
+		var entry: Dictionary=_cached_scenery("l%d"%index,Vector2i(Vector2(800,900)*scale_value),origin,"landmark")
+		if not entry.is_empty(): entry.painter.landmark=landmark
+
+
+func _draw_cached_landmarks() -> void:
+	var landmarks: Array=_frame.get("landmarks",[])
+	for index: int in range(landmarks.size()):
+		var entry: Dictionary=_scenery_cache.get("l%d"%index,{}) if scenery_cache_enabled else {}
+		if not entry.is_empty() and Engine.get_process_frames()>=int(entry.ready):
+			draw_texture(entry.texture,world_to_screen(entry.origin))
+		else:
+			Biomes.landmarks(self,[landmarks[index]],_current_biome,_clock)
 
 
 func screen_to_world(screen_position: Vector2) -> Vector2:
@@ -349,8 +510,11 @@ func _draw() -> void:
 	if _font == null:
 		_font = ThemeDB.fallback_font
 	var world: Vector2 = _frame.get("world_size", Vector2(3200.0, 1100.0))
-	Biomes.background(self, _current_biome, camera_position, screen_size, world, _clock)
-	Biomes.landmarks(self, _frame.get("landmarks", []), _current_biome, _clock)
+	if scenery_cache_enabled and not _background_live and not _background_cache.is_empty() and Engine.get_process_frames()>=int(_background_cache.ready):
+		draw_texture(_background_cache.texture,Vector2.ZERO)
+	else:
+		Biomes.background(self, _current_biome, camera_position, screen_size, world, _clock)
+	_draw_cached_landmarks()
 	_draw_terrain()
 	_draw_gate()
 	_draw_chests()
@@ -442,7 +606,22 @@ func _draw_terrain() -> void:
 	var platforms: Array = _frame.get("platforms", [])
 	var world: Vector2 = _frame.get("world_size", Vector2(3200.0, 1100.0))
 	for index: int in range(platforms.size()):
-		Biomes.platform(self, platforms[index], index, _current_biome, _clock, screen_size, world)
+		var rectangle: Rect2=platforms[index]
+		var tiles: Vector2i=_terrain_tiles(rectangle)
+		var ready: bool=scenery_cache_enabled and tiles.x>=0 and tiles.y>tiles.x
+		if ready:
+			for tile: int in range(tiles.x,tiles.y):
+				var entry: Dictionary=_scenery_cache.get("t%d:%d"%[index,tile],{})
+				if entry.is_empty() or Engine.get_process_frames()<int(entry.ready): ready=false; break
+		if not ready:
+			Biomes.platform(self,rectangle,index,_current_biome,_clock,screen_size,world)
+			continue
+		for tile: int in range(tiles.x,tiles.y):
+			var entry: Dictionary=_scenery_cache["t%d:%d"%[index,tile]]
+			var width: float=minf(512.0,rectangle.size.x-tile*512.0)
+			var destination: Vector2=world_to_screen(rectangle.position+Vector2(tile*512,-64))
+			draw_texture_rect_region(entry.texture,Rect2(destination,Vector2(width,256)),Rect2(96,0,width,256))
+		Biomes.platform_animated(self,rectangle,index,_current_biome,_clock,screen_size)
 
 
 func _draw_flora(p: Vector2, scale_value: float, seed_value: int) -> void:

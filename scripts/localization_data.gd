@@ -2,6 +2,8 @@ extends RefCounted
 
 ## Chinese source text is a stable display key, never a replacement pattern.
 const TEXTS: Dictionary = {
+	"移动；相反方向同时按住时，后按优先": "Move; the last pressed direction takes priority",
+	"短按低跳，长按高跳；羽翼增加空跳": "Tap for a low jump, hold for height; Feathers add air jumps",
 	"返回战场": "Back to Battle",
 	"获得遗物 · %s · %s": "Relic Acquired · %s · %s",
 	"已装备 · %s · %s": "Equipped · %s · %s",

@@ -14,6 +14,7 @@ const WORLD_SIZE: Vector2 = Vector2(3200.0, 1100.0)
 const PLAYER_HALF: Vector2 = Vector2(12.0, 21.0)
 const GRAVITY: float = 1750.0
 const JUMP_SPEED: float = 665.0
+const JUMP_RELEASE_SPEED: float = 260.0
 const MOVE_SPEED: float = 245.0
 const DASH_SPEED: float = 720.0
 const DASH_COOLDOWN: float = 2.4
@@ -112,7 +113,7 @@ func add_player(id: int, player_name: String, character: String) -> void:
 		"hp": health, "max_hp": health, "shield": 0.0, "coins": 35,
 		"items": {}, "dead": false, "grounded": false, "fire_cd": 0.0,
 		"skill_cd": 0.0, "dash_cd": 0.0, "invuln": 1.5,
-		"kills": 0, "revive": 0.0, "coyote": 0.0, "jumps": 0,
+		"kills": 0, "revive": 0.0, "coyote": 0.0, "jumps": 0, "jump_rising": false,
 		"drop_timer": 0.0, "dash_timer": 0.0, "dash_dir": Vector2.RIGHT,
 		"hurt_timer": 0.0, "revive_timer": 0.0, "interact_cd": 0.0, "shield_timer": 0.0,
 		"explore_anchor": position, "explore_sites": [position], "explore_window": 0.0, "explore_budget": 0,
@@ -183,6 +184,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		if float(player["shield_timer"]) <= 0.0:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
+		player["jump_rising"] = false
 		player["chrono_timer"] = maxf(0.0, float(player.get("chrono_timer", 0.0)) - dt)
 		player["momentum_timer"] = maxf(0.0, float(player.get("momentum_timer", 0.0)) - dt)
 		var corpse_velocity: Vector2 = player.get("vel", Vector2.ZERO)
@@ -199,6 +201,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 				player["hp"] = float(player["max_hp"]) * 0.55
 				player["invuln"] = 2.5
 				player["revive"] = 0.0
+				player["jump_rising"] = false
 				_reset_exploration(player, false)
 				_emit("revive", player["pos"], {"player": player["id"]})
 		return
@@ -235,26 +238,35 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 	var velocity: Vector2 = player.get("vel", Vector2.ZERO)
 	var position: Vector2 = player.get("pos", state.get("spawn", Vector2(210.0, _floor_y() - PLAYER_HALF.y)))
 	var grounded: bool = bool(player.get("grounded", false))
+	# Only a deliberate jump owns variable-height control. Dash momentum,
+	# knockback and simply walking off a ledge must never be cut by this input.
+	if grounded or velocity.y >= 0.0 or float(player.get("dash_timer", 0.0)) > 0.0:
+		player["jump_rising"] = false
 	player["coyote"] = 0.105 if grounded else maxf(0.0, float(player.get("coyote", 0.0)) - dt)
 	player["drop_timer"] = maxf(0.0, float(player.get("drop_timer", 0.0)) - dt)
 	player["dash_cd"] = maxf(0.0, float(player.get("dash_cd", 0.0)) - dt)
 	player["dash_timer"] = maxf(0.0, float(player.get("dash_timer", 0.0)) - dt)
 	var speed: float = MOVE_SPEED * (1.0 + minf(1.1, _stacks(player, "thruster") * 0.09)) * (1.3 if float(player["chrono_timer"]) > 0.0 else 1.0)
-	if bool(command.get("drop", false)) and position.y + PLAYER_HALF.y < _floor_y() - 5.0:
-		player["drop_timer"] = 0.22
-		position.y += 5.0
-		velocity.y = maxf(velocity.y, 100.0)
-		grounded = false
-		player["coyote"] = 0.0
+	if bool(command.get("drop", false)):
+		# Down+jump is only a drop request, even on the bottom floor.
+		if position.y + PLAYER_HALF.y < _floor_y() - 5.0:
+			player["drop_timer"] = 0.22
+			position.y += 5.0
+			velocity.y = maxf(velocity.y, 100.0)
+			grounded = false
+			player["coyote"] = 0.0
+			player["jump_rising"] = false
 	elif bool(command.get("jump", false)):
 		if grounded or float(player["coyote"]) > 0.0:
 			velocity.y = -JUMP_SPEED
 			player["jumps"] = 1
 			player["coyote"] = 0.0
+			player["jump_rising"] = true
 			grounded = false
 		elif int(player.get("jumps", 0)) < 1 + _stacks(player, "feather") and _stacks(player, "feather") > 0:
 			velocity.y = -JUMP_SPEED * 0.91
 			player["jumps"] = maxi(1, int(player.get("jumps", 0))) + 1
+			player["jump_rising"] = true
 	if bool(command.get("dash", false)) and float(player["dash_cd"]) <= 0.0:
 		var dash_direction: Vector2 = Vector2(move, 0.0)
 		if absf(move) < 0.1:
@@ -263,8 +275,15 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		player["dash_timer"] = 0.16
 		player["dash_cd"] = maxf(0.8, DASH_COOLDOWN / (1.0 + _stacks(player, "thruster") * 0.1))
 	if float(player["dash_timer"]) > 0.0:
+		player["jump_rising"] = false
 		velocity = Vector2(player["dash_dir"]) * DASH_SPEED
 	else:
+		# Missing held state preserves the original full arc for old commands.
+		# A release consumes this jump's control once; pressing again cannot
+		# restore upward speed without a separate, available feather jump.
+		if bool(player.get("jump_rising", false)) and not bool(command.get("jump_held", true)):
+			velocity.y = maxf(velocity.y, -JUMP_RELEASE_SPEED)
+			player["jump_rising"] = false
 		velocity.x = move_toward(velocity.x, move * speed, (2500.0 if grounded else 1800.0) * dt)
 		velocity.y = minf(1100.0, velocity.y + GRAVITY * dt)
 	var result: Dictionary = _move_body(position, velocity, dt, PLAYER_HALF, float(player["drop_timer"]) > 0.0)
@@ -273,10 +292,13 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 	player["grounded"] = result["grounded"]
 	if bool(result["grounded"]):
 		player["jumps"] = 0
+	if bool(result["grounded"]) or Vector2(result["vel"]).y >= 0.0:
+		player["jump_rising"] = false
 	if Vector2(player["pos"]).y > _world_size().y + 80.0:
 		# Safety floor recovery, also identical during local prediction.
 		player["pos"] = Vector2(clampf(position.x, 30.0, _world_size().x - 30.0), _floor_y() - PLAYER_HALF.y - 24.0)
 		player["vel"] = Vector2.ZERO
+		player["jump_rising"] = false
 
 
 func _move_body(position: Vector2, velocity: Vector2, dt: float, half: Vector2, drop: bool = false) -> Dictionary:
@@ -371,6 +393,7 @@ func _use_skill(player: Dictionary) -> void:
 	player["skill_cd"] = float(definition.get("cooldown", 5.0)) * cooldown_scale
 	match equipment:
 		"shockwave":
+			player["jump_rising"] = false
 			player["invuln"] = maxf(float(player["invuln"]), 0.45)
 			player["dash_timer"] = 0.2
 			player["dash_dir"] = aim
@@ -677,6 +700,7 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 	player["hurt_timer"] = 6.0
 	var push: float = signf(Vector2(player["pos"]).x - source.x)
 	player["vel"] = Vector2(push * 165.0, -150.0)
+	player["jump_rising"] = false
 	_emit("hit", player["pos"], {"amount": amount, "crit": false, "player": player["id"], "friendly": true})
 	if float(player["hp"]) <= 0.0:
 		if int(player.get("phoenix_spent", 0)) < mini(2, _stacks(player, "phoenix")):
@@ -1647,6 +1671,7 @@ func _build_stage(stage: int) -> void:
 		player["shield"] = 0.0
 		player["shield_timer"] = 0.0
 		player["jumps"] = 0
+		player["jump_rising"] = false
 		player["phoenix_spent"] = 0
 		player["chrono_timer"] = 0.0
 		player["momentum_timer"] = 0.0

@@ -1,4 +1,4 @@
-SomeSide 0.8.0 - Windows x64
+SomeSide 0.9.0 - Windows x64
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
@@ -33,8 +33,8 @@ SomeSide 0.8.0 - Windows x64
 高叠层仅适度增加大小和亮度，不改变角色碰撞体或遮住武器。
 
 按键
-A / D 或左右方向键：移动
-Space / W / 上方向键：单次跳跃，羽毛可增加空跳
+A / D 或左右方向键：移动；两方向同时按住时，后按优先
+Space / W / 上方向键：短按低跳、长按高跳，羽毛可增加空跳
 S + Space：向下穿过平台
 鼠标移动：瞄准
 鼠标左键：主攻击
@@ -70,7 +70,8 @@ system languages default to English. Change the language in Settings.
 Your saved preference is used on later launches. Co-op players can use
 different languages. Your gold balance is shown in gold at the top right.
 
-A/D or Left/Right: move. Space/W/Up: jump. S + Space: drop through platforms.
+A/D or Left/Right: move; last pressed direction wins. Space/W/Up: jump.
+Tap for a low jump, hold for height. S + Space: drop through platforms.
 Mouse: aim. Left mouse: primary weapon. Right mouse or Q: active equipment.
 Shift: dash. E: use the highlighted item, facility, rift, or rescue target.
 F: cycle nearby targets. Hold Alt: expand nearby item details.

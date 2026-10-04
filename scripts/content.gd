@@ -1,6 +1,8 @@
 class_name SideContent
 extends RefCounted
 
+static var _definitions: Dictionary = {}
+
 static func passives() -> Array:
 	return [
 		_record("overclock", "超频芯片", "每层 +13% 普通攻击速度。", "67e5ef", "passive"),
@@ -62,12 +64,13 @@ static func equipment() -> Array:
 	return result
 
 static func definition(id: String) -> Dictionary:
-	for catalog in [passives(), weapons(), equipment()]:
-		for record_value in catalog:
-			var record: Dictionary = record_value
-			if str(record.id) == id:
-				return record
-	return {}
+	if _definitions.is_empty():
+		for catalog in [passives(), weapons(), equipment()]:
+			for record: Dictionary in catalog:
+				_definitions[str(record.id)] = record
+	# Keep the public API isolated: callers may annotate their own copy.
+	# Records contain only value types, so a shallow copy is sufficient.
+	return Dictionary(_definitions.get(id, {})).duplicate()
 
 static func _record(id: String, title: String, description: String, color: String, category: String, rarity: String = "common", warning: String = "") -> Dictionary:
 	if id in ["lens", "ember", "siphon", "coolant", "scattergun", "repair_field"]:

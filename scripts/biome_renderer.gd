@@ -194,7 +194,7 @@ static func _leaf(v: Node2D, base: Vector2, axis: Vector2, width: float, tint: C
 	if width>7:
 		v.draw_line(base+axis*0.15,base+axis*0.84,tint.lightened(0.035),0.7,true)
 
-static func platform(v: Node2D, rectangle: Rect2, index: int, biome: String, time: float, size: Vector2, world: Vector2) -> void:
+static func platform(v: Node2D, rectangle: Rect2, index: int, biome: String, time: float, size: Vector2, world: Vector2, static_only: bool = false) -> void:
 	var p: Vector2 = v.world_to_screen(rectangle.position)
 	var width: float = rectangle.size.x
 	var floor_piece: bool = rectangle.size.y>60 or rectangle.position.y>=world.y-160
@@ -234,7 +234,7 @@ static func platform(v: Node2D, rectangle: Rect2, index: int, biome: String, tim
 			if cell%3==index%3:
 				_branch(v,Vector2(x+24,p.y+11),Vector2(x+41,p.y+26),Vector2(x+8,p.y+45),Vector2(x+26,p.y+72),6,Color("456148"))
 				_branch(v,Vector2(x+26,p.y+31),Vector2(x+33,p.y+43),Vector2(x+50,p.y+49),Vector2(x+53,p.y+59),3,Color("36563e"))
-			if cell%3!=1: _fern(v,Vector2(x+span*(0.25+_n(seed+29)*0.5),p.y),0.55+_n(seed)*0.55,time,Color("43795d"),false)
+			if not static_only and cell%3!=1: _fern(v,Vector2(x+span*(0.25+_n(seed+29)*0.5),p.y),0.55+_n(seed)*0.55,time,Color("43795d"),false)
 			if int(seed)%7==0: _mushroom(v,Vector2(x+14,p.y),0.65+_n(seed+5)*0.45)
 		elif biome=="canyon":
 			_poly(v,[Vector2(x,p.y+6),Vector2(end,p.y+4),Vector2(end-6,p.y+16+_n(seed)*7),Vector2(x+3,p.y+23+_n(seed+1)*4)],Color("856049").lightened(_n(seed+6)*0.065))
@@ -272,6 +272,21 @@ static func platform(v: Node2D, rectangle: Rect2, index: int, biome: String, tim
 	v.draw_line(Vector2(left,p.y+4),Vector2(right,p.y+4),ground.lightened(0.12),1.4,true)
 	if floor_piece:
 		_haze_floor(v,left,right,p.y+66,minf(depth,260),ground)
+
+## The foliage stays live above cached material. Its phase follows exactly the
+## same screen-space placement as the uncached renderer.
+static func platform_animated(v: Node2D, rectangle: Rect2, index: int, biome: String, time: float, size: Vector2) -> void:
+	if biome!="rainforest": return
+	var p: Vector2=v.world_to_screen(rectangle.position)
+	if p.y < -40 or p.y>size.y+40 or p.x+rectangle.size.x<0 or p.x>size.x: return
+	var first: int=maxi(0,int(floor((-90-p.x)/74.0)))
+	var last: int=mini(int(ceil(rectangle.size.x/74.0)),first+22)
+	for cell: int in range(first,last):
+		var x: float=p.x+cell*74.0
+		var span: float=minf(p.x+rectangle.size.x,x+74.0)-x
+		if span<30 or cell%3==1: continue
+		var seed: float=index*89+cell
+		_fern(v,Vector2(x+span*(0.25+_n(seed+29)*0.5),p.y),0.55+_n(seed)*0.55,time,Color("43795d"),false)
 
 static func _haze_floor(v: Node2D, left: float, right: float, y: float, depth: float, tint: Color) -> void:
 	for i: int in range(4):
