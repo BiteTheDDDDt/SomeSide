@@ -20,6 +20,7 @@ const Biomes = preload("res://scripts/biome_renderer.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const Appearance = preload("res://scripts/player_appearance.gd")
 const Entities = preload("res://scripts/entity_renderer.gd")
+const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
 const Locale = preload("res://scripts/localization.gd")
 const MAX_EFFECTS: int = 384
@@ -50,6 +51,7 @@ var _shake: float = 0.0
 var _shake_offset: Vector2 = Vector2.ZERO
 var _stars: Array[Vector3] = []
 var _render_positions: Dictionary = {}
+var _fixed_samples: Dictionary = {}
 var _render_stage: int = -1
 var _last_snapshot_time: float = -1.0
 var _snapshot_age: float = 0.0
@@ -125,14 +127,14 @@ func set_frame(snapshot: Dictionary, local_id: int, delta: float) -> void:
 		target = spawn + Vector2(660.0 + sin(_clock * 0.06) * 160.0, -220.0)
 	elif players.has(local_id):
 		var player: Dictionary = players[local_id]
-		var position_value: Vector2 = player.get("pos", Vector2(640.0, 750.0))
+		var position_value: Vector2 = _entity_draw_position("p" + str(local_id), player.get("pos", Vector2(640.0, 750.0)))
 		var aim: Vector2 = player.get("aim", Vector2.RIGHT)
 		target = position_value + Vector2(aim.x * 92.0, -58.0 + aim.y * 38.0)
 		if bool(player.get("dead", false)):
 			for other: Variant in players.values():
 				var other_player: Dictionary = other
 				if not bool(other_player.get("dead", false)):
-					target = other_player.get("pos", target)
+					target = _entity_draw_position("p" + str(other_player.get("id", -1)), other_player.get("pos", target))
 					break
 	var world_size: Vector2 = _frame.get("world_size", Vector2(3200.0, 1100.0))
 	target.x = clampf(target.x, screen_size.x * 0.5, maxf(screen_size.x * 0.5, world_size.x - screen_size.x * 0.5))
@@ -276,14 +278,11 @@ func world_to_screen(world_position: Vector2) -> Vector2:
 
 func _update_render_positions(delta: float) -> void:
 	# This cache never writes into the authoritative or predicted snapshot.
-	if not interpolate_remote_entities:
-		_render_positions.clear()
-		_last_snapshot_time = -1.0
-		return
 	var stage: int = int(_frame.get("stage", 1))
 	var snapshot_time: float = float(_frame.get("time", 0.0))
 	if stage != _render_stage or snapshot_time < _last_snapshot_time:
 		_render_positions.clear()
+		_fixed_samples.clear()
 		_render_stage = stage
 	if snapshot_time != _last_snapshot_time:
 		_snapshot_age = 0.0
@@ -293,21 +292,92 @@ func _update_render_positions(delta: float) -> void:
 	var alive: Dictionary = {}
 	var players: Dictionary = _frame.get("players", {})
 	for player_id: Variant in players:
-		if int(player_id) == _local_id:
-			continue
 		var player: Dictionary = players[player_id]
 		var key: String = "p" + str(player_id)
-		_cache_entity_position(key, player, delta, 28.0)
+		if not interpolate_remote_entities or int(player_id) == _local_id:
+			# The local client's position advances on prediction ticks, while its
+			# snapshot time only advances on packets. Do not use network age here.
+			var tick: float = float(Engine.get_physics_frames()) if interpolate_remote_entities else snapshot_time
+			_cache_fixed_position(key, player, tick, delta, 1.0 if interpolate_remote_entities else 1.0 / maxf(1.0, float(Engine.physics_ticks_per_second)))
+		else:
+			_cache_entity_position(key, player, delta, 28.0)
 		alive[key] = true
 	for category: String in ["enemies", "projectiles"]:
 		for value: Variant in _frame.get(category, []):
 			var entity: Dictionary = value
 			var key: String = ("b" if category == "projectiles" else "e") + str(entity.get("id", 0))
-			_cache_entity_position(key, entity, delta, 42.0 if category == "projectiles" else 28.0)
+			if interpolate_remote_entities:
+				_cache_entity_position(key, entity, delta, 42.0 if category == "projectiles" else 28.0)
+			else:
+				var fresh: bool = not _fixed_samples.has(key)
+				_cache_fixed_position(key, entity, snapshot_time, delta)
+				if category == "projectiles" and fresh:
+					_seed_projectile_motion(key, entity)
 			alive[key] = true
 	for key: Variant in _render_positions.keys():
 		if not alive.has(key):
 			_render_positions.erase(key)
+			_fixed_samples.erase(key)
+
+
+func _cache_fixed_position(key: String, entity: Dictionary, tick: float, delta: float, tick_period: float = 1.0 / 60.0) -> void:
+	var position_value: Vector2 = entity.get("pos", Vector2.ZERO)
+	var dead: bool = bool(entity.get("dead", false))
+	var step: float = 1.0 / maxf(1.0, float(Engine.physics_ticks_per_second))
+	var sample: Dictionary = _fixed_samples.get(key, {})
+	if sample.is_empty() or tick < float(sample.tick) or position_value.distance_squared_to(sample.current) > 180.0 * 180.0 or dead != bool(sample.dead):
+		sample = {"previous": position_value, "current": position_value, "tick": tick, "age": 0.0, "span": step, "dead": dead}
+	elif tick != float(sample.tick):
+		sample.erase("launch_origin")
+		var span: float = maxf(step, (tick - float(sample.tick)) / tick_period * step)
+		var skipped: bool = span > 0.1
+		sample.previous = position_value if skipped else sample.current
+		sample.current = position_value
+		sample.tick = tick
+		sample.span = span
+		# Keep the fractional render phase across ticks (including 144/165 Hz),
+		# rather than restarting it whenever a physics update happens to arrive.
+		sample.age = clampf(float(sample.age) + delta - span, 0.0, step) if not skipped else 0.0
+	else:
+		# A client's visual reconciliation offset can change between prediction
+		# ticks. Apply that offset once, without a second low-pass/velocity guess.
+		var correction: Vector2 = position_value - Vector2(sample.current)
+		sample.previous += correction
+		sample.current = position_value
+		sample.age = minf(step, float(sample.age) + delta)
+	_fixed_samples[key] = sample
+	# Interpolation stays within two known physics positions. Landing, walls and
+	# released movement cannot extrapolate through collision geometry.
+	var fraction: float = (float(sample.span) - step + float(sample.age)) / float(sample.span)
+	_render_positions[key] = Vector2(sample.previous).lerp(sample.current, clampf(fraction, 0.0, 1.0))
+
+
+func _seed_projectile_motion(key: String, projectile: Dictionary) -> void:
+	var step: float = 1.0 / maxf(1.0, float(Engine.physics_ticks_per_second))
+	if str(projectile.get("team", "")) != "player" or str(projectile.get("kind", "")) not in ["bullet", "pellet", "rail", "boomerang", "storm", "lance"] or float(projectile.get("age", 1.0)) > step * 1.01:
+		return
+	var owner: Dictionary = Dictionary(_frame.get("players", {})).get(int(projectile.get("owner", -1)), {})
+	if owner.is_empty() or bool(owner.get("dead", false)) or Vector2(projectile.get("origin", Vector2.INF)).distance_to(WeaponPose.muzzle_position(owner)) > 2.0:
+		return
+	# A newly fired bullet has already advanced one authority step. Give its
+	# first visual segment the same interpolated gun origin as the muzzle flash;
+	# old network bullets, turrets and active equipment never attach to the gun.
+	var origin: Vector2 = weapon_draw_pose(owner).muzzle
+	var sample: Dictionary = _fixed_samples[key]
+	sample.previous = origin
+	sample.launch_origin = origin
+	sample.age = 0.0
+	_fixed_samples[key] = sample
+	_render_positions[key] = origin
+
+
+func rendered_projectile_trail_length(projectile: Dictionary, draw_position: Vector2, maximum: float) -> float:
+	var length: float = projectile_trail_length(projectile, draw_position, maximum)
+	var sample: Dictionary = _fixed_samples.get("b" + str(projectile.get("id", 0)), {})
+	if sample.has("launch_origin"):
+		var direction: Vector2 = Vector2(projectile.get("vel", Vector2.RIGHT)).normalized()
+		length = minf(length, maxf(0.0, (draw_position - Vector2(sample.launch_origin)).dot(direction)))
+	return length
 
 
 func _cache_entity_position(key: String, entity: Dictionary, delta: float, response: float) -> void:
@@ -320,7 +390,7 @@ func _cache_entity_position(key: String, entity: Dictionary, delta: float, respo
 
 
 func _entity_draw_position(key: String, position_value: Vector2) -> Vector2:
-	return _render_positions.get(key, position_value) if interpolate_remote_entities else position_value
+	return _render_positions.get(key, position_value)
 
 
 func weapon_draw_pose(player: Dictionary) -> Dictionary:
@@ -1078,8 +1148,12 @@ func _draw_players() -> void:
 		var vel: Vector2 = player.get("vel", Vector2.ZERO)
 		var grounded: bool = player.get("grounded", false)
 		var running: float = clampf(absf(vel.x) / 100.0, 0.0, 1.0)
-		var bob: float = absf(cos(_clock * 16.0)) * running * 1.0 if grounded else 0.0
-		p.y -= bob
+		if Pixels.available(character):
+			# Pixel poses already contain their authored step motion. Additional
+			# fractional body bob detached the torso from the fixed weapon shoulder.
+			p = Pixels.snap_position(self, p)
+		else:
+			p.y -= absf(cos(_clock * 16.0)) * running if grounded else 0.0
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
 		Appearance.draw_layer(self, appearance, true, _clock)
 		Entities.player_body(self, player, _clock)
@@ -1116,6 +1190,8 @@ func _draw_enemies() -> void:
 		var enemy: Dictionary = value
 		if float(enemy.get("hp",1.0))<=0.0: continue
 		var p: Vector2 = world_to_screen(_entity_draw_position("e" + str(enemy.get("id", 0)), enemy.get("pos", Vector2.ZERO)))
+		if Pixels.available(Pixels.enemy_id(enemy)):
+			p = Pixels.snap_position(self, p)
 		var bounds: Rect2 = Entities.enemy_bounds(enemy)
 		if not Rect2(p+bounds.position,bounds.size).grow(28.0).intersects(Rect2(Vector2.ZERO,screen_size)): continue
 		var kind: String = str(enemy.get("kind", "crawler"))
@@ -1160,7 +1236,7 @@ func _draw_projectiles() -> void:
 		var strength: float = effect_strength(projectile) if friendly else 1.0
 		var velocity: Vector2 = projectile.get("vel",Vector2.RIGHT)
 		var requested: float = minf(velocity.length()*0.032*sqrt(strength),92.0 if kind in ["rail","lance"] else 42.0)
-		var tail: float = projectile_trail_length(projectile,rendered,requested)
+		var tail: float = rendered_projectile_trail_length(projectile,rendered,requested)
 		ProjectileArt.draw(self,projectile,p,_clock,strength,tail)
 
 

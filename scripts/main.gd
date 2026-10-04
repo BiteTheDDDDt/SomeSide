@@ -11,13 +11,15 @@ const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
-const VERSION: String = "0.10.0"
+const VERSION: String = "0.11.0"
 const DEFAULT_PORT: int = 27841
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
 const MUTED := Color("91aaa9")
 const TEAL := Color("70dfbd")
 const AMBER := Color("f2b368")
+const SURFACE := Color("10272e")
+const EDGE := Color("30474b")
 
 var sim = Simulation.new()
 var world = WorldView.new()
@@ -930,23 +932,53 @@ func _label(parent: Node, text: String, size: int = 18, color: Color = PAPER) ->
 func _button(parent: Node, text: String, action: Callable, primary: bool = false) -> Button:
 	var button := Button.new()
 	button.text = Locale.text(text)
-	button.custom_minimum_size = Vector2(0, 48)
+	button.custom_minimum_size = Vector2(0, 44)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_override("font", font)
-	button.add_theme_font_size_override("font_size", 17)
-	button.add_theme_color_override("font_color", INK if primary else PAPER)
-	button.add_theme_color_override("font_hover_color", INK)
-	button.add_theme_color_override("font_pressed_color", INK)
-	button.add_theme_color_override("font_disabled_color", Color("526768"))
-	button.add_theme_stylebox_override("normal", _style(AMBER if primary else Color("153039"), Color("355157") if not primary else Color.TRANSPARENT))
-	button.add_theme_stylebox_override("hover", _style(TEAL))
-	button.add_theme_stylebox_override("pressed", _style(AMBER.darkened(0.12)))
-	button.add_theme_stylebox_override("disabled", _style(Color("11272e")))
-	button.add_theme_stylebox_override("focus", _style(Color.TRANSPARENT, TEAL))
+	button.add_theme_font_size_override("font_size", 16)
+	_skin_button(button, primary)
 	button.pressed.connect(func(): sound.play_event("ui"); action.call())
 	parent.add_child(button)
 	return button
+
+func _skin_button(button: Button, primary: bool = false) -> void:
+	button.add_theme_color_override("font_color", INK if primary else PAPER)
+	button.add_theme_color_override("font_hover_color", INK if primary else PAPER)
+	button.add_theme_color_override("font_pressed_color", INK)
+	button.add_theme_color_override("font_disabled_color", Color("667879"))
+	button.add_theme_stylebox_override("normal", _style(AMBER if primary else SURFACE, AMBER if primary else EDGE, 4))
+	button.add_theme_stylebox_override("hover", _style(AMBER.lightened(0.12) if primary else Color("1b363d"), AMBER if primary else Color("66827f"), 4))
+	button.add_theme_stylebox_override("pressed", _style(AMBER.darkened(0.12), AMBER, 4))
+	button.add_theme_stylebox_override("disabled", _style(Color("112127"), Color("24383d"), 4))
+	var focus: StyleBoxFlat = _style(Color.TRANSPARENT, PAPER, 4)
+	focus.set_border_width_all(2)
+	button.add_theme_stylebox_override("focus", focus)
+
+func _divider(parent: Node) -> void:
+	var line := HSeparator.new()
+	var style := StyleBoxLine.new()
+	style.color = EDGE
+	style.thickness = 1
+	line.add_theme_stylebox_override("separator", style)
+	line.custom_minimum_size.y = 9
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(line)
+
+func _overlay_surface(bounds: Rect2, shade_alpha: float = 0.88) -> void:
+	overlay = Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(overlay)
+	var shade := ColorRect.new()
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.018, 0.037, 0.046, shade_alpha)
+	overlay.add_child(shade)
+	var surface := Panel.new()
+	surface.position = bounds.position
+	surface.size = bounds.size
+	surface.add_theme_stylebox_override("panel", _style(Color("0b1e25"), EDGE, 8))
+	surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(surface)
 
 func _gap(parent: Node, height: float = 12.0) -> void:
 	var gap := Control.new()
@@ -992,37 +1024,26 @@ func _page(title: String, subtitle: String, width: float = 480.0, preserve_game:
 			overlay.queue_free()
 	else:
 		_clear_ui()
-	overlay = Control.new()
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(overlay)
-	var wash := ColorRect.new()
-	wash.color = Color(0.025, 0.075, 0.095, 0.94)
-	wash.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
-	wash.offset_right = width + 130.0
-	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay.add_child(wash)
-	var line := ColorRect.new()
-	line.color = Color(0.44, 0.87, 0.74, 0.22)
-	line.position = Vector2(width + 129.0, 0)
-	line.size = Vector2(1, 720)
-	overlay.add_child(line)
+	_overlay_surface(Rect2(40, 28, width + 48, 644), 0.5 if not preserve_game else 0.85)
 	var margin := MarginContainer.new()
-	margin.position = Vector2(64, 50)
-	margin.size = Vector2(width, 610)
+	margin.position = Vector2(64, 46)
+	margin.size = Vector2(width, 600)
 	overlay.add_child(margin)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 10)
 	margin.add_child(column)
-	_label(column, "SOMESIDE  /  EXPEDITION PROGRAM", 12, TEAL)
-	_gap(column, 3)
-	_label(column, title, 48 if title == "SomeSide" else 34)
-	var description: Label = _label(column, subtitle, 16, MUTED)
+	if title != "SomeSide":
+		_label(column, "SomeSide", 13, TEAL)
+	_label(column, title, 52 if title == "SomeSide" else 32)
+	var description: Label = _label(column, subtitle, 14, MUTED)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description.custom_minimum_size.x = width
-	_gap(column, 9)
-	var version: Label = _label(overlay, "EARLY EXPEDITION  ·  v%s" % VERSION, 12, MUTED)
+	_divider(column)
+	var version: Label = _label(overlay, "v%s" % VERSION, 12, MUTED)
+	version.name = "VersionLabel"
 	version.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	version.position = Vector2(64, 684)
+	_refresh_fps_view()
 	return column
 
 func _show_menu(message: String = "") -> void:
@@ -1032,16 +1053,16 @@ func _show_menu(message: String = "") -> void:
 	world.menu_preview = true
 	if sim.state.is_empty() or sim.state.get("phase", "playing") != "playing":
 		sim.start_run([{"id": 1, "name": "SomeSide", "character": "ranger"}], 73021)
-	var column: VBoxContainer = _page("SomeSide", "雨幕之外，总有另一边。\n一场关于远征、共鸣与生还的合作冒险。")
+	var column: VBoxContainer = _page("SomeSide", "探索、战斗，与朋友一起抵达另一边。")
 	var character: String = "游侠 · RANGER" if profile.character == "ranger" else "先锋 · VANGUARD"
-	_label(column, Locale.format("当前旅者  /  %s", [Locale.text(character)]), 15, AMBER)
-	_button(column, "开始独行     →", _start_solo, true)
+	_label(column, Locale.format("当前角色：%s", [Locale.text(character)]), 14, MUTED)
+	_button(column, "单人游戏", _start_solo, true)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	column.add_child(row)
 	_button(row, "创建合作房间", _host_lobby)
 	_button(row, "加入房间", _show_join)
-	_button(column, "选择旅者", _show_characters)
+	_button(column, "选择角色", _show_characters)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 12)
 	column.add_child(row2)
@@ -1056,29 +1077,43 @@ func _show_menu(message: String = "") -> void:
 	if not message.is_empty():
 		var error_label: Label = _label(column, message, 14, AMBER)
 		error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var badge: Label = _label(overlay, "01 — THE CANOPY\n巨 木 雨 林", 16, Color("b8ccc0"))
-	badge.position = Vector2(970, 230)
-	badge.add_theme_constant_override("line_spacing", 7)
+	var badge: Label = _label(overlay, "%02d  /  %s" % [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "巨木雨林")))], 14, MUTED)
+	badge.position = Vector2(950, 650)
 
 func _show_characters() -> void:
 	screen = "characters"
-	var page_width: float = 550 if Locale.current_language == "en" else 480
-	var column: VBoxContainer = _page("选择旅者", "相同的世界，两种截然不同的生存方式。", page_width)
+	var page_width: float = 590
+	var column: VBoxContainer = _page("选择角色", "选择初始武器与技能；遗物会改变你的战斗方式。", page_width)
 	column.add_theme_constant_override("separation", 8)
 	for definition in Simulation.character_catalog():
 		var selected: bool = str(profile.character) == str(definition.id)
 		var panel := PanelContainer.new()
-		panel.add_theme_stylebox_override("panel", _style(Color("12313a"), TEAL if selected else Color("2b484f")))
+		panel.add_theme_stylebox_override("panel", _style(SURFACE, AMBER if selected else EDGE, 4))
 		column.add_child(panel)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 18)
+		panel.add_child(row)
+		var portrait := TextureRect.new()
+		portrait.custom_minimum_size = Vector2(76, 88)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var appearance: Dictionary = PixelActorRenderer.frame_for(str(definition.id), {"grounded": true}, 0.0, true)
+		if not appearance.is_empty(): portrait.texture = appearance.texture
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(portrait)
 		var content := VBoxContainer.new()
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		content.add_theme_constant_override("separation", 6)
-		panel.add_child(content)
-		_label(content, ("●  " if selected else "○  ") + Locale.text(str(definition.name)), 23, definition.get("color", TEAL))
+		row.add_child(content)
+		_label(content, str(definition.name), 22, PAPER)
 		var description: Label = _label(content, str(definition.description), 15, MUTED)
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		description.custom_minimum_size.x = page_width - 36
+		description.custom_minimum_size.x = page_width - 130
 		var character_id: String = str(definition.id)
-		_button(content, "已选中" if selected else "选择", func(): profile.character = character_id; _save_profile(); _show_characters(), selected)
+		var select: Button = _button(content, "已选中" if selected else "选择", func(): profile.character = character_id; _save_profile(); _show_characters(), selected)
+		select.custom_minimum_size.y = 38
+		select.disabled = selected
 	_gap(column, 8)
 	_button(column, "返回", _show_menu)
 
@@ -1086,36 +1121,38 @@ func _text_field(parent: Node, value: String, placeholder: String = "") -> LineE
 	var field := LineEdit.new()
 	field.text = value
 	field.placeholder_text = Locale.text(placeholder)
-	field.custom_minimum_size.y = 48
+	field.custom_minimum_size.y = 44
 	field.add_theme_font_override("font", font)
-	field.add_theme_font_size_override("font_size", 18)
+	field.add_theme_font_size_override("font_size", 16)
 	field.add_theme_color_override("font_color", PAPER)
-	field.add_theme_stylebox_override("normal", _style(Color("0c242c"), Color("3a575b")))
-	field.add_theme_stylebox_override("focus", _style(Color("102e37"), TEAL))
+	field.add_theme_color_override("font_placeholder_color", MUTED)
+	field.add_theme_color_override("caret_color", AMBER)
+	field.add_theme_color_override("selection_color", Color("375751"))
+	field.add_theme_stylebox_override("normal", _style(Color("0a1a21"), EDGE, 4))
+	field.add_theme_stylebox_override("focus", _style(Color("0f252c"), TEAL, 4))
 	parent.add_child(field)
 	return field
 
 func _show_join() -> void:
 	screen = "join"
-	var column: VBoxContainer = _page("加入远征", "与朋友并肩跨越裂隙。房主需要先创建房间。")
+	var column: VBoxContainer = _page("加入房间", "输入朋友的房间地址。房主需要先创建房间。", 520)
 	_label(column, "房主 IP 地址", 15, TEAL)
 	var address: LineEdit = _text_field(column, _connect_address, "例如 192.168.1.20")
 	_label(column, "UDP 端口", 15, TEAL)
 	var port_field: LineEdit = _text_field(column, str(_port))
 	port_field.max_length = 5
 	_gap(column, 6)
-	_button(column, "连接房间     →", func(): _port = clampi(int(port_field.text), 1024, 65535); _join_lobby(address.text), true)
+	_button(column, "连接", func(): _port = clampi(int(port_field.text), 1024, 65535); _join_lobby(address.text), true)
 	_button(column, "返回", _show_menu)
 	_gap(column, 4)
 	var note: Label = _label(column, "同一局域网可直接连接。互联网直连需要可达的公网地址与 UDP 端口转发，也可使用虚拟局域网。当前版本通过 IP 加入。", 14, MUTED)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.custom_minimum_size.x = 480
+	note.custom_minimum_size.x = 520
 
 func _show_lobby() -> void:
 	screen = "lobby"
 	world.menu_preview = true
-	var subtitle: String = "队员准备后，由房主启动远征。"
-	var column: VBoxContainer = _page("远征小队", subtitle, 530)
+	var column: VBoxContainer = _page("合作房间", "所有玩家准备后，房主即可开始游戏。", 620)
 	var address_text: String = Locale.format("房主 %s  ·  UDP %d", [_connect_address, _port])
 	if hosting:
 		var addresses: Array[String] = []
@@ -1125,21 +1162,37 @@ func _show_lobby() -> void:
 		address_text = Locale.format("你的局域网地址  %s  :  %d", [", ".join(addresses.slice(0, 2)) if not addresses.is_empty() else "127.0.0.1", _port])
 	var address_label: Label = _label(column, address_text, 14, TEAL)
 	address_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	address_label.custom_minimum_size.x = 530
+	address_label.custom_minimum_size.x = 620
 	var me: Dictionary = {}
 	for index in range(4):
 		var row := PanelContainer.new()
-		row.add_theme_stylebox_override("panel", _style(Color("112c35")))
+		row.add_theme_stylebox_override("panel", _style(SURFACE, EDGE, 4))
 		column.add_child(row)
+		var cells := HBoxContainer.new()
+		cells.add_theme_constant_override("separation", 14)
+		row.add_child(cells)
+		var number: Label = _label(cells, "%02d" % [index + 1], 14, MUTED)
+		number.custom_minimum_size.x = 26
+		number.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		if index < roster.size():
 			var member: Dictionary = roster[index]
 			if int(member.id) == local_id:
 				me = member
 			var role: String = "游侠" if member.character == "ranger" else "先锋"
 			var state_text: String = "准备就绪" if member.get("ready", false) else "等待准备"
-			_label(row, "%02d    %s%s  /  %s    ·    %s" % [index + 1, str(member.name), Locale.text(" (你)") if member.id == local_id else "", Locale.text(role), Locale.text(state_text)], 16, TEAL if member.get("ready", false) else PAPER)
+			var identity := VBoxContainer.new()
+			identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			identity.add_theme_constant_override("separation", 2)
+			cells.add_child(identity)
+			var name_label: Label = _label(identity, "", 16, PAPER)
+			name_label.text = str(member.name)
+			_label(identity, Locale.text(role) + (Locale.text(" (你)") if member.id == local_id else ""), 12, MUTED)
+			var status: Label = _label(cells, state_text, 13, TEAL if member.get("ready", false) else MUTED)
+			status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		else:
-			_label(row, Locale.format("%02d    等待旅者加入 …", [index + 1]), 16, MUTED)
+			var empty: Label = _label(cells, "等待玩家加入", 14, MUTED)
+			empty.custom_minimum_size.y = 42
+			empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var change_row := HBoxContainer.new()
 	change_row.add_theme_constant_override("separation", 10)
 	column.add_child(change_row)
@@ -1148,7 +1201,7 @@ func _show_lobby() -> void:
 		var all_ready: bool = true
 		for member in roster:
 			all_ready = all_ready and bool(member.get("ready", false))
-		var start: Button = _button(change_row, "开始远征  →", _start_match, true)
+		var start: Button = _button(change_row, "开始游戏", _start_match, true)
 		start.disabled = not all_ready
 	else:
 		var ready_now: bool = bool(me.get("ready", false))
@@ -1172,7 +1225,7 @@ func _show_settings(in_game: bool = false) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	else:
 		screen = "settings"
-	var column: VBoxContainer = _page("设置", "调整身份、声音与战斗表现。设置自动保存。", 550, in_game)
+	var column: VBoxContainer = _page("设置", "语言、声音与显示。更改自动保存。", 550, in_game)
 	column.add_theme_constant_override("separation", 7)
 	var language_row := HBoxContainer.new()
 	language_row.add_theme_constant_override("separation", 10)
@@ -1248,6 +1301,14 @@ func _settings_slider(parent: Node, title: String, value: float, minimum: float,
 	slider.value = value
 	slider.custom_minimum_size.y = 32
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var track: StyleBoxFlat = _style(Color("253c41"), Color.TRANSPARENT, 2)
+	track.content_margin_top = 3
+	track.content_margin_bottom = 3
+	var fill: StyleBoxFlat = track.duplicate()
+	fill.bg_color = TEAL.darkened(0.25)
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", fill)
+	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
 	row.add_child(slider)
 	var amount: Label = _label(row, "%d%%" % roundi(value * 100), 14, MUTED)
 	amount.custom_minimum_size.x = 50
@@ -1256,8 +1317,8 @@ func _settings_slider(parent: Node, title: String, value: float, minimum: float,
 func _show_guide() -> void:
 	screen = "guide"
 	var guide_width: float = 800 if Locale.current_language == "en" else 590
-	var column: VBoxContainer = _page("生还手册", "保持移动。瞄准弱点。让遗物产生共鸣。", guide_width)
-	column.add_theme_constant_override("separation", 9)
+	var column: VBoxContainer = _page("操作指南", "基础操作与通关目标。", guide_width)
+	column.add_theme_constant_override("separation", 7)
 	var guide: Array = [
 		["A / D   或   ← / →", "移动；相反方向同时按住时，后按优先"],
 		["Space / W / ↑", "短按低跳，长按高跳；羽翼增加空跳"],
@@ -1272,16 +1333,27 @@ func _show_guide() -> void:
 	for entry in guide:
 		var row := HBoxContainer.new()
 		column.add_child(row)
-		var key: Label = _label(row, entry[0], 16, AMBER)
-		key.custom_minimum_size.x = 190
+		row.add_theme_constant_override("separation", 16)
+		var key_box := PanelContainer.new()
+		var key_style: StyleBoxFlat = _style(SURFACE, EDGE, 3)
+		key_style.content_margin_left = 10
+		key_style.content_margin_right = 10
+		key_style.content_margin_top = 3
+		key_style.content_margin_bottom = 3
+		key_box.add_theme_stylebox_override("panel", key_style)
+		key_box.custom_minimum_size.x = 220
+		row.add_child(key_box)
+		var key: Label = _label(key_box, entry[0], 13, AMBER)
+		key.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var instruction: Label = _label(row, entry[1], 15, PAPER)
+		instruction.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		instruction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_gap(column, 6)
 	var tip: Label = _label(column, "三处区域路线不同，按 M 找路，基础单跳即可通行。停留不持续补怪，强度仍随时间增长。遗物图标常驻左下角，悬停查看效果；Tab 查看构筑与图鉴。白 / 绿 / 紫 / 金代表四级稀有度，红字另示代价。裂隙充能并击败守卫后可前进。", 15, MUTED)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip.custom_minimum_size.x = guide_width
-	_button(column, "我准备好了", _show_menu, true)
+	_button(column, "返回", _show_menu, true)
 
 func _icon(parent: Node, id: String, size: int = 48) -> TextureRect:
 	var image := TextureRect.new()
@@ -1480,6 +1552,8 @@ func _fps_setting_text() -> String:
 func _refresh_fps_view() -> void:
 	if is_instance_valid(_fps_label):
 		_fps_label.visible = bool(profile.get("show_fps", true))
+		var wide_modal: bool = (is_instance_valid(_inventory_grid) and _inventory_grid.is_inside_tree()) or (is_instance_valid(_map_view) and _map_view.is_inside_tree())
+		_fps_label.position = Vector2(1158, 0 if wide_modal else 101)
 	if is_instance_valid(_fps_settings_button):
 		_fps_settings_button.text = _fps_setting_text()
 
@@ -1805,7 +1879,8 @@ func _inventory_card(parent: Node, definition: Dictionary, count: int, equipped:
 	panel.custom_minimum_size = Vector2(510, 110)
 	var rarity: String = str(definition.get("rarity", "common"))
 	var tint: Color = Content.rarity_color(rarity)
-	var frame: StyleBoxFlat = _style(Color("153039") if count > 0 else Color("0f252e"), Color(tint, 0.6 if count > 0 else 0.25), 6)
+	var frame: StyleBoxFlat = _style(SURFACE if count > 0 else Color("0d2027"), Color(tint, 0.5 if count > 0 else 0.22), 4)
+	frame.border_width_left = 3
 	frame.content_margin_left = 13
 	frame.content_margin_right = 13
 	panel.add_theme_stylebox_override("panel", frame)
@@ -1836,19 +1911,13 @@ func _show_inventory() -> void:
 	_reset_controls()
 	paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	overlay = Control.new()
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(overlay)
-	var shade := ColorRect.new()
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.01, 0.035, 0.055, 0.97)
-	overlay.add_child(shade)
+	_overlay_surface(Rect2(48, 20, 1184, 680), 0.94)
 	var content := VBoxContainer.new()
-	content.position = Vector2(100, 30)
-	content.size = Vector2(1080, 660)
+	content.position = Vector2(72, 38)
+	content.size = Vector2(1136, 638)
 	content.add_theme_constant_override("separation", 10)
 	overlay.add_child(content)
-	_label(content, "旅者构筑", 30, PAPER)
+	_label(content, "背包与图鉴", 30, PAPER)
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
 	_label(content, Locale.format("%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s", [Locale.text("游侠" if player.get("character", "ranger") == "ranger" else "先锋"), ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), Locale.text("合作远征仍在继续" if online else "远征已暂停")]), 14, MUTED)
 	_inventory_filters.clear()
@@ -1869,7 +1938,7 @@ func _show_inventory() -> void:
 		_label(rarity_legend, "◆ " + Locale.text(Content.rarity_name(rarity)), 12, Content.rarity_color(rarity))
 	_label(rarity_legend, "叠层数量在角标显示；红字表示副作用。", 12, MUTED)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(1080, 320)
+	scroll.custom_minimum_size = Vector2(1136, 320)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	content.add_child(scroll)
@@ -1881,6 +1950,7 @@ func _show_inventory() -> void:
 	scroll.add_child(_inventory_grid)
 	_button(content, "返回战场  ·  Tab / Esc", _resume, true)
 	_populate_inventory("owned")
+	_refresh_fps_view()
 
 func _populate_inventory(filter_key: String) -> void:
 	if not is_instance_valid(_inventory_grid):
@@ -1911,12 +1981,11 @@ func _populate_inventory(filter_key: String) -> void:
 		_inventory_card(_inventory_grid, definition, count, equipped)
 	for key in _inventory_filters:
 		var button: Button = _inventory_filters[key]
-		button.add_theme_color_override("font_color", INK if key == filter_key else PAPER)
-		var style: StyleBoxFlat = _style(AMBER if key == filter_key else Color("102c35"), Color.TRANSPARENT if key == filter_key else Color("35515a"), 6)
-		style.content_margin_top = 6
-		style.content_margin_bottom = 6
-		button.add_theme_stylebox_override("normal", style)
-		button.add_theme_stylebox_override("hover", style)
+		_skin_button(button, key == filter_key)
+		for state: String in ["normal", "hover", "pressed", "disabled"]:
+			var style: StyleBoxFlat = button.get_theme_stylebox(state)
+			style.content_margin_top = 6
+			style.content_margin_bottom = 6
 	var scroll: ScrollContainer = _inventory_grid.get_parent()
 	scroll.scroll_vertical = 0
 
@@ -1924,30 +1993,25 @@ func _show_map() -> void:
 	_reset_controls()
 	paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	overlay = Control.new()
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(overlay)
-	var shade := ColorRect.new()
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.015, 0.04, 0.065, 0.98)
-	overlay.add_child(shade)
+	_overlay_surface(Rect2(48, 20, 1184, 680), 0.94)
 	var title: Label = _label(overlay, "%02d  /  %s" % [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "远征地图")))], 30, PAPER)
 	_map_title = title
-	title.position = Vector2(70, 34)
+	title.position = Vector2(72, 38)
 	var subtitle: Label = _label(overlay, Locale.text("寻找通往高处裂隙的路线，探索分支补给。") + " " + Locale.text("合作远征仍在继续。" if online else "远征已暂停。"), 14, MUTED)
-	subtitle.position = Vector2(70, 82)
+	subtitle.position = Vector2(72, 84)
 	_map_view = MapView.new()
-	_map_view.position = Vector2(70, 123)
-	_map_view.size = Vector2(1140, 458)
+	_map_view.position = Vector2(72, 123)
+	_map_view.size = Vector2(1136, 458)
 	_map_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_map_view.map_font = font
 	_map_view.set_frame(sim.state, local_id)
 	overlay.add_child(_map_view)
 	var legend: Label = _label(overlay, "青色 ● 你    蓝色 ● 队友    橙色 ◎ 裂隙门    图标 = 补给设施（暗色表示已使用）", 13, MUTED)
-	legend.position = Vector2(70, 602)
+	legend.position = Vector2(72, 596)
 	var back: Button = _button(overlay, "返回战场  ·  M / Esc", _resume, true)
-	back.position = Vector2(70, 646)
-	back.size = Vector2(1140, 44)
+	back.position = Vector2(72, 632)
+	back.size = Vector2(1136, 44)
+	_refresh_fps_view()
 
 
 func _notify(message: String, duration: float = 3.5) -> void:
@@ -1960,22 +2024,16 @@ func _show_pause() -> void:
 	_reset_controls()
 	paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	overlay = Control.new()
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui.add_child(overlay)
-	var shade := ColorRect.new()
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.01, 0.04, 0.065, 0.88)
-	overlay.add_child(shade)
+	_overlay_surface(Rect2(411, 158, 458, 404), 0.78)
 	var panel := VBoxContainer.new()
-	panel.position = Vector2(435, 190)
+	panel.position = Vector2(435, 180)
 	panel.size = Vector2(410, 340)
-	panel.add_theme_constant_override("separation", 18)
+	panel.add_theme_constant_override("separation", 12)
 	overlay.add_child(panel)
-	_label(panel, "短暂休整", 38, PAPER)
-	_label(panel, "合作远征仍在继续。" if online else "雨幕等待你的归来。", 16, MUTED)
-	_gap(panel)
-	_button(panel, "继续远征", _resume, true)
+	_label(panel, "游戏菜单", 32, PAPER)
+	_label(panel, "合作远征仍在继续。" if online else "游戏已暂停。", 14, MUTED)
+	_divider(panel)
+	_button(panel, "继续游戏", _resume, true)
 	_button(panel, "设置", func(): _show_settings(true))
 	_button(panel, "返回主菜单", func(): _disconnect(); _show_menu())
 	_label(panel, "Esc 返回  ·  F11 全屏  ·  F3 帧率", 13, MUTED)
@@ -1988,6 +2046,7 @@ func _resume() -> void:
 	_map_title = null
 	_inventory_grid = null
 	_inventory_filters.clear()
+	_refresh_fps_view()
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	if is_instance_valid(overlay):
 		overlay.queue_free()
@@ -2004,10 +2063,21 @@ func _show_results() -> void:
 			profile.wins = int(profile.wins) + 1
 		_save_profile()
 		_run_saved = true
-	var column: VBoxContainer = _page("抵达另一边" if won else "雨幕将你记住", "远征成功。带着共鸣，走向下一个黎明。" if won else "这一次，旅途止步于此。下一次会更远。")
+	var column: VBoxContainer = _page("通关成功" if won else "本局结束", "已完成全部三个区域。" if won else "调整构筑，再次挑战。", 560)
 	var elapsed: int = int(sim.state.get("time", 0.0))
-	_label(column, Locale.format("第 %d 区   /   %02d:%02d   /   %d 击破", [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, int(sim.state.get("kills", 0))]), 21, AMBER)
-	_gap(column)
+	var stats := HBoxContainer.new()
+	stats.add_theme_constant_override("separation", 12)
+	column.add_child(stats)
+	for metric: Array in [["区域", "%d / 3" % int(sim.state.get("stage", 1))], ["用时", "%02d:%02d" % [elapsed / 60, elapsed % 60]], ["击破", str(int(sim.state.get("kills", 0)))]]:
+		var card := PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.add_theme_stylebox_override("panel", _style(SURFACE, EDGE, 4))
+		stats.add_child(card)
+		var words := VBoxContainer.new()
+		card.add_child(words)
+		_label(words, metric[0], 12, MUTED)
+		_label(words, metric[1], 24, AMBER)
+	_divider(column)
 	for player in sim.state.get("players", {}).values():
 		_label(column, Locale.format("%s   ·   %d 件遗物   ·   %d 击破", [str(player.name), _item_total(player.get("items", {})), int(player.get("kills", 0))]), 16, PAPER)
 	_gap(column, 15)
@@ -2017,7 +2087,7 @@ func _show_results() -> void:
 		else:
 			_label(column, "等待房主返回大厅，可再次出发。", 15, TEAL)
 	else:
-		_button(column, "再次出发     →", _start_solo, true)
+		_button(column, "再玩一次", _start_solo, true)
 	_button(column, "返回主菜单", func(): _disconnect(); _show_menu())
 
 func _return_to_lobby() -> void:

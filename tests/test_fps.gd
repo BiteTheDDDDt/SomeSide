@@ -164,6 +164,16 @@ func _test_gameplay_and_language() -> void:
 	game.call("_resume")
 	await _layout()
 	_check(label.visible and not bool(game.paused), "Resuming play retains the selected FPS state")
+	for modal: String in ["inventory", "map"]:
+		game.call("_show_" + modal)
+		await _layout()
+		_check(label.visible and label.get_global_rect().end.y <= 20.0, modal + " keeps FPS in the top margin without crossing the panel border")
+		game.call("_toggle_fps")
+		game.call("_toggle_fps")
+		_check(label.visible and label.position.y == 0.0, modal + " FPS toggling preserves the top-margin placement")
+		game.call("_resume")
+		await _layout()
+		_check(label.position == Vector2(1158, 101), modal + " closes with FPS restored below the gold HUD")
 	var readouts: int = 0
 	for child in game.ui.get_children():
 		if child.name == "FpsReadout": readouts += 1

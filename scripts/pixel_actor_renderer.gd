@@ -8,11 +8,13 @@ const MANIFEST_PATH: String = "res://assets/sprites/actors.json"
 const MAX_ACTORS: int = 32
 const MAX_FRAMES: int = 64
 const MAX_TEXTURE_BYTES: int = 64 * 1024 * 1024
+const MAX_BAKED_BYTES: int = 8 * 1024 * 1024
 static var _loaded: bool = false
 static var _actors: Dictionary = {}
 static var _textures: Dictionary = {}
 static var _errors: Array[String] = []
 static var _texture_bytes: int = 0
+static var _baked_bytes: int = 0
 
 static func _ensure_loaded() -> void:
 	if not _loaded:
@@ -23,6 +25,7 @@ static func reload_manifest(path: String = MANIFEST_PATH) -> void:
 	_textures.clear()
 	_errors.clear()
 	_texture_bytes = 0
+	_baked_bytes = 0
 	_loaded = true
 	if not FileAccess.file_exists(path):
 		return
@@ -39,11 +42,13 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 	_textures.clear()
 	_errors.clear()
 	_texture_bytes = 0
+	_baked_bytes = 0
 	_loaded = true
 	if int(data.get("version", 0)) != 1 or not data.get("actors", {}) is Dictionary:
 		_errors.append("Unsupported actor manifest version or actor table")
 		return
 	var records: Dictionary = data.get("actors", {})
+	var images: Dictionary = {}
 	for id_value: Variant in records:
 		if _actors.size() >= MAX_ACTORS:
 			_errors.append("Actor budget exceeded")
@@ -93,6 +98,14 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 		if frames.size() != frame_values.size():
 			_errors.append("Invalid crop, anchor or timing: " + id)
 			continue
+		# Downsample once at a fixed actor-local phase. Sampling a 1536px sheet
+		# directly at 0.125 scale selected different source texels each time the
+		# camera moved by a fraction of a pixel, making an unchanged pose shimmer.
+		if not images.has(path):
+			images[path] = texture.diffuse_texture.get_image()
+		if not _bake_frames(images[path], frames, union, scale_value):
+			_errors.append("Invalid or oversized logical-pixel canvas: " + id)
+			continue
 		var animations: Dictionary = {}
 		var declared: Dictionary = source.get("animations", {}) if source.get("animations", {}) is Dictionary else {}
 		for animation_key: Variant in declared:
@@ -112,6 +125,58 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 			if declared_bounds.size.x > 0 and declared_bounds.size.y > 0:
 				bounds = bounds.merge(declared_bounds)
 		_actors[id] = {"path": path, "frames": frames, "animations": animations, "bounds": bounds, "scale": scale_value}
+
+static func _bake_frames(image: Image, frames: Array, union: Rect2, scale_value: float) -> bool:
+	if image == null or image.is_empty():
+		return false
+	if image.is_compressed() and image.decompress() != OK:
+		return false
+	# Every animation frame shares this integer pivot and size. A differently
+	# cropped hand/foot may move, but cannot change the sampling phase of the torso.
+	var target := Rect2(union.position.floor(), union.end.ceil() - union.position.floor())
+	var size_value := Vector2i(target.size)
+	if size_value.x <= 0 or size_value.y <= 0 or size_value.x > 512 or size_value.y > 512:
+		return false
+	var columns: int = int(ceil(sqrt(float(frames.size()))))
+	var rows: int = int(ceil(float(frames.size()) / columns))
+	var cost: int = size_value.x * columns * size_value.y * rows * 4
+	if _baked_bytes + cost > MAX_BAKED_BYTES:
+		return false
+	var baked := Image.create(size_value.x * columns, size_value.y * rows, false, Image.FORMAT_RGBA8)
+	baked.fill(Color.TRANSPARENT)
+	for index: int in range(frames.size()):
+		var frame: Dictionary = frames[index]
+		var rect: Rect2 = frame.source
+		var anchor: Vector2 = frame.anchor
+		var offset := Vector2i((index % columns) * size_value.x, (index / columns) * size_value.y)
+		for y: int in range(size_value.y):
+			for x: int in range(size_value.x):
+				var local: Vector2 = (target.position + Vector2(x + 0.5, y + 0.5)) / scale_value + anchor
+				if local.x >= 0 and local.y >= 0 and local.x < rect.size.x and local.y < rect.size.y:
+					var source: Vector2i = Vector2i((rect.position + local).floor())
+					baked.set_pixel(x + offset.x, y + offset.y, image.get_pixel(source.x, source.y))
+		frame["draw_target"] = target
+		frame["baked_region"] = Rect2(Vector2(offset), Vector2(size_value))
+	var nearest := CanvasTexture.new()
+	nearest.diffuse_texture = ImageTexture.create_from_image(baked)
+	nearest.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	nearest.texture_repeat = CanvasItem.TEXTURE_REPEAT_DISABLED
+	for frame: Dictionary in frames:
+		var atlas := AtlasTexture.new()
+		atlas.atlas = nearest
+		atlas.region = frame.baked_region
+		atlas.filter_clip = true
+		frame.texture = atlas
+	_baked_bytes += cost
+	return true
+
+## Snap after the actual viewport stretch, including noninteger fullscreen
+## scaling. Physics, camera coordinates, aim and network snapshots stay exact.
+static func snap_position(canvas: CanvasItem, position_value: Vector2) -> Vector2:
+	var transform_value: Transform2D = canvas.get_viewport_transform() * canvas.get_global_transform()
+	if absf(transform_value.determinant()) < 0.00001:
+		return position_value
+	return transform_value.affine_inverse() * (transform_value * position_value).round()
 
 static func _numbers(value: Variant, count: int) -> bool:
 	if not value is Array or value.size() != count:
@@ -155,7 +220,7 @@ static func actor_ids() -> Array:
 
 static func stats() -> Dictionary:
 	_ensure_loaded()
-	return {"actors": _actors.size(), "textures": _textures.size(), "bytes": _texture_bytes, "max_bytes": MAX_TEXTURE_BYTES, "errors": _errors.duplicate()}
+	return {"actors": _actors.size(), "textures": _textures.size(), "bytes": _texture_bytes, "max_bytes": MAX_TEXTURE_BYTES, "baked_bytes": _baked_bytes, "max_baked_bytes": MAX_BAKED_BYTES, "errors": _errors.duplicate()}
 
 static func enemy_id(enemy: Dictionary) -> String:
 	if str(enemy.get("kind", "crawler")) != "boss":
@@ -213,7 +278,7 @@ static func frame_for(id: String, state: Dictionary, clock: float, player: bool 
 	var tint: Color = Color(1.75, 1.75, 1.65, 1.0) if flash else Color.WHITE
 	if not player and bool(state.get("elite", false)):
 		tint *= Color(1.08, 1.02, 0.91, 1.0)
-	return {"actor": id, "animation": animation, "index": chosen, "texture": frame.texture, "source": frame.source, "target": frame.target, "tint": tint}
+	return {"actor": id, "animation": animation, "index": chosen, "texture": frame.texture, "source": frame.source, "target": frame.target, "draw_target": frame.draw_target, "tint": tint}
 
 static func draw_player(canvas: Node2D, player: Dictionary, clock: float) -> bool:
 	return _draw(canvas, frame_for(str(player.get("character", "ranger")), player, clock, true))
@@ -224,5 +289,5 @@ static func draw_enemy(canvas: Node2D, enemy: Dictionary, clock: float) -> bool:
 static func _draw(canvas: Node2D, frame: Dictionary) -> bool:
 	if frame.is_empty():
 		return false
-	canvas.draw_texture_rect(frame.texture, frame.target, false, frame.tint)
+	canvas.draw_texture_rect(frame.texture, frame.draw_target, false, frame.tint)
 	return true

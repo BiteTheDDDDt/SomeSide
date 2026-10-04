@@ -34,9 +34,11 @@ func _run() -> void:
 	await _layout()
 	_check(str(game.get("screen")) == "menu", "Main scene opens the title menu")
 	_check_page_bounds("menu")
-	await _press("选择旅者")
+	await _press("选择角色")
 	_check(str(game.get("screen")) == "characters", "Character button opens character selection")
 	_check_page_bounds("characters")
+	var portraits: Array = _find_type(game.get("ui"), "TextureRect")
+	_check(portraits.size() == 2 and portraits[0].texture != null and portraits[1].texture != null, "Character selection shows both actual packaged character portraits")
 	await _press("选择", true)
 	_check(str(Dictionary(game.get("profile")).character) == "vanguard", "Selecting the second character changes the local profile")
 	await _press("返回", true)
@@ -49,7 +51,7 @@ func _run() -> void:
 	for label in _find_type(game.get("ui"), "Label"):
 		guide_text += label.text + "\n"
 	_check((guide_text.contains("羽毛") or guide_text.contains("羽翼")) and not guide_text.contains("空中可再次跳跃"), "Guide explains single-jump progression without the obsolete free double jump")
-	await _press("我准备好了")
+	await _press("返回")
 	await _press("设置", true)
 	_check(str(game.get("screen")) == "settings", "Settings opens from the menu")
 	_check_page_bounds("settings")
@@ -77,7 +79,7 @@ func _run() -> void:
 	_check(str(game.get("screen")) == "join", "Join room opens the address form")
 	_check_page_bounds("join")
 	await _press("返回", true)
-	await _press("开始独行")
+	await _press("单人游戏")
 	_check(str(game.get("screen")) == "playing", "Starting solo creates a playable run")
 	var simulation = game.get("sim")
 	_check(str(simulation.state.players[1].character) == "vanguard" and str(simulation.state.players[1].name) == "UI Pilot", "The run uses the selected character and edited name")
@@ -155,7 +157,7 @@ func _run() -> void:
 	var paused_time: float = simulation.state.time
 	game.call("_physics_process", 1.0 / 60.0)
 	_check(is_equal_approx(float(simulation.state.time), paused_time), "A paused solo physics tick does not advance the run")
-	await _press("继续远征")
+	await _press("继续游戏")
 	_check(not bool(game.get("paused")), "Resume clears pause")
 	_check(not is_instance_valid(game.get("overlay")), "Resume removes the modal overlay")
 	_check_hud_mouse_filters()
@@ -174,7 +176,7 @@ func _run() -> void:
 	_check_page_bounds("results")
 	game.call("_process", 1.0 / 60.0)
 	_check(int(Dictionary(game.get("profile")).runs) == 1, "Repeated result frames do not duplicate the run record")
-	await _press("再次出发")
+	await _press("再玩一次")
 	_check(str(game.get("screen")) == "playing" and str(simulation.state.phase) == "playing" and int(simulation.state.stage) == 1, "Restart creates a fresh stage-one run")
 	_check(simulation.state.players[1].items.is_empty() and int(simulation.state.kills) == 0, "Restart resets run inventory and kill counts")
 	game.call("_show_pause")
@@ -482,6 +484,7 @@ func _find_type(node: Node, type_name: String) -> Array:
 func _check_page_bounds(label: String) -> void:
 	var buttons: Array = _find_type(game.get("ui"), "Button")
 	var bad: Array[String] = []
+	var focus_visible: bool = true
 	for button_value in buttons:
 		var button: Button = button_value
 		if not button.is_visible_in_tree():
@@ -489,7 +492,17 @@ func _check_page_bounds(label: String) -> void:
 		var rect: Rect2 = button.get_global_rect()
 		if rect.position.x < -0.5 or rect.position.y < -0.5 or rect.end.x > 1280.5 or rect.end.y > 720.5:
 			bad.append("%s %s" % [button.text, rect])
+		var focus: StyleBoxFlat = button.get_theme_stylebox("focus") as StyleBoxFlat
+		focus_visible = focus_visible and focus != null and focus.border_width_left >= 2 and focus.border_color.a >= 0.9
 	_check(bad.is_empty(), "%s buttons stay inside 1280x720%s" % [label, "" if bad.is_empty() else ": " + "; ".join(bad)])
+	_check(focus_visible, label + " buttons provide a consistent visible keyboard focus outline")
+	var clean_copy: bool = true
+	var valid_version: bool = true
+	for text_label: Label in _find_type(game.get("ui"), "Label"):
+		for phrase: String in ["EXPEDITION PROGRAM", "EARLY EXPEDITION", "PROTOTYPE"]:
+			clean_copy = clean_copy and not text_label.text.to_upper().contains(phrase)
+		if text_label.name == "VersionLabel": valid_version = valid_version and text_label.text == "v" + str(game.VERSION)
+	_check(clean_copy and valid_version, label + " has clean release copy and only the release version in its footer")
 
 func _all_labels_ignore_mouse(node: Node) -> bool:
 	for label_value in _find_type(node, "Label"):

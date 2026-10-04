@@ -1,4 +1,4 @@
-SomeSide 0.10.0 - Windows x64
+﻿SomeSide 0.11.0 - Windows x64
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
@@ -62,8 +62,8 @@ F3：显示 / 隐藏实际帧率
 可达的地址，例如虚拟局域网，或已经配置的 UDP 端口映射。
 
 关于此版本
-这是可玩的玩法与合作原型，使用固定关卡；角色与敌人为生成的像素
-精灵图，场景、武器和特效由程序绘制，音效由程序合成。
+本版本包含两名角色、三张关卡地图及单人 / 2–4 人合作模式。
+角色与敌人使用像素精灵图，场景、武器、特效和音效由程序生成。
 引擎为 Godot 4.7.2，中文字体为 Noto Sans SC。
 请随游戏保留 GODOT-LICENSE.txt 和 FONT-OFL.txt。
 
@@ -78,6 +78,7 @@ Actual FPS appears below it by default. F3 or Settings toggles the display;
 your choice is saved. Characters and enemies now use animated pixel sprites.
 
 A/D or Left/Right: move; last pressed direction wins. Space/W/Up: jump.
+
 Tap for a low jump, hold for height. S + Space: drop through platforms.
 Mouse: aim. Left mouse: primary weapon. Right mouse or Q: active equipment.
 Shift: dash. E: use the highlighted item, facility, rift, or rescue target.

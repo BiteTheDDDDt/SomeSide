@@ -304,7 +304,7 @@ func _check_english_page(context: String) -> void:
 		message = message.replace("Pilot 雨","").replace("游侠","").replace("简体中文","").replace("中文","")
 		if _has_chinese(message): untranslated.append(message)
 		if (node is Label or node is Button) and node.is_visible_in_tree(): _check_text_bounds(node,context,false)
-		if node is Label and node.is_visible_in_tree() and node.text.begins_with("EARLY EXPEDITION"): version=node
+		if node is Label and node.is_visible_in_tree() and node.name == "VersionLabel": version=node
 		if node is Button and node.is_visible_in_tree(): buttons.append(node)
 	_check(untranslated.is_empty(),context+" has no untranslated text"+("" if untranslated.is_empty() else ": "+str(untranslated)))
 	if version!=null:
