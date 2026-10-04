@@ -10,7 +10,8 @@ const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
-const VERSION: String = "0.9.0"
+const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
+const VERSION: String = "0.10.0"
 const DEFAULT_PORT: int = 27841
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
@@ -31,7 +32,7 @@ var online: bool = false
 var hosting: bool = false
 var local_id: int = 1
 var roster: Array = []
-var profile: Dictionary = {"name": "Traveller", "character": "ranger", "volume": 0.65, "effects": 1.0, "shake": true, "fullscreen": false, "runs": 0, "best_stage": 0, "wins": 0, "language": ""}
+var profile: Dictionary = {"name": "Traveller", "character": "ranger", "volume": 0.65, "effects": 1.0, "shake": true, "fullscreen": false, "runs": 0, "best_stage": 0, "wins": 0, "language": "", "show_fps": true}
 var paused: bool = false
 var _hud_labels: Dictionary = {}
 var _hp_bar: ProgressBar
@@ -94,6 +95,11 @@ var _coin_feedback: float = 0.0
 var _player_input = PlayerInput.new()
 var _controls_focused: bool = true
 var _loot_signature: Array = []
+var _fps_label: Label
+var _fps_settings_button: Button
+var _fps_refresh_clock: float = 0.0
+var _fps_value: int = 0
+const FPS_REFRESH_INTERVAL: float = 0.25
 
 func _ready() -> void:
 	Engine.max_fps = 120
@@ -130,6 +136,7 @@ func _ready() -> void:
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(ui)
 	ui.draw.connect(_draw_reticle)
+	_build_fps_overlay()
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected)
@@ -148,6 +155,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_elapsed += delta
+	_update_fps(delta)
 	var was_coin_feedback: bool = _coin_feedback > 0.0
 	_coin_feedback = maxf(0.0, _coin_feedback - delta)
 	if was_coin_feedback and _hud_labels.has("coins") and is_instance_valid(_hud_labels.coins):
@@ -334,6 +342,11 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 	sound.play_event(str(event.type))
 
 func _input(event: InputEvent) -> void:
+	# This shortcut also works when a settings text field owns GUI focus.
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3 and _controls_focused:
+		_toggle_fps()
+		get_viewport().set_input_as_handled()
+		return
 	# Observe releases before GUI controls can consume them.
 	if screen == "playing" and not paused and _controls_focused:
 		_player_input.handle_event(event)
@@ -748,6 +761,7 @@ func _load_profile() -> void:
 	profile.volume = clampf(float(profile.volume), 0.0, 1.0)
 	profile.effects = clampf(float(profile.effects), 0.5, 1.5)
 	profile.shake = bool(profile.shake)
+	profile.show_fps = bool(profile.get("show_fps", true))
 	profile.character = profile.character if profile.character in ["ranger", "vanguard"] else "ranger"
 	profile.name = str(profile.name).substr(0, 18)
 	profile.language = Locale.choose_language(str(profile.get("language", "")), OS.get_locale())
@@ -878,6 +892,8 @@ func _finish_automation() -> void:
 	var report: Dictionary = {"passed": passed, "mode": _smoke, "started": _started, "max_players": _max_players, "snapshots": _snapshots_received, "inputs": _inputs_received, "events": _events_seen, "tick": _tick, "stage": sim.state.get("stage", 0), "kills": sim.state.get("kills", 0), "phase": sim.state.get("phase", ""), "screen": screen, "elapsed": _elapsed}
 	report["language"] = Locale.current_language
 	report["profile_language"] = str(profile.get("language", ""))
+	report["pixel_actors"] = PixelActorRenderer.stats()
+	report["fps"] = {"visible": is_instance_valid(_fps_label) and _fps_label.is_visible_in_tree(), "value": _fps_value}
 	report["advanced"] = _options.has("smoke-advanced")
 	report["observed"] = _advanced_observed.duplicate(true)
 	report["biomes"] = _options.has("smoke-biomes")
@@ -942,9 +958,13 @@ func _clear_ui() -> void:
 	_reset_controls()
 	_loot_signature.clear()
 	for child in ui.get_children():
+		if child == _fps_label:
+			continue
 		ui.remove_child(child)
 		child.queue_free()
 	_hud_labels.clear()
+	_fps_settings_button = null
+	_refresh_fps_view()
 	_coin_panel = null
 	_last_coin_balance = -1
 	_coin_feedback = 0.0
@@ -1173,7 +1193,11 @@ func _show_settings(in_game: bool = false) -> void:
 	var effect_hint: Label = _label(column, "叠层会增强局部光效；可降低强度或关闭镜头震动。", 13, MUTED)
 	effect_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	effect_hint.custom_minimum_size.x = 550
-	_button(column, Locale.format("镜头震动  ·  %s", [Locale.text("开启" if profile.shake else "关闭")]), func(): profile.shake = not profile.shake; _apply_settings(); _save_profile(); _show_settings(_settings_in_game))
+	var display_row := HBoxContainer.new()
+	display_row.add_theme_constant_override("separation", 12)
+	column.add_child(display_row)
+	_button(display_row, Locale.format("镜头震动  ·  %s", [Locale.text("开启" if profile.shake else "关闭")]), func(): profile.shake = not profile.shake; _apply_settings(); _save_profile(); _show_settings(_settings_in_game))
+	_fps_settings_button = _button(display_row, _fps_setting_text(), _toggle_fps)
 	_button(column, "切换窗口 / 全屏  ·  F11", func(): profile.fullscreen = not profile.fullscreen; _apply_settings(); _save_profile())
 	_button(column, "返回战场" if in_game else "返回", _resume if in_game else _show_menu, true)
 
@@ -1243,7 +1267,7 @@ func _show_guide() -> void:
 		["Shift", "移动方向冲刺；静止时朝瞄准方向"],
 		["E", "拾取 / 使用设施 / 激活裂隙门 / 救援"],
 		["F   /   按住 Alt", "切换附近目标 / 展开道具与装备详情"],
-		["Tab / M / Esc / F11", "构筑 / 地图 / 菜单 / 全屏"]
+		["Tab / M / Esc / F11 / F3", "构筑 / 地图 / 菜单 / 全屏 / 帧率"]
 	]
 	for entry in guide:
 		var row := HBoxContainer.new()
@@ -1436,6 +1460,53 @@ func _update_coins(balance: int) -> void:
 	_coin_panel.custom_minimum_size.x = width
 	_coin_panel.size = Vector2(width, 40)
 	_coin_panel.position.x = 1262.0 - width
+
+func _build_fps_overlay() -> void:
+	_fps_label = _label(ui, "— FPS", 12, MUTED)
+	_fps_label.name = "FpsReadout"
+	_fps_label.position = Vector2(1158, 101)
+	_fps_label.size = Vector2(104, 20)
+	_fps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_fps_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_fps_label.z_index = 100
+	_fps_label.add_theme_color_override("font_shadow_color", Color(0.02, 0.04, 0.05, 0.9))
+	_fps_label.add_theme_constant_override("shadow_offset_x", 1)
+	_fps_label.add_theme_constant_override("shadow_offset_y", 1)
+	_refresh_fps_view()
+
+func _fps_setting_text() -> String:
+	return Locale.format("显示帧率  ·  %s  /  F3", [Locale.text("开启" if profile.get("show_fps", true) else "关闭")])
+
+func _refresh_fps_view() -> void:
+	if is_instance_valid(_fps_label):
+		_fps_label.visible = bool(profile.get("show_fps", true))
+	if is_instance_valid(_fps_settings_button):
+		_fps_settings_button.text = _fps_setting_text()
+
+func _toggle_fps() -> void:
+	profile.show_fps = not bool(profile.get("show_fps", true))
+	_refresh_fps_view()
+	_update_fps(0.0, true)
+	_save_profile()
+
+func _update_fps(delta: float, force: bool = false) -> void:
+	_fps_refresh_clock += maxf(0.0, delta)
+	if not force and _fps_refresh_clock < FPS_REFRESH_INTERVAL:
+		return
+	_fps_refresh_clock = fmod(_fps_refresh_clock, FPS_REFRESH_INTERVAL)
+	if not is_instance_valid(_fps_label) or not bool(profile.get("show_fps", true)):
+		return
+	# Engine FPS measures rendered frames, independently of the 60 Hz simulation.
+	_fps_value = maxi(0, roundi(Engine.get_frames_per_second()))
+	var next_text: String = "%d FPS" % _fps_value if _fps_value > 0 else "— FPS"
+	if _fps_label.text != next_text:
+		_fps_label.text = next_text
+	var tint: Color = MUTED
+	if _fps_value > 0 and _fps_value < 30:
+		tint = Color("d69587")
+	elif _fps_value > 0 and _fps_value < 45:
+		tint = AMBER
+	_set_label_color(_fps_label, tint)
 
 func _update_inspection_visibility() -> void:
 	if not is_instance_valid(_relic_strip):
@@ -1907,7 +1978,7 @@ func _show_pause() -> void:
 	_button(panel, "继续远征", _resume, true)
 	_button(panel, "设置", func(): _show_settings(true))
 	_button(panel, "返回主菜单", func(): _disconnect(); _show_menu())
-	_label(panel, "Esc 返回  ·  F11 全屏", 13, MUTED)
+	_label(panel, "Esc 返回  ·  F11 全屏  ·  F3 帧率", 13, MUTED)
 
 func _resume() -> void:
 	_reset_controls()

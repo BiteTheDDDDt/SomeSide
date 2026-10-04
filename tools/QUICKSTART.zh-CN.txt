@@ -1,10 +1,11 @@
-SomeSide 0.9.0 - Windows x64
+SomeSide 0.10.0 - Windows x64
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
 首次启动按系统语言选择：中文系统使用中文，其他语言默认英文。
 可在设置中切换简体中文 / English；之后优先使用已保存的选择。
 右上角金色数字独立显示当前金币余额。
+金币下方默认显示实际 FPS，可按 F3 或在设置中切换，选择会保存。
 
 玩法
 横版平台动作、鼠标自由瞄准、局内道具叠加和 2–4 人合作。
@@ -22,11 +23,13 @@ SomeSide 0.9.0 - Windows x64
 难度按实际局内时间增长，包括停留；后续敌人生命与攻击更强。
 三张扩大后的地图具有不同地形与支路，按 M 查看关卡地图。
 三关重绘了各自背景、平台材质与地标，角色、怪物和弹道也已细化。
+两名角色、九种怪物和三种首领使用像素精灵图与多帧姿态。
 雨林敌人擅长跳扑、吐弹与落点孢子；峡谷擅长冲锋、钻地与散射；
 遗迹有锁定射线、闪现齐射与修复支援，共九种普通敌人与三种首领。
 危险攻击先显示方向线或落点预警，开始蓄力后可通过走位躲避。
 眩晕或击杀施法者可取消其危险区，注意优先处理支援和远程单位。
 堆叠道具增强对应特效，设置中可调整强度。
+枪口、命中与死亡加入定向碎片、余烬、烟雾和冲击环，保持数量上限。
 八种武器使用不同的手持模型，枪口与弹丸发射位置一致。
 拾取遗物会改变角色的背包、头饰、肩甲等局部外观，队友也能看到。
 饰件最多占用六个部位，同部位优先显示更稀有、叠层更多的遗物；
@@ -48,6 +51,7 @@ Tab：当前构筑，可切换三类物品图鉴
 M：关卡地图
 Esc：暂停或个人菜单（联机时不会暂停其他人）
 F11：全屏
+F3：显示 / 隐藏实际帧率
 
 合作
 一人创建房间，其余玩家输入该主机的 IP 地址加入。
@@ -58,7 +62,8 @@ F11：全屏
 可达的地址，例如虚拟局域网，或已经配置的 UDP 端口映射。
 
 关于此版本
-这是一个可玩的玩法与合作原型，使用固定关卡和程序生成美术音效。
+这是可玩的玩法与合作原型，使用固定关卡；角色与敌人为生成的像素
+精灵图，场景、武器和特效由程序绘制，音效由程序合成。
 引擎为 Godot 4.7.2，中文字体为 Noto Sans SC。
 请随游戏保留 GODOT-LICENSE.txt 和 FONT-OFL.txt。
 
@@ -69,6 +74,8 @@ On first launch, Chinese system locales use Simplified Chinese; all other
 system languages default to English. Change the language in Settings.
 Your saved preference is used on later launches. Co-op players can use
 different languages. Your gold balance is shown in gold at the top right.
+Actual FPS appears below it by default. F3 or Settings toggles the display;
+your choice is saved. Characters and enemies now use animated pixel sprites.
 
 A/D or Left/Right: move; last pressed direction wins. Space/W/Up: jump.
 Tap for a low jump, hold for height. S + Space: drop through platforms.
@@ -77,6 +84,7 @@ Shift: dash. E: use the highlighted item, facility, rift, or rescue target.
 F: cycle nearby targets. Hold Alt: expand nearby item details.
 Hover over owned item icons to read their effects. Tab: build and catalog.
 M: map. Esc: pause/menu (co-op keeps running). F11: fullscreen.
+F3: show/hide FPS.
 
 Pick up relics to build your character. Items stay on the ground until you
 choose them with E. Weapons and active equipment each have one slot;

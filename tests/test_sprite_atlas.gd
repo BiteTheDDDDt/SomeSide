@@ -3,6 +3,7 @@ extends SceneTree
 const Atlas = preload("res://scripts/sprite_atlas.gd")
 const Entities = preload("res://scripts/entity_renderer.gd")
 const Projectiles = preload("res://scripts/projectile_renderer.gd")
+const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 
 class Gallery extends Node2D:
 	var mode: String = "enemies"
@@ -39,6 +40,8 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
+	# Exercise the retained vector fallback independently of production pixel art.
+	Pixels.install_manifest({"version": 1, "actors": {}})
 	_test_plans()
 	probe = Gallery.new()
 	root.size = Vector2i(1280, 720)
@@ -51,6 +54,7 @@ func _run() -> void:
 		await _test_native()
 	probe.queue_free()
 	await process_frame
+	Pixels.reload_manifest()
 	print("SPRITE_ATLAS_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
 

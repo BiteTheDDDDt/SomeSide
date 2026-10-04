@@ -1,12 +1,14 @@
-# SomeSide 0.9.0
+# SomeSide 0.10.0
 
 一个可以直接运行的 2D 横版动作 Roguelike 原型：鼠标自由瞄准、两种战斗风格、局内道具叠加、三段关卡，以及玩家主机驱动的 2–4 人合作。
 
-使用 Godot 4.7.2 / GDScript。画面与音效由程序生成，内置 Noto Sans SC 中文字体。
+使用 Godot 4.7.2 / GDScript。角色与怪物使用像素风精灵图，场景、武器、饰件和特效由程序绘制，音效由程序合成；内置 Noto Sans SC 中文字体。
 
 ## 开始游戏
 
-**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.9 独立版本位于 `dist/v0.9.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.9.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
+**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.10 独立版本位于 `dist/v0.10.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.10.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
+
+0.10 默认在右上角金币下方显示实际 FPS，按 **F3** 或在设置中切换，偏好会保存。两名角色、九种普通怪物和三种首领接入独立精灵帧；角色跑跳、敌人行动与蓄力会切换姿态，武器仍独立朝鼠标瞄准，遗物饰件继续随构筑变化。新增按武器区分的枪口反馈、定向碎屑、余烬、烟雾和冲击环，死亡碎片按生物、岩石和机械材质变化；粒子保持总量上限。精灵图由内置 imagegen 生成，原始 RGBA 素材与生成说明保存在 [assets/sprites](assets/sprites/ART_PROMPTS.md)。
 
 0.9 加入可变高度跳跃：短按低跳，长按保持原最高跳跃轨迹；羽翼空跳也可控制高度。A/D 或左右方向键同时按住时，后按方向优先，松开后恢复仍按住的方向。切出窗口、暂停和切换页面时清除游戏按键，避免持续移动或开火。静态场景与重复绘制、物品查询和 UI 更新也进行了性能优化。
 
@@ -90,6 +92,7 @@
 | 查看道具背包 | Tab |
 | 查看关卡地图 | M |
 | 全屏切换 | F11 |
+| 显示 / 隐藏帧率（默认开启） | F3 |
 
 联机时打开个人菜单不会暂停其他玩家的世界。
 
@@ -149,10 +152,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -C
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-network-controls-v09.ps1 -Clients 3 -Port 27924 -Impaired
 
 # 原生 OpenGL 渲染基准，持续移动镜头；省略 --moving 则固定镜头
-.\tools\runtime\Godot_v4.7.2-stable_win64_console.exe --path . --script res://tools/perf-v09.gd -- --tag=local-moving --moving
+.\tools\runtime\Godot_v4.7.2-stable_win64_console.exe --path . --script res://tools/perf-v10.gd -- --tag=local-moving --moving
 ```
 
-导出结果是 `dist/v0.9.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 生成只含游戏、快速开始说明和许可的 0.9 ZIP。未下载模板时，第一次导出会下载约 1.28 GB 官方模板归档，仅提取 Windows x86_64 所需模板。
+导出结果是 `dist/v0.10.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 生成只含游戏、快速开始说明和许可的 0.10 ZIP。未下载模板时，第一次导出会下载约 1.28 GB 官方模板归档，仅提取 Windows x86_64 所需模板。
 
 测试覆盖快照深拷贝、随机种子、瞄准预测、单跳与羽翼、手动拾取、多人争抢、装备冷却保留、设施交易和稀有掉落。地图可达性通过真实移动与碰撞验证：两个角色都不带道具、不冲刺，起跳和落点留出余量，并验证起跳位置偏差。压力测试继续检查四人长时间构筑与切关一致性。网络测试启动独立 Godot 进程，要求主机见到完整队伍、收到输入，客户端接收多次快照，并成功退出且没有运行时错误。证据保存在 `tools/results/network-*`。
 

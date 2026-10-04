@@ -368,4 +368,7 @@ const TEXTS: Dictionary = {
 	"生命": "Health",
 	"护盾": "Shield",
 	"威胁": "Threat",
+	"显示帧率  ·  %s  /  F3": "Show FPS  ·  %s  /  F3",
+	"构筑 / 地图 / 菜单 / 全屏 / 帧率": "Build / map / menu / fullscreen / FPS",
+	"Esc 返回  ·  F11 全屏  ·  F3 帧率": "Esc: Back  ·  F11: Fullscreen  ·  F3: FPS",
 }

@@ -4,6 +4,7 @@ extends RefCounted
 ## Silhouettes and material panels, in the actor's local facing transform.
 ## All animation is presentation-only and never changes the supplied snapshot.
 const Atlas = preload("res://scripts/sprite_atlas.gd")
+const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const CACHE_META: StringName = &"someside_enemy_atlas"
 const CACHE_MAX_BYTES: int = 28 * 1024 * 1024
 const ANIMATION_FRAMES: int = 16
@@ -18,7 +19,12 @@ const KINDS: Array[String] = ["crawler","spitter","spore_moth","drone","charger"
 static func prepare(canvas: Node2D) -> void:
 	if DisplayServer.get_name() == "headless" or canvas.has_meta(CACHE_META):
 		return
-	Atlas.prepare(canvas, CACHE_META, atlas_entries(), _paint_atlas_entry, CACHE_MAX_BYTES)
+	var fallback_entries: Array = []
+	for entry: Dictionary in atlas_entries():
+		if not Pixels.available(str(entry.data.state.kind)):
+			fallback_entries.append(entry)
+	if not fallback_entries.is_empty():
+		Atlas.prepare(canvas, CACHE_META, fallback_entries, _paint_atlas_entry, CACHE_MAX_BYTES)
 
 static func cache_info(canvas: Node2D) -> Dictionary:
 	return Atlas.stats(canvas, CACHE_META)
@@ -30,7 +36,7 @@ static func atlas_entries() -> Array:
 		var frames: int = ANIMATION_FRAMES if frequency > 0.0 else 1
 		for variant: int in range(8 if kind == "charger" else 4):
 			var state: Dictionary = {"kind": kind, "id": 0, "elite": (variant & 1) != 0, "flash": 0.1 if (variant & 2) != 0 else 0.0, "telegraph": 0.5 if (variant & 4) != 0 else 0.0}
-			var bounds: Rect2 = enemy_bounds(state)
+			var bounds: Rect2 = _vector_enemy_bounds(state)
 			# The elite crown extends seven pixels above the base art bounds.
 			bounds = Rect2(bounds.position - Vector2(4, 10), bounds.size + Vector2(8, 14))
 			for frame: int in range(frames):
@@ -45,6 +51,12 @@ static func enemy_kinds() -> Array[String]:
 	return KINDS.duplicate()
 
 static func enemy_bounds(enemy: Dictionary) -> Rect2:
+	var pixel_bounds: Rect2 = Pixels.bounds(Pixels.enemy_id(enemy))
+	if pixel_bounds.size != Vector2.ZERO:
+		return pixel_bounds
+	return _vector_enemy_bounds(enemy)
+
+static func _vector_enemy_bounds(enemy: Dictionary) -> Rect2:
 	match str(enemy.get("kind","crawler")):
 		"boss": return Rect2(-68,-78,136,128)
 		"spore_moth": return Rect2(-37,-32,74,59)
@@ -86,6 +98,11 @@ static func _eye(c: Node2D, center: Vector2, radius: float, tint: Color = HOT) -
 	c.draw_circle(center+Vector2(-0.6,-0.9),maxf(0.5,radius*0.22),WHITE,true,-1,true)
 
 static func player_body(c: Node2D, player: Dictionary, clock: float) -> void:
+	if Pixels.draw_player(c, player, clock):
+		return
+	_player_vector(c, player, clock)
+
+static func _player_vector(c: Node2D, player: Dictionary, clock: float) -> void:
 	var heavy: bool = str(player.get("character","ranger")) == "vanguard"
 	var metal: Color = Color("c8d2bf") if not heavy else Color("d6bb8d")
 	var shadow: Color = Color("3f5b62") if not heavy else Color("725d4b")
@@ -150,6 +167,11 @@ static func player_body(c: Node2D, player: Dictionary, clock: float) -> void:
 		c.draw_circle(Vector2(-10,-28),1.1,signal_color,true,-1,true)
 
 static func enemy(c: Node2D, state: Dictionary, clock: float) -> void:
+	if Pixels.draw_enemy(c, state, clock):
+		if bool(state.get("elite", false)) and str(state.get("kind", "")) != "boss":
+			var top: float = enemy_bounds(state).position.y - 3.0
+			_poly(c, [Vector2(-5, top), Vector2(-3, top-4), Vector2(0, top-1), Vector2(3, top-4), Vector2(5, top)], Color("ffc77c"), false)
+		return
 	var kind: String = str(state.get("kind", "crawler"))
 	# Large bosses retain the full vector animation. Ordinary silhouettes are
 	# sampled at subpixel resolution; position, facing and warning stay live.
@@ -185,7 +207,7 @@ static func _enemy_vector(c: Node2D, state: Dictionary, clock: float) -> void:
 		"boss": _boss(c,state,phase,flash,signal_color)
 		_: _crawler(c,phase,flash,signal_color)
 	if elite and kind!="boss":
-		var top: float = enemy_bounds(state).position.y-3.0
+		var top: float = _vector_enemy_bounds(state).position.y-3.0
 		_poly(c,[Vector2(-5,top),Vector2(-3,top-4),Vector2(0,top-1),Vector2(3,top-4),Vector2(5,top)],Color("ffc77c"),false)
 
 static func _crawler(c: Node2D, phase: float, flash: float, signal_color: Color) -> void:

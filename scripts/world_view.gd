@@ -24,6 +24,8 @@ const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
 const Locale = preload("res://scripts/localization.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
+const PARTICLE_KINDS: Array[String] = ["spark", "fragment", "ember", "smoke"]
+const PARTICLE_WIDTHS: Array[float] = [1.0, 2.0, 4.0, 7.0]
 
 const INK: Color = Color("07171e")
 const SKY: Color = Color("081e28")
@@ -38,6 +40,10 @@ var _clock: float = 0.0
 var _camera_ready: bool = false
 var _effects: Array[Dictionary] = []
 var _numbers: Array[Dictionary] = []
+var _particle_batches: int = 0
+var _particle_segments: int = 0
+var _particle_points: Array[PackedVector2Array] = [PackedVector2Array(), PackedVector2Array(), PackedVector2Array(), PackedVector2Array()]
+var _particle_colors: Array[PackedColorArray] = [PackedColorArray(), PackedColorArray(), PackedColorArray(), PackedColorArray()]
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _font: Font
 var _shake: float = 0.0
@@ -377,13 +383,15 @@ func effect_strength(event: Dictionary) -> float:
 func visual_budget_stats() -> Dictionary:
 	return {"effects": _effects.size(), "max_effects": MAX_EFFECTS,
 		"damage_numbers": _numbers.size(), "max_damage_numbers": MAX_DAMAGE_NUMBERS,
-		"fx_scale": clampf(fx_scale, 0.5, 1.5), "shake": minf(_shake, 5.0)}
+		"fx_scale": clampf(fx_scale, 0.5, 1.5), "shake": minf(_shake, 5.0),
+		"particle_batches": _particle_batches, "max_particle_batches": PARTICLE_WIDTHS.size(),
+		"particle_segments": _particle_segments}
 
 
 func _add_effect(effect: Dictionary) -> void:
 	# Reserve 64 slots for readable silhouettes (arcs, impacts, muzzle flashes)
 	# so four-player proc chains cannot replace everything with small sparks.
-	if str(effect.get("kind", "spark")) == "spark" and _effects.size() >= MAX_EFFECTS - 64:
+	if str(effect.get("kind", "spark")) in PARTICLE_KINDS and _effects.size() >= MAX_EFFECTS - 64:
 		return
 	if _effects.size() >= MAX_EFFECTS:
 		_effects.pop_front()
@@ -419,23 +427,28 @@ func push_events(events: Array) -> void:
 		match kind:
 			"shoot":
 				var enemy_shot: bool = event.get("enemy", false)
+				var weapon: String = str(event.get("weapon", event.get("kind", "bullet")))
 				var shot_color: Color = Color("f4a08b") if enemy_shot else (Color("a6dfff") if str(event.get("kind", "")) in ["rail", "railgun"] else GOLD)
 				if str(event.get("kind", "")) in ["storm", "storm_staff"]: shot_color = Color("89dbec")
 				if str(event.get("kind", "")) == "boomerang": shot_color = Color("9be0cf")
 				var shot_strength: float = 0.85 if enemy_shot else strength
-				var muzzle: Dictionary = {"kind":"muzzle", "pos":position_value, "angle":direction.angle(), "color":shot_color, "strength":shot_strength, "age":0.0, "life":0.105}
+				var muzzle: Dictionary = {"kind":"muzzle", "style":weapon, "pos":position_value, "angle":direction.angle(), "color":shot_color, "strength":shot_strength, "age":0.0, "life":0.13 if weapon in ["railgun","sun_lance"] else 0.105}
 				if event.has("weapon"):
 					muzzle.merge({"owner":event.get("player", -1), "weapon":event.weapon})
 					var pose: Dictionary = muzzle_effect_pose(muzzle)
 					if not bool(pose.visible): continue
 					position_value = pose.pos
 				_add_effect(muzzle)
-				_spark(position_value, shot_color, clampi(int(3.0 + shot_strength * 3.0), 3, 12), 125.0, 0.19)
+				_burst(position_value, shot_color, clampi(int(4.0 + shot_strength * 3.0), 4, 13), 165.0 if weapon=="scattergun" else 115.0, 0.25, direction, 0.8 if weapon=="scattergun" else 0.38, "spark")
+				if not enemy_shot and weapon in ["pulse_rifle", "scattergun"]:
+					_burst(position_value-direction*9.0,Color("bba477"),2,55.0,0.48,direction.orthogonal()-direction*0.4,0.35,"fragment")
 			"hit":
 				var crit: bool = event.get("crit", false)
 				var color_value: Color = (Color("f6987d") if bool(event.get("friendly", false)) else GOLD) if crit else CREAM
-				_spark(position_value, color_value, clampi(int((7.0 if crit else 4.0) * strength), 3, 22), 145.0 + strength * 22.0, 0.3)
-				_add_effect({"kind":"impact", "pos":position_value, "color":color_value, "strength":strength, "age":0.0, "life":0.17})
+				var impact_direction: Vector2 = _impact_direction(event)
+				_burst(position_value, color_value, clampi(int((8.0 if crit else 5.0) * strength), 4, 22), 190.0 + strength * 24.0, 0.34, impact_direction, 0.95, "spark")
+				_burst(position_value, color_value.darkened(0.4), clampi(int(2.0*strength),2,5), 75.0,0.45,impact_direction,1.8,"fragment")
+				_add_effect({"kind":"impact", "pos":position_value, "angle":impact_direction.angle(), "crit":crit, "color":color_value, "strength":strength, "age":0.0, "life":0.17})
 				if crit or strength >= 1.7:
 					_ring(position_value, Color(color_value, 0.65), 14.0 + strength * 5.0, 0.22)
 				if event.has("arc_from"):
@@ -443,8 +456,13 @@ func push_events(events: Array) -> void:
 				if _numbers.size() < MAX_DAMAGE_NUMBERS:
 					_numbers.append({"pos": position_value + Vector2(_rng.randf_range(-9.0, 9.0), -22.0), "text": str(int(event.get("amount", 0))), "age": 0.0, "crit": crit})
 			"death":
-				_spark(position_value, ORANGE, clampi(int(12.0 * strength), 7, 30), 175.0, 0.48)
-				_ring(position_value, Color(ORANGE, 0.65), 34.0 + strength * 10.0, 0.35)
+				var material: Dictionary = death_material(str(event.get("kind","crawler")))
+				var death_color: Color = material.color
+				var elite: bool = bool(event.get("elite",false)) or str(event.get("kind",""))=="boss"
+				_burst(position_value,death_color,clampi(int((18.0 if elite else 12.0)*strength),6,30),190.0,0.55,Vector2.UP,PI,str(material.particle))
+				_burst(position_value,death_color.lightened(0.3),7 if elite else 4,220.0,0.26,Vector2.UP,PI,"spark")
+				_burst(position_value,death_color,4,36.0,0.6,Vector2.UP,0.7,"smoke")
+				_add_effect({"kind":"shatter", "pos":position_value,"color":death_color,"radius":(52.0 if elite else 33.0)*sqrt(strength),"strength":strength,"age":0.0,"life":0.38})
 			"explosion":
 				if str(event.get("team",""))=="enemy" and bool(event.get("healing",false)):
 					# Enemy repair reads as a small amber machine pulse, never the
@@ -465,7 +483,10 @@ func push_events(events: Array) -> void:
 					_add_effect({"kind":"gravity", "pos":position_value, "color":effect_color, "radius":clampf(float(event.get("radius",200.0)),40.0,300.0), "strength":strength, "age":0.0, "life":0.75})
 				if explosion_kind == "meteor":
 					_add_effect({"kind":"meteor", "pos":position_value, "color":effect_color, "strength":strength, "age":0.0, "life":0.35})
-				_spark(position_value, effect_color, clampi(int((15.0 if healing or shielding else 20.0) * strength), 8, 42), 90.0 if healing or shielding else 220.0, 0.8 if healing or shielding else 0.55)
+				_burst(position_value, effect_color, clampi(int((12.0 if healing or shielding else 18.0) * strength), 8, 36), 90.0 if healing or shielding else 260.0, 0.8 if healing or shielding else 0.55,Vector2.UP,PI,"ember" if healing or shielding else "spark")
+				if not healing and not shielding and not temporal:
+					_burst(position_value,effect_color.darkened(0.3),clampi(int(4.0*strength),4,10),150.0,0.7,Vector2.UP,PI,"fragment")
+					_burst(position_value,effect_color,4,45.0,0.65,Vector2.UP,PI,"smoke")
 				_ring(position_value, effect_color, float(event.get("radius", 90.0)), 0.9 if healing or shielding else 0.42)
 				if not healing and not shielding and not temporal:
 					_add_effect({"kind":"blast", "pos":position_value, "color":effect_color, "strength":strength, "radius":clampf(float(event.get("radius",90.0)),20.0,260.0), "age":0.0, "life":0.48})
@@ -478,7 +499,9 @@ func push_events(events: Array) -> void:
 				var swipe: Dictionary = {"kind": "flame" if flame else "slash", "pos": position_value, "angle": direction.angle(), "age": 0.0, "life": 0.19 if flame else 0.27, "color": Color("ffa77a") if flame else GOLD, "strength":strength, "radius":clampf(float(event.get("radius",170.0 if flame else 85.0)),45.0,180.0 if flame else 160.0)}
 				if event.has("weapon"):
 					swipe.merge({"owner":event.get("player", -1), "weapon":event.weapon})
+					if not bool(muzzle_effect_pose(swipe).visible): continue
 				_add_effect(swipe)
+				_burst(position_value,Color("ffa45c") if flame else Color("abead8"),clampi(int(3.0*strength),3,9),160.0 if flame else 90.0,0.32,direction,0.33 if flame else 0.8,"ember" if flame else "spark")
 			"dash":
 				var dash_color: Color = Color("eea27c") if bool(event.get("enemy",false)) else TEAL
 				_spark(position_value, dash_color, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
@@ -496,6 +519,39 @@ func push_events(events: Array) -> void:
 				_ring(position_value, GOLD, 220.0, 1.3)
 
 
+func _impact_direction(event: Dictionary) -> Vector2:
+	var destination: Vector2 = event.get("pos",Vector2.ZERO)
+	var players: Dictionary = _frame.get("players",{})
+	var owner: int = int(event.get("owner",-1))
+	var source: Vector2 = destination-Vector2.RIGHT
+	if event.has("arc_from"):
+		source=event.arc_from
+	elif players.has(owner):
+		source=players[owner].pos
+	var direction: Vector2=(destination-source).normalized()
+	return direction if direction.length_squared()>0.001 else Vector2.RIGHT
+
+
+func death_material(kind: String) -> Dictionary:
+	# Cosmetic fragments suggest the creature's material without persistent gore.
+	if kind in ["crawler","spitter","spore_moth"] or (kind=="boss" and _current_biome=="rainforest"):
+		return {"color":Color("bfda83"),"particle":"ember"}
+	if kind in ["charger","burrower"] or (kind=="boss" and _current_biome=="canyon"):
+		return {"color":Color("c9956b"),"particle":"fragment"}
+	return {"color":Color("a0cbe5") if kind in ["drone","player"] else Color("c5a9ef"),"particle":"fragment"}
+
+
+func _burst(position_value: Vector2, color_value: Color, count: int, speed: float, life: float, direction: Vector2, spread: float, style: String) -> void:
+	var angle: float=direction.angle()
+	for index: int in range(clampi(count,0,42)):
+		if _effects.size()>=MAX_EFFECTS-64: break
+		var velocity: Vector2=Vector2.from_angle(angle+_rng.randf_range(-spread,spread))*_rng.randf_range(speed*0.35,speed)
+		var gravity: float=250.0 if style=="fragment" else (-18.0 if style=="ember" or style=="smoke" else 100.0)
+		_add_effect({"kind":style,"pos":position_value,"vel":velocity,"color":color_value,"age":0.0,
+			"life":clampf(life*_rng.randf_range(0.75,1.2),0.08,1.2),"size":_rng.randf_range(1.4,3.2),
+			"gravity":gravity,"drag":3.5 if style=="spark" else 1.2,"spin":_rng.randf_range(-8.0,8.0),"phase":_rng.randf_range(-PI,PI)})
+
+
 func _spark(position_value: Vector2, color_value: Color, count: int, speed: float, life: float) -> void:
 	for index: int in range(count):
 		var velocity: Vector2 = Vector2.from_angle(_rng.randf_range(-PI, PI)) * _rng.randf_range(speed * 0.25, speed)
@@ -504,6 +560,60 @@ func _spark(position_value: Vector2, color_value: Color, count: int, speed: floa
 
 func _ring(position_value: Vector2, color_value: Color, radius: float, life: float) -> void:
 	_add_effect({"kind": "ring", "pos": position_value, "color": color_value, "radius": minf(radius, 300.0), "age": 0.0, "life": life})
+
+
+func _particle_segment(bucket: int, from: Vector2, to: Vector2, color_value: Color) -> void:
+	_particle_points[bucket].append(from)
+	_particle_points[bucket].append(to)
+	_particle_colors[bucket].append(color_value)
+	_particle_segments+=1
+
+
+func _build_particle_batches() -> void:
+	_particle_batches=0
+	_particle_segments=0
+	for bucket: int in range(PARTICLE_WIDTHS.size()):
+		_particle_points[bucket].clear()
+		_particle_colors[bucket].clear()
+	for effect: Dictionary in _effects:
+		var kind: String=str(effect.get("kind",""))
+		if kind not in PARTICLE_KINDS: continue
+		var age: float=float(effect.get("age",0.0))
+		var t: float=clampf(age/maxf(0.01,float(effect.get("life",0.5))),0.0,1.0)
+		var velocity: Vector2=effect.get("vel",Vector2.ZERO)
+		var drag: float=maxf(0.01,float(effect.get("drag",0.01)))
+		var p: Vector2=world_to_screen(effect.pos)+velocity*((1.0-exp(-drag*age))/drag)+Vector2(0,float(effect.get("gravity",160.0))*age*age*0.5)
+		if not _visible(p,24.0): continue
+		p=p.round()
+		var tint: Color=effect.get("color",GOLD)
+		tint.a*=pow(1.0-t,0.7)
+		var size_value: float=float(effect.get("size",2.0))
+		match kind:
+			"fragment":
+				var axis: Vector2=Vector2.from_angle(float(effect.get("phase",0.0))+age*float(effect.get("spin",3.0)))
+				_particle_segment(2,p-axis*size_value,p+axis*size_value,Color(tint.darkened(0.48),tint.a))
+				_particle_segment(0,p-axis*size_value+Vector2(0,-1),p+axis*size_value+Vector2(0,-1),tint)
+			"ember":
+				var drift: Vector2=Vector2(sin(age*9.0+float(effect.get("phase",0.0)))*3.0,0.0)
+				_particle_segment(1,p+drift,p+drift+Vector2(0,1),tint)
+				if t<0.6: _particle_segment(0,p+drift,p+drift+Vector2(1,0),Color(CREAM,tint.a*0.85))
+			"smoke":
+				_particle_segment(3,p-Vector2(2+t*3.0,0),p+Vector2(2+t*3.0,0),Color(tint.darkened(0.45),0.12*(1.0-t)))
+			_:
+				var tail: Vector2=velocity.normalized()*clampf(velocity.length()*0.045*(1.0-t),2.0,14.0)
+				_particle_segment(1 if size_value>2.2 else 0,p-tail,p,tint)
+				if t<0.4 and size_value>2.2: _particle_segment(0,p,p+velocity.normalized()*2.0,Color(CREAM,tint.a))
+	for bucket: int in range(PARTICLE_WIDTHS.size()):
+		if not _particle_points[bucket].is_empty(): _particle_batches+=1
+
+
+func _draw_particle_batches() -> void:
+	_build_particle_batches()
+	# Four native commands handle every debris/ember/spark color. Thick dim
+	# fragments first, then bright pixel edges; enemy warnings are drawn later.
+	for bucket: int in range(PARTICLE_WIDTHS.size()-1,-1,-1):
+		if not _particle_points[bucket].is_empty():
+			draw_multiline_colors(_particle_points[bucket],_particle_colors[bucket],PARTICLE_WIDTHS[bucket],false)
 
 
 func _draw() -> void:
@@ -1210,11 +1320,14 @@ func _draw_hazard(hazard: Dictionary) -> void:
 
 
 func _draw_effects() -> void:
+	_draw_particle_batches()
 	for effect: Dictionary in _effects:
+		if str(effect.get("kind","")) in PARTICLE_KINDS: continue
 		var pose: Dictionary = muzzle_effect_pose(effect)
 		if not bool(pose.visible):
 			continue
 		var p: Vector2 = world_to_screen(pose.pos)
+		if not _visible(p,float(effect.get("radius",0.0))+280.0) and not effect.has("from"): continue
 		var effect_angle: float = Vector2(pose.aim).angle()
 		var age: float = effect.get("age", 0.0)
 		var life: float = effect.get("life", 0.5)
@@ -1252,19 +1365,58 @@ func _draw_effects() -> void:
 				var angle: float = effect_angle
 				var length: float = (11.0 + strength * 8.0) * (1.0 - t * 0.6)
 				draw_set_transform(p, angle)
-				_glow(Vector2(length * 0.3, 0.0), 14.0 + strength * 5.0, Color(color_value, 0.045 * (1.0 - t)), 3)
-				draw_colored_polygon(PackedVector2Array([Vector2(-3,-2),Vector2(length*0.35,-3.0-strength*1.2),Vector2(length,-1),Vector2(length*0.47,2.0+strength),Vector2(-3,2)]), color_value)
-				draw_line(Vector2(0,0),Vector2(length*0.64,0),Color(CREAM,color_value.a),2.0,true)
-				if strength >= 1.7:
-					draw_line(Vector2(length*0.18,-7),Vector2(length*0.5,-2),Color(color_value,0.45*(1-t)),1.5,true)
-					draw_line(Vector2(length*0.18,7),Vector2(length*0.5,2),Color(color_value,0.45*(1-t)),1.5,true)
+				var style: String=str(effect.get("style",effect.get("weapon","pulse_rifle")))
+				match style:
+					"scattergun":
+						for ray: int in range(3):
+							var tip: Vector2=Vector2(length*(1.3 if ray==1 else 0.85),float(ray-1)*(9.0+strength*2.0))
+							draw_colored_polygon(PackedVector2Array([Vector2(-2,-3),tip,Vector2(3,3)]),color_value)
+						draw_line(Vector2.ZERO,Vector2(length*0.7,0),Color(CREAM,color_value.a),3.0,false)
+					"railgun", "rail":
+						for side: float in [-1.0,1.0]:
+							draw_line(Vector2(0,side*3),Vector2(length*1.5,side*1),color_value,2.0,false)
+							draw_line(Vector2(length*0.45,side*3),Vector2(length*0.22,side*8),Color(color_value,0.55*(1-t)),1.0,false)
+						draw_line(Vector2.ZERO,Vector2(length*1.2,0),Color(CREAM,color_value.a),1.0,false)
+					"storm_staff", "storm":
+						for fork: int in range(3):
+							var y: float=float(fork-1)*9.0
+							draw_polyline(PackedVector2Array([Vector2.ZERO,Vector2(7,y*0.25+3),Vector2(13,y*0.45-3),Vector2(length,y)]),color_value,1.0,false)
+						draw_rect(Rect2(-2,-2,5,5),Color(CREAM,color_value.a))
+					"sun_lance", "lance":
+						draw_colored_polygon(PackedVector2Array([Vector2(-1,-2),Vector2(length*1.65,0),Vector2(-1,2)]),Color(CREAM,color_value.a))
+						draw_line(Vector2(3,-9),Vector2(3,9),color_value,2.0,false)
+						draw_line(Vector2(-3,-5),Vector2(9,5),Color(color_value,0.65*(1-t)),1.0,false)
+					"boomerang":
+						for side: float in [-1.0,1.0]:
+							draw_polyline(PackedVector2Array([Vector2(0,side*3),Vector2(9,side*10),Vector2(length,side*4)]),color_value,2.0,false)
+						draw_rect(Rect2(-1,-1,4,3),Color(CREAM,color_value.a))
+					_:
+						draw_colored_polygon(PackedVector2Array([Vector2(-2,-2),Vector2(6,-4),Vector2(9,-2),Vector2(length,0),Vector2(9,2),Vector2(6,4),Vector2(-2,2)]),color_value)
+						draw_line(Vector2.ZERO,Vector2(length*0.65,0),Color(CREAM,color_value.a),2.0,false)
 				draw_set_transform(Vector2.ZERO)
 			"impact":
 				var radius: float = (5.0 + strength * 4.0) * (1.0 - t * 0.55)
-				for ray: int in range(4):
-					var direction: Vector2 = Vector2.from_angle(float(ray) * PI * 0.5 + 0.34)
-					draw_line(p - direction * radius * 0.15, p + direction * radius, color_value, 1.8, true)
-				_glow(p, radius*1.4, Color(color_value,0.04*(1-t)),2)
+				var direction: Vector2=Vector2.from_angle(effect_angle)
+				var side: Vector2=direction.orthogonal()
+				draw_line(p-direction*radius*0.45,p+direction*radius*1.6,color_value,2.0,false)
+				draw_line(p-side*radius*0.7,p+side*radius*0.7,color_value,1.0,false)
+				if t<0.42: draw_rect(Rect2(p-Vector2(2,2),Vector2(4,4)),Color(CREAM,color_value.a))
+				if bool(effect.get("crit",false)):
+					draw_arc(p,radius*1.1,effect_angle-0.8,effect_angle+0.8,8,Color(GOLD,color_value.a),2.0,false)
+			"shatter":
+				var spread: float=float(effect.get("radius",33.0))*(0.3+0.7*(1.0-pow(1.0-t,2.0)))
+				var rays: PackedVector2Array=PackedVector2Array()
+				var chips: PackedVector2Array=PackedVector2Array()
+				for shard: int in range(6):
+					var angle: float=float(shard)*TAU/6.0+0.2
+					var direction: Vector2=Vector2.from_angle(angle)
+					var center: Vector2=p+direction*spread
+					rays.append(center-direction*6.0*(1-t))
+					rays.append(center)
+					chips.append(p+direction*spread*0.72)
+					chips.append(p+direction.rotated(0.27)*spread*0.72)
+				draw_multiline(rays,color_value,2.0,false)
+				draw_multiline(chips,Color(color_value,0.35*(1-t)),1.0,false)
 			"blast":
 				var radius: float = float(effect.get("radius",90.0))
 				var spread: float = radius * (1.0 - pow(1.0-t,3.0))
@@ -1306,11 +1458,6 @@ func _draw_effects() -> void:
 						var anchor: Vector2 = points[3+branch]
 						var branch_end: Vector2 = anchor + Vector2(13.0,-18.0).rotated(float(branch)*2.1 + _clock*1.0)
 						draw_polyline(PackedVector2Array([anchor,anchor.lerp(branch_end,0.6)+Vector2(4,3),branch_end]),Color(color_value,color_value.a*0.55),1.0,true)
-			"spark":
-				var velocity: Vector2 = effect.get("vel", Vector2.ZERO)
-				p += velocity * age + Vector2(0.0, 80.0 * age * age)
-				var size_value: float = float(effect.get("size", 2.0)) * (1.0 - t * 0.5)
-				draw_line(p, p - velocity * 0.02, color_value, size_value, true)
 			"ring":
 				var radius: float = float(effect.get("radius", 40.0)) * (1.0 - pow(1.0 - t, 3.0))
 				draw_arc(p, maxf(0.1, radius), 0.0, TAU, 48, color_value, 2.5 * (1.0 - t) + 0.5, true)
