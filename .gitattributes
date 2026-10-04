@@ -1,0 +1,14 @@
+# Keep source text consistent across Windows and other platforms.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Game assets are stored as binary data.
+*.ttf binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.ogg binary
+*.wav binary
+*.zip binary
+*.exe binary

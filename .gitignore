@@ -1,0 +1,22 @@
+# Godot editor cache and local export credentials.
+/.godot/
+/export_credentials.cfg
+
+# Downloaded engine/templates, generated test evidence, and release builds.
+/tools/runtime/
+/tools/results/
+/tools/*.png
+/tests/*.png
+/tests/*.png.import
+/dist/
+
+# Local environment and temporary files.
+.env
+.env.*
+!.env.example
+*.tmp
+*.log
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
