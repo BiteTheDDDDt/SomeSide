@@ -3,1099 +3,2185 @@
   "notes": "Explicit alpha-aware crops. Source PNG pixels are preserved; 32/255 alpha analysis locates the authored silhouette and excludes almost-transparent generation noise. Crop padding preserves edges. Frame anchors are common source-space body centers, not per-frame bounding-box centers.",
   "actors": {
     "ranger": {
-      "texture": "res://assets/sprites/heroes-v1.png",
-      "scale": 0.125,
+      "texture": "res://assets/sprites/ranger-v2.png",
+      "scale": 0.17,
       "frames": [
         {
           "rect": [
-            51,
-            85,
-            149,
-            383
-          ],
-          "anchor": [
-            75,
-            213
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            255,
-            104,
-            258,
-            364
-          ],
-          "anchor": [
-            140,
-            194
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            559,
-            104,
-            163,
-            364
-          ],
-          "anchor": [
-            95,
-            194
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            777,
-            110,
-            248,
-            358
-          ],
-          "anchor": [
-            122,
-            188
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            1068,
-            110,
-            162,
-            358
-          ],
-          "anchor": [
-            95,
-            188
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            1342,
-            97,
-            155,
-            307
-          ],
-          "anchor": [
-            76,
-            201
-          ],
-          "duration": 0.11
-        }
-      ],
-      "animations": {
-        "idle": [
-          0
-        ],
-        "run": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "rise": [
-          5
-        ],
-        "fall": [
-          5
-        ],
-        "dash": [
-          5
-        ]
-      }
-    },
-    "vanguard": {
-      "texture": "res://assets/sprites/heroes-v1.png",
-      "scale": 0.125,
-      "frames": [
-        {
-          "rect": [
+            117,
             39,
-            562,
-            185,
-            408
+            138,
+            288
           ],
           "anchor": [
-            87,
-            240
+            85.426,
+            162.471
           ],
-          "duration": 0.11
+          "duration": 0.18
         },
         {
           "rect": [
-            255,
-            581,
-            274,
-            392
+            399,
+            39,
+            139,
+            288
           ],
           "anchor": [
-            141,
-            221
+            86.366,
+            162.471
           ],
-          "duration": 0.11
+          "duration": 0.18
         },
         {
           "rect": [
-            559,
-            583,
-            188,
-            385
+            695,
+            39,
+            145,
+            288
           ],
           "anchor": [
-            98,
-            219
+            93.346,
+            162.471
           ],
-          "duration": 0.11
+          "duration": 0.18
         },
         {
           "rect": [
-            779,
-            586,
-            263,
-            387
-          ],
-          "anchor": [
-            124,
-            216
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            1073,
-            586,
-            180,
-            384
-          ],
-          "anchor": [
-            96,
-            216
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            1337,
-            568,
-            172,
-            325
-          ],
-          "anchor": [
-            86,
-            234
-          ],
-          "duration": 0.11
-        }
-      ],
-      "animations": {
-        "idle": [
-          0
-        ],
-        "run": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "rise": [
-          5
-        ],
-        "fall": [
-          5
-        ],
-        "dash": [
-          5
-        ]
-      }
-    },
-    "crawler": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.3,
-      "frames": [
-        {
-          "rect": [
-            26,
-            53,
-            177,
-            103
-          ],
-          "anchor": [
-            88,
-            37.667
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            230,
-            49,
-            169,
-            107
-          ],
-          "anchor": [
-            87,
-            41.667
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            434,
-            52,
-            164,
-            104
-          ],
-          "anchor": [
-            86,
-            38.667
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            630,
-            54,
-            171,
-            102
-          ],
-          "anchor": [
-            95,
-            36.667
-          ],
-          "duration": 0.16
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "spitter": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.3,
-      "frames": [
-        {
-          "rect": [
-            40,
-            193,
-            161,
-            126
-          ],
-          "anchor": [
-            79,
-            55.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            239,
-            195,
-            165,
-            125
-          ],
-          "anchor": [
-            82,
-            53.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            441,
-            197,
-            166,
-            123
-          ],
-          "anchor": [
-            82,
-            51.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            646,
-            198,
-            161,
-            123
-          ],
-          "anchor": [
-            81,
-            50.0
-          ],
-          "duration": 0.16
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "spore_moth": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.33,
-      "frames": [
-        {
-          "rect": [
-            22,
-            340,
-            172,
-            182
-          ],
-          "anchor": [
-            97,
-            125
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            230,
-            363,
-            166,
-            152
-          ],
-          "anchor": [
-            94,
-            102
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            431,
-            370,
-            170,
-            149
-          ],
-          "anchor": [
-            96,
-            95
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            635,
-            341,
-            179,
-            180
-          ],
-          "anchor": [
-            96,
-            124
-          ],
-          "duration": 0.11
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "drone": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.3,
-      "frames": [
-        {
-          "rect": [
-            34,
-            542,
-            141,
-            161
-          ],
-          "anchor": [
-            87,
-            89
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            242,
-            539,
-            132,
-            161
-          ],
-          "anchor": [
-            83,
-            92
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            421,
-            575,
-            201,
-            124
-          ],
-          "anchor": [
-            108,
-            56
-          ],
-          "duration": 0.11
-        },
-        {
-          "rect": [
-            653,
-            540,
+            997,
+            39,
             142,
-            164
+            288
           ],
           "anchor": [
-            81,
-            91
+            88.966,
+            162.471
           ],
-          "duration": 0.11
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "charger": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.3,
-      "frames": [
-        {
-          "rect": [
-            11,
-            734,
-            203,
-            131
-          ],
-          "anchor": [
-            104,
-            49.0
-          ],
-          "duration": 0.16
+          "duration": 0.18
         },
         {
           "rect": [
-            225,
-            742,
-            191,
-            124
+            79,
+            354,
+            212,
+            292
           ],
           "anchor": [
+            128.716,
+            166.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            400,
+            354,
+            148,
+            292
+          ],
+          "anchor": [
+            94.956,
+            166.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            688,
+            351,
+            205,
+            295
+          ],
+          "anchor": [
+            110.136,
+            169.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            973,
+            351,
+            226,
+            287
+          ],
+          "anchor": [
+            130.206,
+            161.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            77,
+            666,
+            233,
+            289
+          ],
+          "anchor": [
+            131.146,
+            163.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            403,
+            667,
+            149,
+            288
+          ],
+          "anchor": [
+            96.216,
+            162.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            686,
+            667,
+            218,
+            293
+          ],
+          "anchor": [
+            114.706,
+            167.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            1013,
+            663,
+            148,
+            292
+          ],
+          "anchor": [
+            94.826,
+            166.471
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
             97,
-            41.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            424,
-            742,
-            199,
-            123
-          ],
-          "anchor": [
-            100,
-            41.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            628,
-            745,
-            197,
-            120
-          ],
-          "anchor": [
-            101,
-            38.0
-          ],
-          "duration": 0.16
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "burrower": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.3,
-      "frames": [
-        {
-          "rect": [
-            25,
-            909,
-            168,
-            130
-          ],
-          "anchor": [
-            86,
-            58.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            217,
-            914,
-            190,
-            125
-          ],
-          "anchor": [
-            100,
-            53.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            433,
-            916,
-            183,
-            123
-          ],
-          "anchor": [
-            89,
-            51.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            646,
-            916,
-            159,
-            123
-          ],
-          "anchor": [
-            81,
-            51.0
-          ],
-          "duration": 0.16
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "sentinel": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.23,
-      "frames": [
-        {
-          "rect": [
-            56,
-            1066,
-            118,
-            236
-          ],
-          "anchor": [
-            63,
-            134.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            237,
-            1067,
-            136,
-            235
-          ],
-          "anchor": [
-            88,
-            133.0
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            453,
-            1069,
-            133,
+            964,
+            163,
             233
           ],
           "anchor": [
-            75,
-            131.0
+            106.226,
+            164.286
           ],
-          "duration": 0.16
+          "duration": 0.12
+        },
+        {
+          "rect": [
+            399,
+            964,
+            143,
+            271
+          ],
+          "anchor": [
+            101.306,
+            164.486
+          ],
+          "duration": 0.12
         },
         {
           "rect": [
             661,
-            1060,
-            123,
-            242
+            997,
+            207,
+            195
           ],
           "anchor": [
-            74,
-            140.0
+            163.546,
+            165.306
           ],
-          "duration": 0.16
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "skirmisher": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.23,
-      "frames": [
-        {
-          "rect": [
-            30,
-            1336,
-            140,
-            212
-          ],
-          "anchor": [
-            81,
-            123.043
-          ],
-          "duration": 0.16
+          "duration": 0.12
         },
         {
           "rect": [
-            217,
-            1336,
-            182,
-            211
-          ],
-          "anchor": [
-            101,
-            123.043
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            432,
-            1333,
-            151,
-            215
-          ],
-          "anchor": [
-            90,
-            126.043
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            637,
-            1339,
-            181,
-            208
-          ],
-          "anchor": [
-            91,
-            120.043
-          ],
-          "duration": 0.16
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "conductor": {
-      "texture": "res://assets/sprites/enemies-v1.png",
-      "scale": 0.22,
-      "frames": [
-        {
-          "rect": [
-            33,
-            1571,
+            1010,
+            1015,
             152,
-            266
+            221
           ],
           "anchor": [
-            78,
-            84
+            103.436,
+            95.471
           ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            242,
-            1571,
-            146,
-            266
-          ],
-          "anchor": [
-            76,
-            84
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            446,
-            1575,
-            149,
-            262
-          ],
-          "anchor": [
-            76,
-            80
-          ],
-          "duration": 0.16
-        },
-        {
-          "rect": [
-            652,
-            1572,
-            151,
-            265
-          ],
-          "anchor": [
-            75,
-            83
-          ],
-          "duration": 0.16
+          "duration": 0.09,
+          "shoulder": [
+            0,
+            7
+          ]
         }
       ],
       "animations": {
         "idle": [
           0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
+          1,
+          2,
           3
+        ],
+        "run": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "rise": [
+          12
+        ],
+        "fall": [
+          13
+        ],
+        "dash": [
+          14
+        ],
+        "land": [
+          15
         ]
-      }
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "run": "loop",
+        "rise": "once",
+        "fall": "once",
+        "dash": "once",
+        "land": "once"
+      },
+      "movement_speed": 245,
+      "bounds": [
+        -25,
+        -35,
+        50,
+        58
+      ]
     },
-    "boss_spore": {
-      "texture": "res://assets/sprites/bosses-v1.png",
-      "scale": 0.36,
+    "vanguard": {
+      "texture": "res://assets/sprites/vanguard-v2.png",
+      "scale": 0.175,
       "frames": [
         {
           "rect": [
-            12,
-            14,
-            348,
-            292
+            89,
+            25,
+            158,
+            298
           ],
           "anchor": [
-            178,
-            176
+            103.3,
+            176.0
           ],
-          "duration": 0.24
+          "duration": 0.18
         },
         {
           "rect": [
-            396,
-            7,
-            349,
-            302
+            392,
+            25,
+            157,
+            298
           ],
           "anchor": [
-            178,
-            183
+            100.27,
+            176.0
           ],
-          "duration": 0.24
+          "duration": 0.18
         },
         {
           "rect": [
-            776,
-            8,
-            354,
-            301
+            688,
+            25,
+            168,
+            298
           ],
           "anchor": [
-            182,
-            182
+            108.73,
+            176.0
           ],
-          "duration": 0.24
+          "duration": 0.18
         },
         {
           "rect": [
-            1158,
-            7,
-            374,
-            302
+            1011,
+            25,
+            160,
+            298
           ],
           "anchor": [
-            184,
-            183
+            102.24,
+            176.0
           ],
-          "duration": 0.24
-        }
-      ],
-      "animations": {
-        "idle": [
-          0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
-          3
-        ]
-      }
-    },
-    "boss_stone": {
-      "texture": "res://assets/sprites/bosses-v1.png",
-      "scale": 0.36,
-      "frames": [
+          "duration": 0.18
+        },
         {
           "rect": [
-            20,
-            331,
+            71,
+            345,
+            205,
+            287
+          ],
+          "anchor": [
+            121.12,
+            165.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            403,
+            345,
+            156,
+            287
+          ],
+          "anchor": [
+            102.25,
+            165.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            706,
+            345,
+            171,
+            287
+          ],
+          "anchor": [
+            112.54,
+            165.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            1020,
             343,
-            293
+            167,
+            288
           ],
           "anchor": [
+            121.38,
+            166.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            74,
+            655,
+            218,
+            290
+          ],
+          "anchor": [
+            133.41,
+            168.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            400,
+            658,
+            168,
+            286
+          ],
+          "anchor": [
+            119.17,
+            164.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            711,
+            655,
+            167,
+            289
+          ],
+          "anchor": [
+            112.04,
+            167.0
+          ],
+          "duration": 0.065
+        },
+        {
+          "rect": [
+            1029,
+            646,
             170,
-            172.778
+            291
           ],
-          "duration": 0.24
+          "anchor": [
+            118.87,
+            169.0
+          ],
+          "duration": 0.065
         },
         {
           "rect": [
-            393,
-            331,
-            353,
-            293
+            89,
+            950,
+            169,
+            245
           ],
           "anchor": [
-            181,
-            172.778
+            113.49,
+            175.911
           ],
-          "duration": 0.24
+          "duration": 0.12
         },
         {
           "rect": [
-            778,
-            327,
-            367,
-            299
+            399,
+            951,
+            160,
+            284
           ],
           "anchor": [
-            180,
-            176.778
+            104.76,
+            176.301
           ],
-          "duration": 0.24
+          "duration": 0.12
         },
         {
           "rect": [
-            1164,
-            325,
-            363,
-            303
+            706,
+            968,
+            204,
+            236
           ],
           "anchor": [
-            178,
-            178.778
+            159.64,
+            178.061
           ],
-          "duration": 0.24
+          "duration": 0.12
+        },
+        {
+          "rect": [
+            1033,
+            1003,
+            168,
+            239
+          ],
+          "anchor": [
+            108.03,
+            117.0
+          ],
+          "duration": 0.09,
+          "shoulder": [
+            0,
+            7
+          ]
         }
       ],
       "animations": {
         "idle": [
           0,
-          1
-        ],
-        "move": [
-          0,
-          1
-        ],
-        "windup": [
-          2
-        ],
-        "attack": [
+          1,
+          2,
           3
+        ],
+        "run": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "rise": [
+          12
+        ],
+        "fall": [
+          13
+        ],
+        "dash": [
+          14
+        ],
+        "land": [
+          15
         ]
-      }
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "run": "loop",
+        "rise": "once",
+        "fall": "once",
+        "dash": "once",
+        "land": "once"
+      },
+      "movement_speed": 245,
+      "bounds": [
+        -25,
+        -35,
+        50,
+        58
+      ]
     },
-    "boss_prism": {
-      "texture": "res://assets/sprites/bosses-v1.png",
-      "scale": 0.34,
+    "crawler": {
+      "texture": "res://assets/sprites/forest-enemies-v2.png",
+      "scale": 0.223913,
+      "movement_speed": 116,
       "frames": [
         {
           "rect": [
-            39,
-            634,
-            306,
-            374
+            4,
+            181,
+            192,
+            142
           ],
           "anchor": [
-            151,
-            224
+            95.4689,
+            55.1456
           ],
-          "duration": 0.24
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            198,
+            181,
+            185,
+            142
+          ],
+          "anchor": [
+            93.5331,
+            55.1456
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            389,
+            181,
+            184,
+            142
+          ],
+          "anchor": [
+            97.8377,
+            55.1456
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            573,
+            181,
+            195,
+            142
+          ],
+          "anchor": [
+            102.7226,
+            55.1456
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            771,
+            180,
+            187,
+            143
+          ],
+          "anchor": [
+            95.5953,
+            56.1456
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            960,
+            180,
+            186,
+            143
+          ],
+          "anchor": [
+            98.6718,
+            56.1456
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1147,
+            194,
+            193,
+            130
+          ],
+          "anchor": [
+            91.5479,
+            43.1456
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1350,
+            178,
+            182,
+            145
+          ],
+          "anchor": [
+            87.7393,
+            58.1456
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "spitter": {
+      "texture": "res://assets/sprites/forest-enemies-v2.png",
+      "scale": 0.2625,
+      "movement_speed": 78,
+      "frames": [
+        {
+          "rect": [
+            24,
+            417,
+            178,
+            147
+          ],
+          "anchor": [
+            87.3789,
+            65.0
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            211,
+            417,
+            179,
+            147
+          ],
+          "anchor": [
+            87.8614,
+            65.0
+          ],
+          "duration": 0.08
         },
         {
           "rect": [
             407,
-            634,
-            332,
-            370
+            417,
+            177,
+            148
           ],
           "anchor": [
-            167,
-            224
+            87.1254,
+            66.0
           ],
-          "duration": 0.24
+          "duration": 0.08
         },
         {
           "rect": [
-            785,
-            633,
-            340,
-            367
+            596,
+            417,
+            178,
+            148
           ],
           "anchor": [
-            173,
-            225
+            87.5952,
+            66.0
           ],
-          "duration": 0.24
+          "duration": 0.08
         },
         {
           "rect": [
-            1167,
-            634,
-            358,
-            374
+            787,
+            417,
+            177,
+            148
           ],
           "anchor": [
-            175,
-            224
+            88.0482,
+            66.0
           ],
-          "duration": 0.24
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            973,
+            416,
+            170,
+            149
+          ],
+          "anchor": [
+            87.723,
+            67.0
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1162,
+            435,
+            178,
+            131
+          ],
+          "anchor": [
+            87.6313,
+            49.0
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1342,
+            427,
+            188,
+            139
+          ],
+          "anchor": [
+            87.2911,
+            57.0
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "spore_moth": {
+      "texture": "res://assets/sprites/forest-enemies-v2.png",
+      "scale": 0.3211765,
+      "movement_speed": 120,
+      "frames": [
+        {
+          "rect": [
+            17,
+            659,
+            185,
+            193
+          ],
+          "anchor": [
+            104.0756,
+            131.8077
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            202,
+            666,
+            188,
+            189
+          ],
+          "anchor": [
+            105.9843,
+            126.8903
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            389,
+            687,
+            193,
+            165
+          ],
+          "anchor": [
+            111.8843,
+            101.1903
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            586,
+            666,
+            187,
+            189
+          ],
+          "anchor": [
+            107.8718,
+            125.4028
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            775,
+            662,
+            188,
+            193
+          ],
+          "anchor": [
+            107.8948,
+            129.6429
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            974,
+            660,
+            180,
+            195
+          ],
+          "anchor": [
+            104.1843,
+            131.2442
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1163,
+            706,
+            170,
+            145
+          ],
+          "anchor": [
+            87.5243,
+            90.6303
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1330,
+            688,
+            200,
+            167
+          ],
+          "anchor": [
+            118.7343,
+            103.0903
+          ],
+          "duration": 0.08
         }
       ],
       "animations": {
         "idle": [
           0,
-          1
+          1,
+          2,
+          3,
+          4,
+          5
         ],
         "move": [
           0,
-          1
+          1,
+          2,
+          3,
+          4,
+          5
         ],
         "windup": [
-          2
+          6
         ],
         "attack": [
-          3
+          7
         ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "charger": {
+      "texture": "res://assets/sprites/canyon-enemies-v2.png",
+      "scale": 0.2710345,
+      "movement_speed": 96,
+      "frames": [
+        {
+          "rect": [
+            21,
+            123,
+            222,
+            147
+          ],
+          "anchor": [
+            113.6847,
+            56.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            277,
+            121,
+            225,
+            149
+          ],
+          "anchor": [
+            111.3569,
+            58.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            522,
+            123,
+            228,
+            147
+          ],
+          "anchor": [
+            117.0683,
+            56.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            777,
+            121,
+            227,
+            149
+          ],
+          "anchor": [
+            115.9632,
+            58.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            21,
+            356,
+            223,
+            152
+          ],
+          "anchor": [
+            110.8574,
+            61.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            273,
+            356,
+            226,
+            151
+          ],
+          "anchor": [
+            114.0049,
+            60.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            525,
+            375,
+            218,
+            132
+          ],
+          "anchor": [
+            110.3309,
+            41.4504
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            762,
+            377,
+            248,
+            138
+          ],
+          "anchor": [
+            131.0754,
+            47.4504
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "burrower": {
+      "texture": "res://assets/sprites/canyon-enemies-v2.png",
+      "scale": 0.2836364,
+      "movement_speed": 64,
+      "frames": [
+        {
+          "rect": [
+            30,
+            618,
+            215,
+            139
+          ],
+          "anchor": [
+            110.0119,
+            62.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            279,
+            618,
+            218,
+            143
+          ],
+          "anchor": [
+            113.1638,
+            66.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            527,
+            619,
+            219,
+            144
+          ],
+          "anchor": [
+            114.174,
+            67.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            786,
+            620,
+            209,
+            139
+          ],
+          "anchor": [
+            107.4127,
+            62.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            30,
+            851,
+            214,
+            141
+          ],
+          "anchor": [
+            106.9107,
+            64.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            278,
+            850,
+            219,
+            142
+          ],
+          "anchor": [
+            106.4744,
+            65.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            521,
+            857,
+            198,
+            132
+          ],
+          "anchor": [
+            89.1645,
+            55.9615
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            766,
+            853,
+            234,
+            142
+          ],
+          "anchor": [
+            106.0522,
+            65.9615
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "drone": {
+      "texture": "res://assets/sprites/canyon-enemies-v2.png",
+      "scale": 0.2883582,
+      "movement_speed": 135,
+      "frames": [
+        {
+          "rect": [
+            50,
+            1079,
+            184,
+            173
+          ],
+          "anchor": [
+            113.0638,
+            95.4224
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            310,
+            1082,
+            173,
+            170
+          ],
+          "anchor": [
+            101.7905,
+            92.2505
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            562,
+            1081,
+            174,
+            174
+          ],
+          "anchor": [
+            102.7237,
+            94.6183
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            819,
+            1079,
+            168,
+            174
+          ],
+          "anchor": [
+            97.3388,
+            96.3412
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            46,
+            1325,
+            189,
+            166
+          ],
+          "anchor": [
+            118.1124,
+            85.8219
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            305,
+            1327,
+            185,
+            151
+          ],
+          "anchor": [
+            113.6545,
+            81.3099
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            549,
+            1329,
+            195,
+            159
+          ],
+          "anchor": [
+            123.9354,
+            82.1253
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            795,
+            1345,
+            188,
+            126
+          ],
+          "anchor": [
+            117.1764,
+            62.9566
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "sentinel": {
+      "texture": "res://assets/sprites/ruins-enemies-v2.png",
+      "scale": 0.2079693,
+      "movement_speed": 55,
+      "frames": [
+        {
+          "rect": [
+            24,
+            83,
+            158,
+            265
+          ],
+          "anchor": [
+            84.2203,
+            152.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            221,
+            83,
+            158,
+            268
+          ],
+          "anchor": [
+            84.4585,
+            155.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            419,
+            83,
+            155,
+            267
+          ],
+          "anchor": [
+            76.0631,
+            154.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            618,
+            85,
+            132,
+            264
+          ],
+          "anchor": [
+            63.9109,
+            151.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            777,
+            83,
+            151,
+            265
+          ],
+          "anchor": [
+            83.7578,
+            152.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            970,
+            83,
+            134,
+            265
+          ],
+          "anchor": [
+            66.9927,
+            152.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1132,
+            145,
+            176,
+            203
+          ],
+          "anchor": [
+            110.2101,
+            90.4068
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1317,
+            126,
+            203,
+            224
+          ],
+          "anchor": [
+            137.7611,
+            111.4068
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "skirmisher": {
+      "texture": "res://assets/sprites/ruins-enemies-v2.png",
+      "scale": 0.2176786,
+      "movement_speed": 102,
+      "frames": [
+        {
+          "rect": [
+            20,
+            430,
+            163,
+            228
+          ],
+          "anchor": [
+            93.9929,
+            134.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            205,
+            429,
+            171,
+            229
+          ],
+          "anchor": [
+            109.3282,
+            135.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            402,
+            430,
+            162,
+            228
+          ],
+          "anchor": [
+            99.8528,
+            134.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            593,
+            430,
+            155,
+            228
+          ],
+          "anchor": [
+            91.0981,
+            134.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            772,
+            430,
+            154,
+            228
+          ],
+          "anchor": [
+            92.6433,
+            134.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            952,
+            430,
+            154,
+            228
+          ],
+          "anchor": [
+            93.3269,
+            134.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1131,
+            467,
+            171,
+            191
+          ],
+          "anchor": [
+            109.7275,
+            97.1214
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1327,
+            432,
+            197,
+            226
+          ],
+          "anchor": [
+            124.0554,
+            132.1214
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "conductor": {
+      "texture": "res://assets/sprites/ruins-enemies-v2.png",
+      "scale": 0.2331474,
+      "movement_speed": 88,
+      "frames": [
+        {
+          "rect": [
+            33,
+            718,
+            160,
+            254
+          ],
+          "anchor": [
+            82.0526,
+            80.9474
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            216,
+            715,
+            163,
+            252
+          ],
+          "anchor": [
+            83.5231,
+            84.7412
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            401,
+            715,
+            160,
+            253
+          ],
+          "anchor": [
+            82.5603,
+            84.9985
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            585,
+            718,
+            163,
+            257
+          ],
+          "anchor": [
+            86.2222,
+            82.9991
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            772,
+            715,
+            161,
+            256
+          ],
+          "anchor": [
+            83.8231,
+            85.7011
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            955,
+            719,
+            157,
+            256
+          ],
+          "anchor": [
+            77.4848,
+            80.4435
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1140,
+            736,
+            163,
+            227
+          ],
+          "anchor": [
+            88.0761,
+            80.0921
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            1351,
+            700,
+            174,
+            273
+          ],
+          "anchor": [
+            100.788,
+            104.536
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "windup": [
+          6
+        ],
+        "attack": [
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "boss_spore": {
+      "texture": "res://assets/sprites/bosses-v2.png",
+      "scale": 0.6549533,
+      "movement_speed": 75,
+      "frames": [
+        {
+          "rect": [
+            44,
+            83,
+            195,
+            164
+          ],
+          "anchor": [
+            99.6954,
+            98.4384
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            312,
+            83,
+            198,
+            164
+          ],
+          "anchor": [
+            101.815,
+            99.1061
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            583,
+            82,
+            200,
+            165
+          ],
+          "anchor": [
+            102.6501,
+            98.9186
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            845,
+            82,
+            194,
+            165
+          ],
+          "anchor": [
+            95.8052,
+            99.9731
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            36,
+            319,
+            211,
+            167
+          ],
+          "anchor": [
+            104.9063,
+            99.2402
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            309,
+            320,
+            206,
+            165
+          ],
+          "anchor": [
+            104.1414,
+            96.3008
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            573,
+            321,
+            219,
+            165
+          ],
+          "anchor": [
+            112.7227,
+            97.4457
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            841,
+            316,
+            208,
+            169
+          ],
+          "anchor": [
+            103.9649,
+            97.7565
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "windup": [
+          4,
+          5
+        ],
+        "attack": [
+          6,
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "boss_stone": {
+      "texture": "res://assets/sprites/bosses-v2.png",
+      "scale": 0.6168421,
+      "movement_speed": 75,
+      "frames": [
+        {
+          "rect": [
+            37,
+            560,
+            217,
+            175
+          ],
+          "anchor": [
+            107.5685,
+            101.6689
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            309,
+            559,
+            212,
+            175
+          ],
+          "anchor": [
+            113.6818,
+            101.6689
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            572,
+            560,
+            215,
+            175
+          ],
+          "anchor": [
+            110.4183,
+            101.6689
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            841,
+            560,
+            211,
+            175
+          ],
+          "anchor": [
+            107.5717,
+            101.6689
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            39,
+            769,
+            206,
+            173
+          ],
+          "anchor": [
+            111.9091,
+            99.6689
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            300,
+            767,
+            215,
+            176
+          ],
+          "anchor": [
+            111.5689,
+            102.6689
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            566,
+            779,
+            257,
+            164
+          ],
+          "anchor": [
+            136.7769,
+            90.6689
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            844,
+            769,
+            209,
+            176
+          ],
+          "anchor": [
+            108.4032,
+            102.6689
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "windup": [
+          4,
+          5
+        ],
+        "attack": [
+          6,
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
+      }
+    },
+    "boss_prism": {
+      "texture": "res://assets/sprites/bosses-v2.png",
+      "scale": 0.6055238,
+      "movement_speed": 75,
+      "frames": [
+        {
+          "rect": [
+            46,
+            976,
+            191,
+            214
+          ],
+          "anchor": [
+            94.2778,
+            127.7754
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            316,
+            976,
+            191,
+            214
+          ],
+          "anchor": [
+            97.0594,
+            127.9546
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            581,
+            976,
+            192,
+            214
+          ],
+          "anchor": [
+            93.8455,
+            127.4547
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            852,
+            977,
+            194,
+            213
+          ],
+          "anchor": [
+            95.6246,
+            125.8985
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            64,
+            1211,
+            155,
+            215
+          ],
+          "anchor": [
+            75.821,
+            125.622
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            330,
+            1211,
+            155,
+            215
+          ],
+          "anchor": [
+            75.2592,
+            125.1383
+          ],
+          "duration": 0.18
+        },
+        {
+          "rect": [
+            565,
+            1211,
+            223,
+            215
+          ],
+          "anchor": [
+            110.0475,
+            125.0659
+          ],
+          "duration": 0.08
+        },
+        {
+          "rect": [
+            858,
+            1211,
+            185,
+            211
+          ],
+          "anchor": [
+            91.196,
+            124.4372
+          ],
+          "duration": 0.08
+        }
+      ],
+      "animations": {
+        "idle": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "move": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "windup": [
+          4,
+          5
+        ],
+        "attack": [
+          6,
+          7
+        ]
+      },
+      "animation_modes": {
+        "idle": "loop",
+        "move": "loop",
+        "windup": "once",
+        "attack": "once"
       }
     }
   }

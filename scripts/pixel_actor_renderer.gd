@@ -9,6 +9,14 @@ const MAX_ACTORS: int = 32
 const MAX_FRAMES: int = 64
 const MAX_TEXTURE_BYTES: int = 64 * 1024 * 1024
 const MAX_BAKED_BYTES: int = 8 * 1024 * 1024
+# At fractional viewport scales a screen pixel can land exactly between two
+# logical texels. Give nearest sampling a consistent tie direction; otherwise
+# interpolated UV rounding can change one column when an integer origin moves.
+const SAMPLE_TIE_BIAS: float = 1.0 / 1024.0
+const TRACK_META: StringName = &"someside_actor_animation_tracks"
+const MAX_TRACKS: int = 256
+const ONE_SHOTS: Array[String] = ["rise", "fall", "jump", "dash", "land", "windup", "attack", "dead"]
+static var _manifest_revision: int = 0
 static var _loaded: bool = false
 static var _actors: Dictionary = {}
 static var _textures: Dictionary = {}
@@ -38,6 +46,7 @@ static func reload_manifest(path: String = MANIFEST_PATH) -> void:
 ## Also used by isolated rendering tests with in-memory Texture2D fixtures.
 ## Ownership stays with this presentation module, never with game snapshots.
 static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {}) -> void:
+	_manifest_revision += 1
 	_actors.clear()
 	_textures.clear()
 	_errors.clear()
@@ -88,15 +97,24 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 			# geometry if a malformed manifest uses an unbounded value.
 			if anchor.abs().x > 8192.0 or anchor.abs().y > 8192.0:
 				break
+			# Attachments use actor-local logical pixels, independent of source PNG
+			# scale. Only presentation follows this point; ballistic aim stays fixed.
+			var shoulder := Vector2(0.0, -5.0)
+			if frame.has("shoulder"):
+				if not _numbers(frame.shoulder, 2):
+					break
+				shoulder = Vector2(float(frame.shoulder[0]), float(frame.shoulder[1]))
+				if shoulder.abs().x > 64.0 or shoulder.abs().y > 64.0:
+					break
 			var target: Rect2 = Rect2(-anchor * scale_value, rect.size * scale_value)
 			var atlas := AtlasTexture.new()
 			atlas.atlas = texture
 			atlas.region = rect
 			atlas.filter_clip = true
-			frames.append({"source": rect, "anchor": anchor, "target": target, "duration": clampf(duration, 0.016, 5.0), "texture": atlas})
+			frames.append({"source": rect, "anchor": anchor, "target": target, "duration": clampf(duration, 0.016, 5.0), "texture": atlas, "shoulder": shoulder})
 			union = target if frames.size() == 1 else union.merge(target)
 		if frames.size() != frame_values.size():
-			_errors.append("Invalid crop, anchor or timing: " + id)
+			_errors.append("Invalid crop, anchor, timing or shoulder: " + id)
 			continue
 		# Downsample once at a fixed actor-local phase. Sampling a 1536px sheet
 		# directly at 0.125 scale selected different source texels each time the
@@ -124,7 +142,16 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 			var declared_bounds: Rect2 = _rect(source.bounds)
 			if declared_bounds.size.x > 0 and declared_bounds.size.y > 0:
 				bounds = bounds.merge(declared_bounds)
-		_actors[id] = {"path": path, "frames": frames, "animations": animations, "bounds": bounds, "scale": scale_value}
+		var modes: Dictionary = {}
+		var declared_modes: Dictionary = source.get("animation_modes", {}) if source.get("animation_modes", {}) is Dictionary else {}
+		for animation: String in animations:
+			var default_mode: String = "once" if animation in ONE_SHOTS else "loop"
+			var mode: String = str(declared_modes.get(animation, default_mode))
+			modes[animation] = mode if mode in ["once", "loop"] else default_mode
+		var movement_speed: float = float(source.get("movement_speed", 245.0 if id in ["ranger", "vanguard"] else 110.0))
+		if not is_finite(movement_speed) or movement_speed <= 0.0:
+			movement_speed = 245.0 if id in ["ranger", "vanguard"] else 110.0
+		_actors[id] = {"path": path, "frames": frames, "animations": animations, "animation_modes": modes, "movement_speed": movement_speed, "bounds": bounds, "scale": scale_value}
 
 static func _bake_frames(image: Image, frames: Array, union: Rect2, scale_value: float) -> bool:
 	if image == null or image.is_empty():
@@ -164,7 +191,7 @@ static func _bake_frames(image: Image, frames: Array, union: Rect2, scale_value:
 	for frame: Dictionary in frames:
 		var atlas := AtlasTexture.new()
 		atlas.atlas = nearest
-		atlas.region = frame.baked_region
+		atlas.region = Rect2(frame.baked_region.position + Vector2.ONE * SAMPLE_TIE_BIAS, frame.baked_region.size)
 		atlas.filter_clip = true
 		frame.texture = atlas
 	_baked_bytes += cost
@@ -250,41 +277,139 @@ static func animation_for(state: Dictionary, player: bool = false) -> String:
 		return "attack"
 	return "move" if velocity.length_squared() > 100.0 or bool(state.get("flying", false)) else "idle"
 
+## Pure sampling remains useful for portraits and asset inspection. Live drawing
+## uses tracked_frame_for so changing actions cannot jump to a global-clock pose.
 static func frame_for(id: String, state: Dictionary, clock: float, player: bool = false) -> Dictionary:
 	_ensure_loaded()
 	if not _actors.has(id):
 		return {}
 	var actor: Dictionary = _actors[id]
-	var animation: String = animation_for(state, player)
-	var aliases: Dictionary = {"run": "move", "move": "run", "rise": "jump", "fall": "jump", "dash": "run", "attack": "move", "windup": "idle", "dead": "idle"}
+	var animation: String = _resolve_animation(actor, animation_for(state, player))
+	var elapsed: float = maxf(0.0, clock) if is_finite(clock) else 0.0
+	if not player:
+		elapsed = _enemy_action_time(actor, animation, state, elapsed)
+	return _sample_frame(id, actor, state, animation, elapsed, player)
+
+static func _resolve_animation(actor: Dictionary, requested: String) -> String:
+	var animation: String = requested
+	var aliases: Dictionary = {"run": "move", "move": "run", "rise": "jump", "fall": "jump", "dash": "run", "land": "idle", "attack": "move", "windup": "idle", "dead": "idle"}
 	if not actor.animations.has(animation):
 		animation = str(aliases.get(animation, "idle"))
 	if not actor.animations.has(animation):
 		animation = "idle"
-	var indices: Array = actor.animations[animation]
+	return animation
+
+static func _duration(actor: Dictionary, animation: String) -> float:
 	var duration: float = 0.0
-	for index: Variant in indices:
+	for index: Variant in actor.animations[animation]:
 		duration += float(actor.frames[int(index)].duration)
+	return duration
+
+static func _enemy_action_time(actor: Dictionary, animation: String, state: Dictionary, fallback: float) -> float:
+	if animation == "windup" and float(state.get("telegraph_max", 0.0)) > 0.0:
+		# The same replicated warning timer drives every client's anticipation,
+		# including enemies that enter the viewport halfway through a windup.
+		var progress: float = 1.0 - float(state.get("telegraph", 0.0)) / float(state.telegraph_max)
+		return clampf(progress, 0.0, 1.0) * _duration(actor, animation)
+	if animation == "attack" and state.has("attack_cd") and state.has("attack_cooldown"):
+		return maxf(0.0, float(state.attack_cooldown) - float(state.attack_cd))
+	return fallback
+
+static func reset_tracks(canvas: CanvasItem) -> void:
+	if canvas.has_meta(TRACK_META):
+		canvas.remove_meta(TRACK_META)
+
+## Tracks belong to the drawing canvas, not to snapshots or static global
+## identities. A new world/preview gets its own clock and frees its own history.
+static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary, clock: float, player: bool = false) -> Dictionary:
+	_ensure_loaded()
+	if not _actors.has(id):
+		return {}
+	var actor: Dictionary = _actors[id]
 	var safe_clock: float = maxf(0.0, clock) if is_finite(clock) else 0.0
-	var phase: float = fposmod(safe_clock + (0.0 if player else float(int(state.get("id", 0)) % 37) * 0.071), duration)
+	var cache: Dictionary = canvas.get_meta(TRACK_META, {})
+	if int(cache.get("revision", -1)) != _manifest_revision or safe_clock < float(cache.get("clock", safe_clock)):
+		cache = {"revision": _manifest_revision, "clock": safe_clock, "pruned": safe_clock, "tracks": {}}
+	var tracks: Dictionary = cache.tracks
+	if safe_clock - float(cache.pruned) > 2.0:
+		for old_key: Variant in tracks.keys():
+			if safe_clock - float(tracks[old_key].clock) > 2.0:
+				tracks.erase(old_key)
+		cache.pruned = safe_clock
+	var key: String = ("p:" if player else "e:") + str(state.get("id", 0)) + ":" + id
+	var track: Dictionary = tracks.get(key, {})
+	var requested: String = animation_for(state, player)
+	var animation: String = _resolve_animation(actor, requested)
+	var grounded: bool = bool(state.get("grounded", false))
+	var position_value: Vector2 = state.get("pos", Vector2.ZERO)
+	var attack_count: int = int(state.get("attack_count", 0))
+	var dt: float = safe_clock - float(track.get("clock", safe_clock))
+	var reset: bool = track.is_empty() or dt < 0.0 or dt > 0.5 or position_value.distance_squared_to(track.get("pos", position_value)) > 180.0 * 180.0
+	var restart: bool = false
+	if not reset and player:
+		var landing: bool = grounded and not bool(track.grounded) and requested not in ["dash", "dead"] and actor.animations.has("land")
+		var firing: bool = requested == "idle" and attack_count > int(track.attack_count) and actor.animations.has("attack")
+		if landing or firing:
+			animation = "land" if landing else "attack"
+			restart = true
+		elif requested in ["idle", "run"] and str(track.animation) in ["land", "attack"] and float(track.elapsed) + dt < _duration(actor, str(track.animation)):
+			# A landing is visual only: walking, aiming and firing remain live.
+			# Running immediately interrupts a standing attack pose.
+			if str(track.animation) == "land" or requested == "idle":
+				animation = str(track.animation)
+	var velocity: Vector2 = state.get("vel", Vector2.ZERO)
+	var rate: float = 1.0
+	if animation in ["run", "move"]:
+		var speed: float = absf(velocity.x) if player or not bool(state.get("flying", false)) else velocity.length()
+		# Hovering still has a full wing cycle; ground feet follow travel speed.
+		rate = clampf(speed / float(actor.movement_speed), 0.4, 2.0)
+		if not player and bool(state.get("flying", false)):
+			rate = maxf(1.0, rate)
+	var elapsed: float = 0.0
+	if not reset and not restart and animation == str(track.get("animation", "")):
+		# Integrate cadence instead of multiplying the entire world clock by the
+		# current speed. Speed relics and braking cannot rewind the running cycle.
+		elapsed = float(track.elapsed) + dt * float(track.get("rate", rate))
+	elif not player and animation in ["idle", "move", "run"]:
+		elapsed = float(posmod(int(state.get("id", 0)), 37)) * 0.071
+	if not player:
+		elapsed = _enemy_action_time(actor, animation, state, elapsed)
+	if not tracks.has(key) and tracks.size() >= MAX_TRACKS:
+		var oldest: String = ""
+		var oldest_clock: float = INF
+		for existing_key: String in tracks:
+			if float(tracks[existing_key].clock) < oldest_clock:
+				oldest_clock = float(tracks[existing_key].clock)
+				oldest = existing_key
+		tracks.erase(oldest)
+	tracks[key] = {"clock": safe_clock, "animation": animation, "elapsed": elapsed, "rate": rate, "grounded": grounded, "attack_count": attack_count, "pos": position_value}
+	cache.clock = safe_clock
+	canvas.set_meta(TRACK_META, cache)
+	return _sample_frame(id, actor, state, animation, elapsed, player)
+
+static func _sample_frame(id: String, actor: Dictionary, state: Dictionary, animation: String, elapsed: float, player: bool) -> Dictionary:
+	var indices: Array = actor.animations[animation]
+	var duration: float = _duration(actor, animation)
+	var loop: bool = str(actor.animation_modes[animation]) == "loop"
+	var phase: float = fposmod(elapsed, duration) if loop else clampf(elapsed, 0.0, duration)
 	var chosen: int = int(indices.back())
 	for index: Variant in indices:
 		chosen = int(index)
 		phase -= float(actor.frames[chosen].duration)
-		if phase < 0.0:
+		if phase < -0.000001:
 			break
 	var frame: Dictionary = actor.frames[chosen]
 	var flash: bool = float(state.get("hurt_timer", 0.0)) > 5.87 if player else float(state.get("flash", 0.0)) > 0.0
 	var tint: Color = Color(1.75, 1.75, 1.65, 1.0) if flash else Color.WHITE
 	if not player and bool(state.get("elite", false)):
 		tint *= Color(1.08, 1.02, 0.91, 1.0)
-	return {"actor": id, "animation": animation, "index": chosen, "texture": frame.texture, "source": frame.source, "target": frame.target, "draw_target": frame.draw_target, "tint": tint}
+	return {"actor": id, "animation": animation, "index": chosen, "texture": frame.texture, "source": frame.source, "target": frame.target, "draw_target": frame.draw_target, "tint": tint, "elapsed": elapsed, "duration": duration, "loop": loop, "shoulder": frame.shoulder}
 
 static func draw_player(canvas: Node2D, player: Dictionary, clock: float) -> bool:
-	return _draw(canvas, frame_for(str(player.get("character", "ranger")), player, clock, true))
+	return _draw(canvas, tracked_frame_for(canvas, str(player.get("character", "ranger")), player, clock, true))
 
 static func draw_enemy(canvas: Node2D, enemy: Dictionary, clock: float) -> bool:
-	return _draw(canvas, frame_for(enemy_id(enemy), enemy, clock))
+	return _draw(canvas, tracked_frame_for(canvas, enemy_id(enemy), enemy, clock))
 
 static func _draw(canvas: Node2D, frame: Dictionary) -> bool:
 	if frame.is_empty():

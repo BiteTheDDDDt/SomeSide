@@ -1,4 +1,4 @@
-﻿SomeSide 0.11.0 - Windows x64
+SomeSide 0.12.0 - Windows x64
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
@@ -24,6 +24,8 @@
 三张扩大后的地图具有不同地形与支路，按 M 查看关卡地图。
 三关重绘了各自背景、平台材质与地标，角色、怪物和弹道也已细化。
 两名角色、九种怪物和三种首领使用像素精灵图与多帧姿态。
+角色各有16帧，包含待机、跑步、上升、下落、冲刺和落地姿态；
+九种怪物与三种首领各有8帧，移动动画的节奏随实际速度变化。
 雨林敌人擅长跳扑、吐弹与落点孢子；峡谷擅长冲锋、钻地与散射；
 遗迹有锁定射线、闪现齐射与修复支援，共九种普通敌人与三种首领。
 危险攻击先显示方向线或落点预警，开始蓄力后可通过走位躲避。
@@ -76,6 +78,8 @@ Your saved preference is used on later launches. Co-op players can use
 different languages. Your gold balance is shown in gold at the top right.
 Actual FPS appears below it by default. F3 or Settings toggles the display;
 your choice is saved. Characters and enemies now use animated pixel sprites.
+Each hero has 16 frames for idle, running, rising, falling, dashing and landing.
+Each enemy and boss has 8 frames; movement animation follows actual speed.
 
 A/D or Left/Right: move; last pressed direction wins. Space/W/Up: jump.
 

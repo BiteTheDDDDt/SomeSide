@@ -1,4 +1,4 @@
-# SomeSide 0.11.0
+# SomeSide 0.12.0
 
 一款 2D 横版动作 Roguelike：鼠标自由瞄准、两种战斗风格、局内道具叠加、三段关卡，以及玩家主机驱动的 2–4 人合作。
 
@@ -6,7 +6,9 @@
 
 ## 开始游戏
 
-**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.11 独立版本位于 `dist/v0.11.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.11.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
+**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.12 独立版本位于 `dist/v0.12.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.12.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
+
+0.12 丰富角色与敌人动画：两名角色各从 6 帧增加到 16 帧，包含 4 帧待机、8 帧跑步，以及独立的上升、下落、冲刺和落地姿态；九种普通敌人与三种首领各从 4 帧增加到 8 帧，总帧数从 60 增至 128。移动动画节奏随速度变化，姿态按实际行动状态切换；动画只影响显示，不改变移动、攻击、碰撞或联机模拟。六张新精灵图用于当前发行包，旧图保留在仓库中。 新素材与完整提示词见 [v0.12 美术记录](assets/sprites/ART_PROMPTS_v0.12.md)。
 
 0.11 修复移动精灵抖动：角色和镜头使用一致的显示位置，缩小后的精灵帧先缓存到固定像素网格，避免移动时细节反复改变。菜单、选角、大厅、设置、指南、暂停、结算、背包和地图统一面板、按钮与信息层级，移除 “Expedition Program / Early Expedition” 等装饰文案；中英文界面同步整理。背包和地图将 FPS 放在顶部留白，返回战场后恢复到金币下方。
 
@@ -154,10 +156,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -C
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-network-controls-v09.ps1 -Clients 3 -Port 27924 -Impaired
 
 # 原生 OpenGL 渲染基准，持续移动镜头；省略 --moving 则固定镜头
-.\tools\runtime\Godot_v4.7.2-stable_win64_console.exe --path . --script res://tools/perf-v11.gd -- --tag=local-moving --moving
+.\tools\runtime\Godot_v4.7.2-stable_win64_console.exe --path . --script res://tools/perf-v12.gd -- --tag=local-moving --moving
 ```
 
-导出结果是 `dist/v0.11.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 生成只含游戏、快速开始说明和许可的 0.11 ZIP。未下载模板时，第一次导出会下载约 1.28 GB 官方模板归档，仅提取 Windows x86_64 所需模板。
+导出结果是 `dist/v0.12.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 生成只含游戏、快速开始说明和许可的 0.12 ZIP。未下载模板时，第一次导出会下载约 1.28 GB 官方模板归档，仅提取 Windows x86_64 所需模板。
 
 测试覆盖快照深拷贝、随机种子、瞄准预测、单跳与羽翼、手动拾取、多人争抢、装备冷却保留、设施交易和稀有掉落。地图可达性通过真实移动与碰撞验证：两个角色都不带道具、不冲刺，起跳和落点留出余量，并验证起跳位置偏差。压力测试继续检查四人长时间构筑与切关一致性。网络测试启动独立 Godot 进程，要求主机见到完整队伍、收到输入，客户端接收多次快照，并成功退出且没有运行时错误。证据保存在 `tools/results/network-*`。
 

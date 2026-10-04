@@ -281,6 +281,7 @@ func _update_render_positions(delta: float) -> void:
 	var stage: int = int(_frame.get("stage", 1))
 	var snapshot_time: float = float(_frame.get("time", 0.0))
 	if stage != _render_stage or snapshot_time < _last_snapshot_time:
+		Pixels.reset_tracks(self)
 		_render_positions.clear()
 		_fixed_samples.clear()
 		_render_stage = stage
@@ -394,11 +395,17 @@ func _entity_draw_position(key: String, position_value: Vector2) -> Vector2:
 
 
 func weapon_draw_pose(player: Dictionary) -> Dictionary:
-	var rendered: Dictionary = player.duplicate()
-	rendered["pos"] = _entity_draw_position("p" + str(player.get("id", -1)), player.get("pos", Vector2.ZERO))
+	var position_value: Vector2 = _entity_draw_position("p" + str(player.get("id", -1)), player.get("pos", Vector2.ZERO))
 	var aim: Vector2 = WeaponPose.normalized_aim(player.get("aim", Vector2.RIGHT))
-	return {"position":rendered.pos, "shoulder":WeaponPose.shoulder_position(rendered.pos),
-		"muzzle":WeaponPose.muzzle_position(rendered), "aim":aim}
+	# A deep landing pose moves the visible shoulder with the torso. Sampling
+	# the same tracked frame again during body drawing is idempotent. Simulation
+	# and input continue to use WeaponPose's unchanged physical shoulder/muzzle.
+	var frame: Dictionary = Pixels.tracked_frame_for(self, str(player.get("character", "ranger")), player, _clock, true)
+	var offset: Vector2 = frame.get("shoulder", Vector2(0.0, -5.0))
+	offset.x *= 1.0 if aim.x >= 0.0 else -1.0
+	var shoulder: Vector2 = position_value + offset
+	return {"position":position_value, "shoulder":shoulder,
+		"muzzle":shoulder + aim * WeaponPose.muzzle_length(str(player.get("weapon", "pulse_rifle"))), "aim":aim}
 
 
 func muzzle_effect_pose(effect: Dictionary) -> Dictionary:
@@ -1150,7 +1157,7 @@ func _draw_players() -> void:
 		var running: float = clampf(absf(vel.x) / 100.0, 0.0, 1.0)
 		if Pixels.available(character):
 			# Pixel poses already contain their authored step motion. Additional
-			# fractional body bob detached the torso from the fixed weapon shoulder.
+			# fractional body bob detached the torso from its selected weapon shoulder.
 			p = Pixels.snap_position(self, p)
 		else:
 			p.y -= absf(cos(_clock * 16.0)) * running if grounded else 0.0
@@ -1158,7 +1165,7 @@ func _draw_players() -> void:
 		Appearance.draw_layer(self, appearance, true, _clock)
 		Entities.player_body(self, player, _clock)
 		draw_set_transform(Vector2.ZERO)
-		# Accessories mirror with the body; the weapon uses the shared fixed shoulder.
+		# Accessories mirror with the body; the weapon follows the selected shoulder.
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
 		Appearance.draw_layer(self, appearance, false, _clock)
 		draw_set_transform(world_to_screen(pose.shoulder), aim.angle(), Vector2(1.0, facing))
