@@ -14,6 +14,8 @@ var interaction_target: Dictionary = {}
 
 const ItemIcons = preload("res://scripts/item_icons.gd")
 const Biomes = preload("res://scripts/biome_renderer.gd")
+const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const Appearance = preload("res://scripts/player_appearance.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
 
@@ -151,6 +153,38 @@ func _entity_draw_position(key: String, position_value: Vector2) -> Vector2:
 	return _render_positions.get(key, position_value) if interpolate_remote_entities else position_value
 
 
+func weapon_draw_pose(player: Dictionary) -> Dictionary:
+	var rendered: Dictionary = player.duplicate()
+	rendered["pos"] = _entity_draw_position("p" + str(player.get("id", -1)), player.get("pos", Vector2.ZERO))
+	var aim: Vector2 = WeaponPose.normalized_aim(player.get("aim", Vector2.RIGHT))
+	return {"position":rendered.pos, "shoulder":WeaponPose.shoulder_position(rendered.pos),
+		"muzzle":WeaponPose.muzzle_position(rendered), "aim":aim}
+
+
+func muzzle_effect_pose(effect: Dictionary) -> Dictionary:
+	var fallback: Dictionary = {"visible":true, "pos":effect.get("pos", Vector2.ZERO),
+		"aim":Vector2.from_angle(float(effect.get("angle", 0.0)))}
+	if not effect.has("weapon"):
+		return fallback
+	var player: Dictionary = Dictionary(_frame.get("players", {})).get(int(effect.get("owner", -1)), {})
+	if player.is_empty() or bool(player.get("dead", false)) or str(player.get("weapon", "")) != str(effect.weapon):
+		fallback.visible = false
+		return fallback
+	var pose: Dictionary = weapon_draw_pose(player)
+	return {"visible":true, "pos":pose.muzzle, "aim":pose.aim}
+
+
+static func projectile_trail_length(projectile: Dictionary, draw_position: Vector2, maximum: float) -> float:
+	var length: float = maxf(0.0, maximum)
+	if str(projectile.get("team", "player")) != "player" or not projectile.has("origin"):
+		return length
+	length = minf(length, maxf(0.0, float(projectile.get("travel_distance", 0.0))))
+	if not bool(projectile.get("returning", false)):
+		var direction: Vector2 = Vector2(projectile.get("vel", Vector2.RIGHT)).normalized()
+		length = minf(length, maxf(0.0, (draw_position - Vector2(projectile.origin)).dot(direction)))
+	return length
+
+
 static func stack_tier(stacks: int) -> int:
 	if stacks >= 8: return 3
 	if stacks >= 4: return 2
@@ -225,7 +259,13 @@ func push_events(events: Array) -> void:
 				if str(event.get("kind", "")) in ["storm", "storm_staff"]: shot_color = Color("89dbec")
 				if str(event.get("kind", "")) == "boomerang": shot_color = Color("9be0cf")
 				var shot_strength: float = 0.85 if enemy_shot else strength
-				_add_effect({"kind":"muzzle", "pos":position_value, "angle":direction.angle(), "color":shot_color, "strength":shot_strength, "age":0.0, "life":0.105})
+				var muzzle: Dictionary = {"kind":"muzzle", "pos":position_value, "angle":direction.angle(), "color":shot_color, "strength":shot_strength, "age":0.0, "life":0.105}
+				if event.has("weapon"):
+					muzzle.merge({"owner":event.get("player", -1), "weapon":event.weapon})
+					var pose: Dictionary = muzzle_effect_pose(muzzle)
+					if not bool(pose.visible): continue
+					position_value = pose.pos
+				_add_effect(muzzle)
 				_spark(position_value, shot_color, clampi(int(3.0 + shot_strength * 3.0), 3, 12), 125.0, 0.19)
 			"hit":
 				var crit: bool = event.get("crit", false)
@@ -265,7 +305,10 @@ func push_events(events: Array) -> void:
 					_shake = minf(5.0, maxf(_shake, 1.5 + strength * 0.8))
 			"slash":
 				var flame: bool = str(event.get("kind", "")) == "flame"
-				_add_effect({"kind": "flame" if flame else "slash", "pos": position_value, "angle": direction.angle(), "age": 0.0, "life": 0.19 if flame else 0.27, "color": Color("ffa77a") if flame else GOLD, "strength":strength, "radius":clampf(float(event.get("radius",170.0 if flame else 85.0)),45.0,180.0 if flame else 160.0)})
+				var swipe: Dictionary = {"kind": "flame" if flame else "slash", "pos": position_value, "angle": direction.angle(), "age": 0.0, "life": 0.19 if flame else 0.27, "color": Color("ffa77a") if flame else GOLD, "strength":strength, "radius":clampf(float(event.get("radius",170.0 if flame else 85.0)),45.0,180.0 if flame else 160.0)}
+				if event.has("weapon"):
+					swipe.merge({"owner":event.get("player", -1), "weapon":event.weapon})
+				_add_effect(swipe)
 			"dash":
 				_spark(position_value, TEAL, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
 				_add_effect({"kind":"dash", "pos":position_value, "angle":direction.angle(), "color":TEAL, "strength":strength, "age":0.0, "life":0.22})
@@ -684,46 +727,86 @@ func _draw_deployables() -> void:
 			draw_line(p+dir*9.0,p+dir*16.0,Color(tint,0.75),1.5,true)
 
 
-func _draw_special_weapon(weapon: String) -> void:
-	# Called in the shoulder's aim transform, independent of character body.
-	var accent: Color = ItemIcons.color(weapon)
-	draw_line(Vector2.ZERO,Vector2(12,3),INK,7.0,true)
-	draw_line(Vector2.ZERO,Vector2(12,3),Color("91a89a"),4.0,true)
+func _draw_weapon(weapon: String) -> void:
+	# Local +X is the authoritative aim. Every tip ends at WeaponPose's muzzle.
+	var end: float = WeaponPose.muzzle_length(weapon)
+	draw_line(Vector2.ZERO, Vector2(12,3), INK, 8.0, true)
+	draw_line(Vector2.ZERO, Vector2(12,3), Color("91a89a"), 4.0, true)
 	match weapon:
+		"pulse_rifle":
+			draw_colored_polygon(PackedVector2Array([Vector2(5,-5),Vector2(23,-5),Vector2(27,-2),Vector2(end,-2),Vector2(end,2),Vector2(22,2),Vector2(16,6),Vector2(7,6)]),INK)
+			draw_rect(Rect2(8,-4,17,6),Color("8da89c"))
+			draw_rect(Rect2(13,2,6,7),Color("405a54"))
+			draw_line(Vector2(11,-3),Vector2(22,-3),TEAL,2.0,true)
+			draw_line(Vector2(26,0),Vector2(end,0),Color("e0ead2"),2.0,true)
+			draw_rect(Rect2(7,-7,4,3),Color("b8cbbb"))
+		"scattergun":
+			draw_colored_polygon(PackedVector2Array([Vector2(5,-8),Vector2(26,-8),Vector2(29,-6),Vector2(end,-6),Vector2(end,6),Vector2(24,6),Vector2(19,10),Vector2(7,8)]),INK)
+			draw_rect(Rect2(7,-6,18,11),Color("a76842"))
+			draw_circle(Vector2(18,6),7.0,INK,true,-1.0,true)
+			draw_circle(Vector2(18,6),4.8,Color("c99d67"),true,-1.0,true)
+			draw_circle(Vector2(18,6),1.8,Color("614a38"),true,-1.0,true)
+			for y: float in [-3.0,3.0]:
+				draw_line(Vector2(23,y),Vector2(end-1,y),Color("e8c99a"),3.0,true)
+			draw_line(Vector2(end, -5),Vector2(end,5),GOLD,1.4,true)
+			for x: float in [10.0,15.0,20.0]: draw_line(Vector2(x,-6),Vector2(x,-2),GOLD,1.0,true)
+		"railgun":
+			draw_colored_polygon(PackedVector2Array([Vector2(6,-6),Vector2(26,-6),Vector2(31,-10),Vector2(37,-10),Vector2(33,-4),Vector2(end,-4),Vector2(end,4),Vector2(28,4),Vector2(20,9),Vector2(8,7)]),INK)
+			draw_rect(Rect2(8,-4,18,8),Color("57758d"))
+			for y: float in [-3.0,3.0]: draw_line(Vector2(26,y),Vector2(end,y),Color("a8dbfa"),1.8,true)
+			draw_line(Vector2(26,0),Vector2(end,0),Color("516d93"),1.0,true)
+			draw_rect(Rect2(14,-11,14,4),INK)
+			draw_line(Vector2(16,-9),Vector2(27,-9),Color("a8dbfa"),2.0,true)
+			for x: float in [12.0,17.0,22.0]: draw_line(Vector2(x,-4),Vector2(x,4),Color("b99fff"),2.0,true)
+			draw_line(Vector2(29,7),Vector2(38,7),Color("6f9fbc"),2.0,true)
 		"flamethrower":
-			draw_rect(Rect2(7,-6,23,12),INK)
-			draw_rect(Rect2(10,-4,18,8),Color("967252"))
-			draw_rect(Rect2(13,6,11,9),INK)
-			draw_rect(Rect2(15,6,7,7),Color("b16b4b"))
-			draw_rect(Rect2(28,-3,14,6),INK)
-			draw_line(Vector2(29,0),Vector2(43,0),accent,2.5,true)
-			draw_arc(Vector2(22,-3),7.0,PI,TAU,12,accent,1.5,true)
-			draw_circle(Vector2(44,0),2.0,Color("ffd49b"),true,-1.0,true)
+			draw_rect(Rect2(6,-7,24,15),INK)
+			draw_rect(Rect2(8,-5,20,10),Color("985b45"))
+			draw_rect(Rect2(11,5,14,12),INK)
+			draw_rect(Rect2(13,6,10,9),Color("e28b55"))
+			draw_line(Vector2(15,8),Vector2(21,8),GOLD,1.5,true)
+			draw_colored_polygon(PackedVector2Array([Vector2(29,-3),Vector2(end,-6),Vector2(end,6),Vector2(29,3)]),INK)
+			draw_line(Vector2(30,-2),Vector2(end,-4),Color("c5a586"),2.0,true)
+			draw_line(Vector2(30,2),Vector2(end,4),Color("c5a586"),2.0,true)
+			draw_line(Vector2(end, -4),Vector2(end,4),ORANGE,1.4,true)
+			draw_arc(Vector2(19,-4),9.0,PI,TAU,16,Color("d99858"),2.0,true)
+			draw_circle(Vector2(end-1,0),1.4,Color("ffe6b5"),true,-1.0,true)
 		"boomerang":
-			draw_colored_polygon(PackedVector2Array([Vector2(17,-21),Vector2(37,-4),Vector2(37,4),Vector2(17,21),Vector2(24,1)]),INK)
-			draw_polyline(PackedVector2Array([Vector2(19,-17),Vector2(33,0),Vector2(19,17)]),accent,4.5,true)
-			draw_polyline(PackedVector2Array([Vector2(23,-11),Vector2(32,0),Vector2(23,11)]),CREAM,1.3,true)
+			draw_colored_polygon(PackedVector2Array([Vector2(17,-23),Vector2(end-1,-5),Vector2(end,0),Vector2(end-1,5),Vector2(17,23),Vector2(20,6),Vector2(26,0),Vector2(20,-6)]),INK)
+			draw_polyline(PackedVector2Array([Vector2(19,-19),Vector2(end-3,0),Vector2(19,19)]),Color("89dec9"),4.5,true)
+			draw_polyline(PackedVector2Array([Vector2(22,-12),Vector2(end-2,0),Vector2(22,12)]),CREAM,1.3,true)
+			draw_line(Vector2(end-3,0),Vector2(end,0),CREAM,1.0,true)
 		"storm_staff":
-			draw_line(Vector2(4,0),Vector2(44,0),INK,7.0,true)
-			draw_line(Vector2(4,0),Vector2(42,0),Color("769b9a"),3.0,true)
-			draw_polyline(PackedVector2Array([Vector2(45,-12),Vector2(32,-8),Vector2(29,0),Vector2(32,8),Vector2(45,12)]),INK,6.0,true)
-			draw_polyline(PackedVector2Array([Vector2(45,-10),Vector2(33,-6),Vector2(31,0),Vector2(33,6),Vector2(45,10)]),accent,2.5,true)
-			_glow(Vector2(43,0),12.0,Color(accent,0.055),2)
-			draw_colored_polygon(PackedVector2Array([Vector2(38,0),Vector2(43,-6),Vector2(48,0),Vector2(43,6)]),accent)
+			draw_line(Vector2(2,0),Vector2(end-10,0),INK,7.0,true)
+			draw_line(Vector2(2,0),Vector2(end-10,0),Color("8994b1"),3.0,true)
+			for x: float in [9.0,17.0,25.0]: draw_line(Vector2(x,-3),Vector2(x,3),Color("c4accd"),1.5,true)
+			draw_polyline(PackedVector2Array([Vector2(end-1,-14),Vector2(end-16,-10),Vector2(end-21,0),Vector2(end-16,10),Vector2(end-1,14)]),INK,6.0,true)
+			draw_polyline(PackedVector2Array([Vector2(end-2,-12),Vector2(end-15,-8),Vector2(end-18,0),Vector2(end-15,8),Vector2(end-2,12)]),Color("bca4df"),2.5,true)
+			draw_colored_polygon(PackedVector2Array([Vector2(end-14,0),Vector2(end-7,-7),Vector2(end,0),Vector2(end-7,7)]),Color("a4edf3"))
+			draw_line(Vector2(end-10,0),Vector2(end,0),CREAM,1.2,true)
 		"sun_lance":
-			draw_line(Vector2(-2,0),Vector2(51,0),INK,6.0,true)
-			draw_line(Vector2(-2,0),Vector2(48,0),Color("b6a17b"),2.5,true)
-			draw_colored_polygon(PackedVector2Array([Vector2(32,-8),Vector2(55,0),Vector2(32,8),Vector2(36,0)]),accent)
-			draw_line(Vector2(35,0),Vector2(52,0),CREAM,1.5,true)
-			draw_arc(Vector2(34,0),10.0,PI*0.3,PI*1.7,18,Color("dbb969"),1.8,true)
-			_glow(Vector2(39,0),14.0,Color(accent,0.045),2)
+			draw_line(Vector2(-3,0),Vector2(end,0),INK,6.0,true)
+			draw_line(Vector2(-3,0),Vector2(end-9,0),Color("ad8556"),2.5,true)
+			draw_colored_polygon(PackedVector2Array([Vector2(end-27,-10),Vector2(end,0),Vector2(end-27,10),Vector2(end-21,0)]),INK)
+			draw_colored_polygon(PackedVector2Array([Vector2(end-24,-7),Vector2(end,0),Vector2(end-24,7),Vector2(end-18,0)]),Color("f9d184"))
+			draw_line(Vector2(end-22,0),Vector2(end,0),CREAM,1.5,true)
+			draw_arc(Vector2(end-28,0),12.0,PI*0.3,PI*1.7,22,Color("dbb969"),2.2,true)
+			draw_line(Vector2(5,-3),Vector2(5,3),GOLD,2.0,true)
+		"arc_blade":
+			draw_line(Vector2(1,0),Vector2(13,0),INK,8.0,true)
+			draw_line(Vector2(1,0),Vector2(13,0),Color("d0ab79"),5.0,true)
+			draw_colored_polygon(PackedVector2Array([Vector2(13,-5),Vector2(end-11,-10),Vector2(end,0),Vector2(end-11,10),Vector2(13,5)]),INK)
+			draw_colored_polygon(PackedVector2Array([Vector2(16,-3),Vector2(end-11,-7),Vector2(end,0),Vector2(end-11,7),Vector2(16,3)]),Color("b6c8b3"))
+			draw_line(Vector2(18,0),Vector2(end,0),GOLD,2.0,true)
+			draw_line(Vector2(13,-10),Vector2(13,10),Color("c5955a"),3.0,true)
 
 
 func _draw_players() -> void:
 	var players: Dictionary = _frame.get("players", {})
 	for key: Variant in players:
 		var player: Dictionary = players[key]
-		var p: Vector2 = world_to_screen(_entity_draw_position("p" + str(key), player.get("pos", Vector2.ZERO)))
+		var pose: Dictionary = weapon_draw_pose(player)
+		var p: Vector2 = world_to_screen(pose.position)
 		if not _visible(p, 90.0):
 			continue
 		var character: String = player.get("character", "ranger")
@@ -744,7 +827,8 @@ func _draw_players() -> void:
 			if revive > 0.0:
 				draw_arc(core, 16.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(revive, 0.0, 1.0), 24, color_value, 2.0, true)
 			continue
-		var aim: Vector2 = player.get("aim", Vector2.RIGHT)
+		var aim: Vector2 = pose.aim
+		var appearance: Array[Dictionary] = Appearance.build(player.get("items", {}))
 		var facing: float = 1.0 if aim.x >= 0.0 else -1.0
 		var vel: Vector2 = player.get("vel", Vector2.ZERO)
 		var grounded: bool = player.get("grounded", false)
@@ -753,6 +837,7 @@ func _draw_players() -> void:
 		var bob: float = absf(cos(_clock * 16.0)) * running * 1.0 if grounded else 0.0
 		p.y -= bob
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
+		Appearance.draw_layer(self, appearance, true, _clock)
 		# The scarf and backpack silhouette keep the tiny pilot readable.
 		var scarf_wave: float = sin(_clock * 9.0) * 2.0 + running * 6.0
 		draw_colored_polygon(PackedVector2Array([Vector2(-5.0, -11.0), Vector2(-17.0 - running * 6.0, -8.0 + scarf_wave), Vector2(-13.0 - running * 8.0, -3.0 + scarf_wave), Vector2(-5.0, -5.0)]), Color("cb815b") if character == "ranger" else Color("629a97"))
@@ -779,44 +864,11 @@ func _draw_players() -> void:
 		draw_line(Vector2(-6.0, -22.0), Vector2(-8.0, -28.0), Color("6a8b83"), 1.5, true)
 		draw_circle(Vector2(-8.0, -28.0), 1.4, color_value, true, -1.0, true)
 		draw_set_transform(Vector2.ZERO)
-		# Independent gun arm follows the world-space aim at any angle.
-		var shoulder: Vector2 = p + Vector2(3.0 * facing, -5.0)
-		var weapon_angle: float = aim.angle()
-		draw_set_transform(shoulder, weapon_angle)
-		if weapon in ["flamethrower", "boomerang", "storm_staff", "sun_lance"]:
-			_draw_special_weapon(weapon)
-		elif weapon != "arc_blade":
-			draw_line(Vector2(0.0, 0.0), Vector2(12.0, 3.0), INK, 7.0, true)
-			draw_line(Vector2(0.0, 0.0), Vector2(12.0, 3.0), Color("91a89a"), 4.0, true)
-			match weapon:
-				"scattergun":
-					draw_colored_polygon(PackedVector2Array([Vector2(7.0, -6.0), Vector2(25.0, -6.0), Vector2(27.0, -4.0), Vector2(35.0, -4.0), Vector2(35.0, 5.0), Vector2(14.0, 5.0), Vector2(10.0, 9.0), Vector2(7.0, 6.0)]), INK)
-					draw_rect(Rect2(10.0, -4.0, 15.0, 7.0), Color("ac8458"))
-					draw_line(Vector2(25.0, -2.0), Vector2(35.0, -2.0), Color("d3c6a1"), 2.0)
-					draw_line(Vector2(25.0, 3.0), Vector2(35.0, 3.0), Color("d3c6a1"), 2.0)
-					for groove: int in range(3):
-						draw_line(Vector2(15.0 + float(groove) * 3.0, -3.0), Vector2(15.0 + float(groove) * 3.0, 3.0), Color("4e5146"), 1.0)
-				"railgun":
-					draw_colored_polygon(PackedVector2Array([Vector2(7.0, -5.0), Vector2(28.0, -5.0), Vector2(28.0, -3.0), Vector2(44.0, -3.0), Vector2(44.0, 5.0), Vector2(15.0, 5.0), Vector2(10.0, 9.0), Vector2(7.0, 6.0)]), INK)
-					draw_rect(Rect2(10.0, -3.0, 18.0, 6.0), Color("62798c"))
-					draw_line(Vector2(27.0, -2.0), Vector2(44.0, -2.0), Color("9fc7e6"), 2.0)
-					draw_line(Vector2(27.0, 3.0), Vector2(44.0, 3.0), Color("9fc7e6"), 2.0)
-					draw_line(Vector2(17.0, -7.0), Vector2(27.0, -7.0), Color("9fc7e6"), 2.0)
-					draw_line(Vector2(22.0, -7.0), Vector2(22.0, -4.0), INK, 2.0)
-					for coil: int in range(3):
-						draw_line(Vector2(14.0 + float(coil) * 4.0, -2.0), Vector2(14.0 + float(coil) * 4.0, 3.0), TEAL, 1.0)
-				_:
-					draw_colored_polygon(PackedVector2Array([Vector2(7.0, -5.0), Vector2(24.0, -5.0), Vector2(24.0, -2.0), Vector2(33.0, -2.0), Vector2(33.0, 3.0), Vector2(13.0, 4.0), Vector2(10.0, 8.0), Vector2(7.0, 6.0)]), INK)
-					draw_rect(Rect2(10.0, -3.0, 15.0, 5.0), Color("879686"))
-					draw_line(Vector2(26.0, 0.0), Vector2(33.0, 0.0), Color("ced5b8"), 2.0)
-					draw_line(Vector2(14.0, -3.0), Vector2(21.0, -3.0), TEAL, 1.5)
-		else:
-			draw_line(Vector2(1.0, 0.0), Vector2(12.0, 0.0), INK, 8.0, true)
-			draw_line(Vector2(1.0, 0.0), Vector2(12.0, 0.0), Color("d0ab79"), 5.0, true)
-			draw_colored_polygon(PackedVector2Array([Vector2(10.0, -4.0), Vector2(37.0, -7.0), Vector2(47.0, 0.0), Vector2(37.0, 7.0), Vector2(10.0, 4.0)]), INK)
-			draw_colored_polygon(PackedVector2Array([Vector2(14.0, -2.0), Vector2(36.0, -5.0), Vector2(43.0, 0.0), Vector2(36.0, 4.0), Vector2(14.0, 2.0)]), Color("b6c8b3"))
-			draw_line(Vector2(17.0, 0.0), Vector2(39.0, 0.0), GOLD, 2.0, true)
-			draw_line(Vector2(12.0, -8.0), Vector2(12.0, 8.0), Color("b68a57"), 3.0, true)
+		# Accessories mirror with the body; the weapon uses the shared fixed shoulder.
+		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
+		Appearance.draw_layer(self, appearance, false, _clock)
+		draw_set_transform(world_to_screen(pose.shoulder), aim.angle(), Vector2(1.0, facing))
+		_draw_weapon(weapon)
 		draw_set_transform(Vector2.ZERO)
 		if float(player.get("chrono_timer", 0.0)) > 0.0:
 			var phase: float = _clock * 1.7
@@ -959,7 +1011,8 @@ func _draw_boss(accent: Color, motion: float) -> void:
 func _draw_projectiles() -> void:
 	for value: Variant in _frame.get("projectiles", []):
 		var projectile: Dictionary = value
-		var p: Vector2 = world_to_screen(_entity_draw_position("b" + str(projectile.get("id", 0)), projectile.get("pos", Vector2.ZERO)))
+		var rendered: Vector2 = _entity_draw_position("b" + str(projectile.get("id", 0)), projectile.get("pos", Vector2.ZERO))
+		var p: Vector2 = world_to_screen(rendered)
 		if not _visible(p, 50.0):
 			continue
 		var velocity: Vector2 = projectile.get("vel", Vector2.RIGHT)
@@ -976,7 +1029,7 @@ func _draw_projectiles() -> void:
 		if "poison" in kind or "acid" in kind:
 			color_value = Color("b6d980")
 		_glow(p, radius * 2.0 + 5.0 + minf(strength, 2.2) * 3.0, Color(color_value, 0.045), 2)
-		var trail: float = clampf(velocity.length() * 0.036 * sqrt(strength), 6.0, 135.0 if kind == "rail" else 60.0)
+		var trail: float = projectile_trail_length(projectile, rendered, clampf(velocity.length() * 0.036 * sqrt(strength), 6.0, 135.0 if kind == "rail" else 60.0))
 		if kind == "boomerang":
 			draw_line(p-direction*trail,p,Color(color_value,0.3),2.0,true)
 			draw_set_transform(p,_clock*15.0 + float(projectile.get("id",0)))
@@ -994,11 +1047,12 @@ func _draw_projectiles() -> void:
 			draw_circle(p,2.4,CREAM,true,-1.0,true)
 			continue
 		if kind == "lance":
-			draw_line(p-direction*110.0,p,Color(color_value,0.11),7.0+strength,true)
-			draw_line(p-direction*85.0,p,Color(color_value,0.55),2.0+strength*0.4,true)
+			var lance_tail: float = projectile_trail_length(projectile, rendered, 110.0)
+			draw_line(p-direction*lance_tail,p,Color(color_value,0.11),7.0+strength,true)
+			draw_line(p-direction*minf(85.0,lance_tail),p,Color(color_value,0.55),2.0+strength*0.4,true)
 			var normal: Vector2 = direction.orthogonal()*4.0
-			draw_colored_polygon(PackedVector2Array([p+direction*14.0,p-direction*11.0+normal,p-direction*7.0,p-direction*11.0-normal]),CREAM)
-			draw_line(p-direction*38.0,p+direction*12.0,CREAM,1.2,true)
+			draw_colored_polygon(PackedVector2Array([p+direction*14.0,p-direction*minf(11.0,lance_tail)+normal,p-direction*minf(7.0,lance_tail),p-direction*minf(11.0,lance_tail)-normal]),CREAM)
+			draw_line(p-direction*minf(38.0,lance_tail),p+direction*12.0,CREAM,1.2,true)
 			continue
 		if kind == "grenade":
 			draw_circle(p, radius + 2.0, INK, true, -1.0, true)
@@ -1035,7 +1089,11 @@ func _draw_threat_overlays() -> void:
 
 func _draw_effects() -> void:
 	for effect: Dictionary in _effects:
-		var p: Vector2 = world_to_screen(effect.get("pos", Vector2.ZERO))
+		var pose: Dictionary = muzzle_effect_pose(effect)
+		if not bool(pose.visible):
+			continue
+		var p: Vector2 = world_to_screen(pose.pos)
+		var effect_angle: float = Vector2(pose.aim).angle()
 		var age: float = effect.get("age", 0.0)
 		var life: float = effect.get("life", 0.5)
 		var t: float = clampf(age / life, 0.0, 1.0)
@@ -1044,12 +1102,12 @@ func _draw_effects() -> void:
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
 		match str(effect.get("kind", "spark")):
 			"flame":
-				var angle: float = float(effect.get("angle",0.0))
-				var reach: float = float(effect.get("radius",170.0)) * (0.7+t*0.25)
+				var angle: float = effect_angle
+				var reach: float = maxf(20.0, float(effect.get("radius",170.0)) - WeaponPose.muzzle_length("flamethrower")) * (0.8+t*0.2)
 				draw_set_transform(p,angle)
 				for ribbon: int in range(5):
 					var side: float = float(ribbon-2)
-					var points: PackedVector2Array = PackedVector2Array([Vector2(16,side*1.3),Vector2(reach*0.4,side*7.0+sin(_clock*17+ribbon)*3),Vector2(reach*0.75,side*13.0+sin(_clock*23+ribbon)*5),Vector2(reach,side*17.0)])
+					var points: PackedVector2Array = PackedVector2Array([Vector2(0,side*1.3),Vector2(reach*0.4,side*6.0+sin(_clock*17+ribbon)*3),Vector2(reach*0.75,side*11.0+sin(_clock*23+ribbon)*5),Vector2(reach,side*15.0)])
 					draw_polyline(points,Color(color_value,0.22*(1-t)),5.0+strength,true)
 					draw_polyline(points,Color(CREAM,0.35*(1-t)) if ribbon==2 else Color(color_value,0.55*(1-t)),1.5,true)
 				draw_set_transform(Vector2.ZERO)
@@ -1069,7 +1127,7 @@ func _draw_effects() -> void:
 				draw_line(origin,p,Color(color_value,0.65*(1-t)),4.0+strength,true)
 				draw_line(origin.lerp(p,0.6),p,Color(CREAM,0.8*(1-t)),2.0,true)
 			"muzzle":
-				var angle: float = float(effect.get("angle", 0.0))
+				var angle: float = effect_angle
 				var length: float = (11.0 + strength * 8.0) * (1.0 - t * 0.6)
 				draw_set_transform(p, angle)
 				_glow(Vector2(length * 0.3, 0.0), 14.0 + strength * 5.0, Color(color_value, 0.045 * (1.0 - t)), 3)
@@ -1137,7 +1195,9 @@ func _draw_effects() -> void:
 				if t < 0.2:
 					_glow(p, radius, Color(color_value, 0.09 * (1.0 - t * 5.0)), 3)
 			"slash":
-				var angle: float = float(effect.get("angle", 0.0))
+				var angle: float = effect_angle
+				if effect.has("weapon"):
+					p -= Vector2(pose.aim) * WeaponPose.muzzle_length(str(effect.weapon))
 				var radius: float = float(effect.get("radius",85.0)) * (0.6+t*0.35)
 				draw_arc(p, radius, angle - 1.25 + t * 0.5, angle + 1.25 + t * 0.5, 36, Color(color_value, (1.0 - t) * 0.1), (9.0+strength*4.0) * (1.0 - t), true)
 				draw_arc(p, radius + 5.0, angle - 1.1 + t * 0.5, angle + 0.8 + t * 0.5, 36, color_value, (2.0+strength*0.9) * (1.0 - t) + 0.5, true)

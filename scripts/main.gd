@@ -6,7 +6,8 @@ const Soundscape = preload("res://scripts/soundscape.gd")
 const Icons = preload("res://scripts/item_icons.gd")
 const MapView = preload("res://scripts/map_view.gd")
 const Content = preload("res://scripts/content.gd")
-const VERSION: String = "0.5.0"
+const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const VERSION: String = "0.6.0"
 const DEFAULT_PORT: int = 27841
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
@@ -252,8 +253,10 @@ func _get_command() -> Dictionary:
 	if paused:
 		command.aim = player.get("aim", Vector2.RIGHT)
 		return command
-	var difference: Vector2 = world.screen_to_world(get_viewport().get_mouse_position()) - Vector2(player.pos)
-	command.aim = difference.normalized() if difference.length_squared() > 16.0 else player.get("aim", Vector2.RIGHT)
+	var aiming_player: Dictionary = player.duplicate(false)
+	if online and not hosting:
+		aiming_player.pos = Vector2(player.pos) + _visual_error
+	command.aim = WeaponPose.aim_at(aiming_player, world.screen_to_world(get_viewport().get_mouse_position()))
 	command.move = Input.get_axis("move_left", "move_right")
 	command.jump = Input.is_action_just_pressed("jump")
 	command.drop = Input.is_action_pressed("down") and command.jump
@@ -289,20 +292,20 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 		return
 	var weapon: String = str(player.get("weapon", "pulse_rifle"))
 	_local_fire_timer = Simulation.attack_interval(player)
-	var event: Dictionary = {"type": "slash" if weapon == "arc_blade" else "shoot", "kind": "bullet" if weapon == "pulse_rifle" else weapon, "pos": Vector2(player.pos) + Vector2(command.aim) * 23.0, "aim": command.aim, "player": local_id}
+	var aim: Vector2 = WeaponPose.normalized_aim(command.get("aim", player.get("aim", Vector2.RIGHT)))
+	var event: Dictionary = {"type": "slash" if weapon == "arc_blade" else "shoot", "kind": "bullet" if weapon == "pulse_rifle" else weapon, "weapon": weapon, "pos": WeaponPose.muzzle_position(player, aim), "aim": aim, "player": local_id}
 	match weapon:
 		"arc_blade":
 			event.radius = 105.0
-			event.pos = Vector2(player.pos) + Vector2(command.aim) * 34.0
 		"flamethrower":
 			event.type = "slash"
 			event.kind = "flame"
 			event.radius = 170.0
-			event.pos = Vector2(player.pos) + Vector2(command.aim) * 50.0
 		"storm_staff":
 			event.kind = "storm"
 		"sun_lance":
 			event.kind = "lance"
+	event.merge(sim._visual_data(local_id), false)
 	world.push_events([event])
 	sound.play_event(str(event.type))
 
@@ -645,10 +648,17 @@ func _pong(stamp: int) -> void:
 	_ping_ms = float(Time.get_ticks_msec() - stamp)
 
 func _consume_events(events: Array) -> void:
-	world.push_events(events)
+	var presented: Array = []
+	for event in events:
+		# The owning client already presents primary attacks immediately.
+		# Keep authoritative damage/skill events and every other player's shots.
+		if online and not hosting and int(event.get("player", -1)) == local_id and event.has("weapon") and str(event.get("type", "")) in ["shoot", "slash"]:
+			continue
+		presented.append(event)
+	world.push_events(presented)
 	_events_seen += events.size()
 	var local_position: Vector2 = sim.state.get("players", {}).get(local_id, {}).get("pos", Vector2.ZERO)
-	for event in events:
+	for event in presented:
 		var kind: String = str(event.get("type", ""))
 		var distance: float = local_position.distance_to(event.get("pos", local_position))
 		sound.play_event(kind, distance)

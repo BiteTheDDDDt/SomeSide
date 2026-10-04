@@ -3,6 +3,7 @@ extends RefCounted
 
 const Content = preload("res://scripts/content.gd")
 const StageLayouts = preload("res://scripts/stage_layouts.gd")
+const WeaponPose = preload("res://scripts/weapon_pose.gd")
 
 ## Authoritative, scene-independent game rules. State contains only serializable
 ## values. All positions are centers; platforms are one-way from above.
@@ -300,14 +301,16 @@ func _move_body(position: Vector2, velocity: Vector2, dt: float, half: Vector2, 
 
 
 func _fire_weapon(player: Dictionary) -> void:
-	var aim: Vector2 = player["aim"]
+	var aim: Vector2 = WeaponPose.normalized_aim(Vector2(player["aim"]))
 	var position: Vector2 = player["pos"]
+	var shoulder: Vector2 = WeaponPose.shoulder_position(position)
+	var muzzle: Vector2 = WeaponPose.muzzle_position(player, aim)
 	var weapon: String = str(player.get("weapon", "pulse_rifle"))
 	player["fire_cd"] = attack_interval(player)
 	player["attack_count"] = int(player.get("attack_count", 0)) + 1
 	match weapon:
 		"arc_blade":
-			_emit("slash", position + aim * 34.0, {"aim": aim, "radius": 105.0, "player": player["id"]})
+			_emit("slash", muzzle, {"aim": aim, "radius": 105.0, "player": player["id"], "weapon": weapon})
 			var enemies: Array = state["enemies"]
 			for enemy_value in enemies.duplicate():
 				var enemy: Dictionary = enemy_value
@@ -320,13 +323,13 @@ func _fire_weapon(player: Dictionary) -> void:
 		"scattergun":
 			for pellet in range(6):
 				var spread: float = (float(pellet) - 2.5) * 0.075 + _rng.randf_range(-0.012, 0.012)
-				_spawn_projectile(position + aim * 21.0, aim.rotated(spread) * 820.0, "player", "pellet", 8.0 * _damage_scale(player), int(player["id"]), 0.43, 4.0)
-			_emit("shoot", position + aim * 22.0, {"aim": aim, "player": player["id"], "kind": "scattergun"})
+				_spawn_projectile(muzzle, aim.rotated(spread) * 820.0, "player", "pellet", 8.0 * _damage_scale(player), int(player["id"]), 0.43, 4.0, shoulder)
+			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "scattergun", "weapon": weapon})
 		"railgun":
-			_spawn_projectile(position + aim * 21.0, aim * 2500.0, "player", "rail", 70.0 * _damage_scale(player), int(player["id"]), 0.6, 5.0)
-			_emit("shoot", position + aim * 22.0, {"aim": aim, "player": player["id"], "kind": "railgun"})
+			_spawn_projectile(muzzle, aim * 2500.0, "player", "rail", 70.0 * _damage_scale(player), int(player["id"]), 0.6, 5.0, shoulder)
+			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "railgun", "weapon": weapon})
 		"flamethrower":
-			_emit("slash", position + aim * 50.0, {"aim": aim, "radius": 170.0, "player": player["id"], "kind": "flame"})
+			_emit("slash", muzzle, {"aim": aim, "radius": 170.0, "player": player["id"], "kind": "flame", "weapon": weapon})
 			for enemy_value in Array(state["enemies"]).duplicate():
 				var enemy: Dictionary = enemy_value
 				var offset: Vector2 = Vector2(enemy["pos"]) - position
@@ -336,18 +339,18 @@ func _fire_weapon(player: Dictionary) -> void:
 					enemy["burn_dps"] = 5.0 * _damage_scale(player)
 					enemy["burn_owner"] = int(player["id"])
 		"boomerang":
-			_spawn_projectile(position + aim * 22.0, aim * 620.0, "player", "boomerang", 26.0 * _damage_scale(player), int(player["id"]), 1.3, 10.0)
-			_emit("shoot", position, {"aim": aim, "player": player["id"], "kind": "boomerang"})
+			_spawn_projectile(muzzle, aim * 620.0, "player", "boomerang", 26.0 * _damage_scale(player), int(player["id"]), 1.3, 10.0, shoulder)
+			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "boomerang", "weapon": weapon})
 		"storm_staff":
-			_spawn_projectile(position + aim * 22.0, aim * 780.0, "player", "storm", 32.0 * _damage_scale(player), int(player["id"]), 1.25, 8.0)
-			_emit("shoot", position, {"aim": aim, "player": player["id"], "kind": "storm"})
+			_spawn_projectile(muzzle, aim * 780.0, "player", "storm", 32.0 * _damage_scale(player), int(player["id"]), 1.25, 8.0, shoulder)
+			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "storm", "weapon": weapon})
 		"sun_lance":
-			_spawn_projectile(position + aim * 22.0, aim * 2400.0, "player", "lance", 120.0 * _damage_scale(player), int(player["id"]), 0.75, 8.0)
-			_emit("shoot", position, {"aim": aim, "player": player["id"], "kind": "lance"})
+			_spawn_projectile(muzzle, aim * 2400.0, "player", "lance", 120.0 * _damage_scale(player), int(player["id"]), 0.75, 8.0, shoulder)
+			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "lance", "weapon": weapon})
 		_:
 			var spread: float = _rng.randf_range(-0.018, 0.018)
-			_spawn_projectile(position + aim * 21.0, aim.rotated(spread) * 1100.0, "player", "bullet", 8.0 * _damage_scale(player), int(player["id"]), 1.3, 3.0)
-			_emit("shoot", position + aim * 22.0, {"aim": aim, "player": player["id"], "kind": "bullet"})
+			_spawn_projectile(muzzle, aim.rotated(spread) * 1100.0, "player", "bullet", 8.0 * _damage_scale(player), int(player["id"]), 1.3, 3.0, shoulder)
+			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "bullet", "weapon": weapon})
 	if _stacks(player, "echo") > 0 and int(player["attack_count"]) % 6 == 0:
 		var target: Dictionary = _nearest_enemy(position, 650.0)
 		if not target.is_empty():
@@ -419,17 +422,19 @@ func _use_skill(player: Dictionary) -> void:
 			_spawn_projectile(position + aim * 24.0, aim * 640.0 + Vector2(0.0, -90.0), "player", "grenade", 70.0 * _damage_scale(player), int(player["id"]), 0.95, 7.0)
 			_emit("shoot", position + aim * 22.0, {"aim": aim, "player": player["id"], "kind": "grenade"})
 
-func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind: String, damage: float, owner: int, ttl: float, radius: float) -> void:
+func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind: String, damage: float, owner: int, ttl: float, radius: float, sweep_origin: Vector2 = Vector2(INF, INF)) -> void:
 	var projectiles: Array = state["projectiles"]
 	if projectiles.size() >= MAX_PROJECTILES:
 		return
 	var player: Dictionary = Dictionary(state.get("players", {})).get(owner, {})
 	var base_pierce: int = 3 if kind == "rail" else (6 if kind == "lance" else (4 if kind == "boomerang" else 1))
 	var extra_pierce: int = mini(3, _stacks(player, "piercer")) if kind != "grenade" and not player.is_empty() else 0
-	projectiles.append({"id": _id(), "pos": position, "vel": velocity, "team": team,
+	projectiles.append({"id": _id(), "pos": position, "origin": position, "travel_distance": 0.0, "vel": velocity, "team": team,
 		"kind": kind, "ttl": ttl, "radius": radius, "damage": damage, "owner": owner,
 		"hit_ids": [], "pierce": mini(9, base_pierce + extra_pierce), "max_pierce": mini(9, base_pierce + extra_pierce), "age": 0.0, "returning": false})
 	var projectile: Dictionary = projectiles.back()
+	if sweep_origin.is_finite():
+		projectile["sweep_origin"] = sweep_origin
 	projectile.merge(_visual_data(owner), true)
 
 
@@ -439,6 +444,9 @@ func _step_projectiles(dt: float) -> void:
 	for projectile_value in projectiles:
 		var projectile: Dictionary = projectile_value
 		var previous: Vector2 = projectile["pos"]
+		var sweep_origin: Vector2 = projectile.get("sweep_origin", previous)
+		var launch_sweep: bool = projectile.has("sweep_origin")
+		projectile.erase("sweep_origin")
 		var velocity: Vector2 = projectile["vel"]
 		var kind: String = projectile["kind"]
 		projectile["age"] = float(projectile.get("age", 0.0)) + dt
@@ -457,6 +465,7 @@ func _step_projectiles(dt: float) -> void:
 		projectile["vel"] = velocity
 		var next: Vector2 = previous + velocity * dt
 		projectile["pos"] = next
+		projectile["travel_distance"] = float(projectile.get("travel_distance", 0.0)) + previous.distance_to(next)
 		projectile["ttl"] = float(projectile["ttl"]) - dt
 		var removed: bool = false
 		if str(projectile["team"]) == "player":
@@ -469,6 +478,11 @@ func _step_projectiles(dt: float) -> void:
 				if float(enemy["hp"]) <= 0.0 or int(enemy["id"]) in Array(projectile.get("hit_ids", [])):
 					continue
 				var hit_t: float = _segment_circle(previous, next, enemy["pos"], _enemy_radius(enemy) + float(projectile["radius"]))
+				if launch_sweep:
+					# The first collision path includes the barrel, but its hidden
+					# shoulder-to-muzzle leg never becomes a visible bullet trail.
+					var barrel_t: float = _segment_circle(sweep_origin, previous, enemy["pos"], _enemy_radius(enemy) + float(projectile["radius"]))
+					hit_t = barrel_t * 0.5 if barrel_t >= 0.0 else (0.5 + hit_t * 0.5 if hit_t >= 0.0 else -1.0)
 				if (int(projectile.get("pierce", 1)) > 1 or kind in ["rail", "lance", "boomerang"]) and hit_t >= 0.0:
 					rail_hits.append({"enemy": enemy, "t": hit_t})
 				if hit_t >= 0.0 and hit_t < nearest_t:
@@ -492,7 +506,10 @@ func _step_projectiles(dt: float) -> void:
 							removed = true
 						break
 			elif not target.is_empty():
-				projectile["pos"] = previous.lerp(next, nearest_t)
+				if launch_sweep:
+					projectile["pos"] = sweep_origin.lerp(previous, nearest_t * 2.0) if nearest_t <= 0.5 else previous.lerp(next, (nearest_t - 0.5) * 2.0)
+				else:
+					projectile["pos"] = previous.lerp(next, nearest_t)
 				if kind == "grenade":
 					_explode(projectile["pos"], 135.0, float(projectile["damage"]), int(projectile["owner"]), "player", 0)
 				else:

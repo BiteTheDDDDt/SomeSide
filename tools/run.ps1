@@ -25,7 +25,7 @@ switch ($Mode) {
         & $enginePath --editor --path $projectDirectory @GameArguments
     }
     'Test' {
-        foreach ($testScript in @('test_simulation.gd', 'test_loot.gd', 'test_content.gd', 'test_rewards.gd', 'test_stress.gd', 'test_director.gd', 'test_visuals.gd', 'test_ui.gd')) {
+        foreach ($testScript in @('test_simulation.gd', 'test_loot.gd', 'test_content.gd', 'test_rewards.gd', 'test_stress.gd', 'test_director.gd', 'test_weapon_pose.gd', 'test_weapon_feedback.gd', 'test_appearance.gd', 'test_visuals.gd', 'test_ui.gd')) {
             $testOutput = @(& $enginePath --headless --path $projectDirectory --script ('res://tests/' + $testScript) @GameArguments 2>&1)
             $testExitCode = $LASTEXITCODE
             $testOutput | Write-Output
@@ -43,13 +43,13 @@ switch ($Mode) {
         if (-not (Test-Path -LiteralPath $templatePath)) {
             & (Join-Path $PSScriptRoot 'install.ps1') -Templates
         }
-        New-Item -ItemType Directory -Path (Join-Path $projectDirectory 'dist\v0.5.0') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $projectDirectory 'dist\v0.6.0') -Force | Out-Null
         & $enginePath --headless --path $projectDirectory --editor --import
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        & $enginePath --headless --path $projectDirectory --export-release 'Windows Desktop' 'dist/v0.5.0/SomeSide.exe' @GameArguments
+        & $enginePath --headless --path $projectDirectory --export-release 'Windows Desktop' 'dist/v0.6.0/SomeSide.exe' @GameArguments
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\GODOT-LICENSE.txt') -Destination (Join-Path $projectDirectory 'dist\v0.5.0\GODOT-LICENSE.txt') -Force
-        Copy-Item -LiteralPath (Join-Path $projectDirectory 'assets\fonts\OFL.txt') -Destination (Join-Path $projectDirectory 'dist\v0.5.0\FONT-OFL.txt') -Force
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\GODOT-LICENSE.txt') -Destination (Join-Path $projectDirectory 'dist\v0.6.0\GODOT-LICENSE.txt') -Force
+        Copy-Item -LiteralPath (Join-Path $projectDirectory 'assets\fonts\OFL.txt') -Destination (Join-Path $projectDirectory 'dist\v0.6.0\FONT-OFL.txt') -Force
     }
 }
 exit $LASTEXITCODE
