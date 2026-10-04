@@ -4,6 +4,7 @@ extends RefCounted
 const Content = preload("res://scripts/content.gd")
 const StageLayouts = preload("res://scripts/stage_layouts.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 
 ## Authoritative, scene-independent game rules. State contains only serializable
 ## values. All positions are centers; platforms are one-way from above.
@@ -22,6 +23,7 @@ const EXPLORE_BUDGET: int = 2
 const MAX_ENEMIES: int = 44
 const MAX_PROJECTILES: int = 280
 const MAX_PICKUPS: int = 90
+const MAX_HAZARDS: int = 24
 const GATE_SECONDS: float = 22.0
 
 var state: Dictionary = {}
@@ -77,7 +79,7 @@ func start_run(roster: Array, seed_value: int = 1) -> void:
 		"seed": seed_value, "kills": 0, "difficulty": 1.0,
 		"players": {}, "enemies": [], "projectiles": [], "pickups": [],
 		"chests": [], "platforms": [], "world_size": WORLD_SIZE,
-		"deployables": [], "effects": [], "loot_history": {"gear": [], "passive": []},
+		"deployables": [], "effects": [], "hazards": [], "loot_history": {"gear": [], "passive": []},
 		"gate": {}, "boss_alive": false,
 		"director": {"mode": "rest", "resting": true, "explorers": [], "event_active": false, "threat_time": 0.0},
 	}
@@ -160,6 +162,7 @@ func step(delta: float, commands: Dictionary) -> void:
 	_step_deployables(dt)
 	_step_effects(dt)
 	_step_projectiles(dt)
+	_step_hazards(dt)
 	_cleanup_enemies()
 	_step_challenges()
 	_step_pickups(dt)
@@ -688,112 +691,269 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 
 
 func _step_enemies(dt: float) -> void:
-	var enemies: Array = state["enemies"]
-	var time: float = state["time"]
-	for enemy_value in enemies:
+	for enemy_value in Array(state["enemies"]):
 		var enemy: Dictionary = enemy_value
 		if float(enemy["hp"]) <= 0.0:
 			continue
 		_step_enemy_status(enemy, dt)
 		if float(enemy["hp"]) <= 0.0:
 			continue
+		for timer in ["attack_cd", "jump_cd", "flash"]:
+			enemy[timer] = maxf(0.0, float(enemy.get(timer, 0.0)) - dt)
 		if float(enemy.get("stun_timer", 0.0)) > 0.0:
+			_cancel_enemy_attack(enemy)
 			enemy["vel"] = Vector2.ZERO
 			continue
-		enemy["attack_cd"] = maxf(0.0, float(enemy.get("attack_cd", 0.0)) - dt)
-		enemy["jump_cd"] = maxf(0.0, float(enemy.get("jump_cd", 0.0)) - dt)
-		enemy["flash"] = maxf(0.0, float(enemy.get("flash", 0.0)) - dt)
 		var target: Dictionary = _nearest_player(enemy["pos"])
 		if target.is_empty():
 			continue
-		var position: Vector2 = enemy["pos"]
-		var target_pos: Vector2 = target["pos"]
-		var offset: Vector2 = target_pos - position
-		var velocity: Vector2 = enemy["vel"]
-		var direction: float = signf(offset.x)
-		var kind: String = enemy["kind"]
-		var elite_scale: float = 1.15 if bool(enemy["elite"]) else 1.0
-		var movement_scale: float = elite_scale * (float(enemy.get("slow_factor", 1.0)) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0)
-		if kind == "drone":
-			var desired: Vector2 = target_pos + Vector2(sin(time * 1.3 + int(enemy["id"])) * 125.0, -100.0)
-			velocity = velocity.move_toward((desired - position).normalized() * 145.0 * movement_scale, 350.0 * dt)
-			position += velocity * dt
-			position.y = clampf(position.y, 80.0, _floor_y() - 35.0)
-			if offset.length() < 510.0 and float(enemy["attack_cd"]) <= 0.0:
-				_enemy_shoot(enemy, offset.normalized(), 300.0, 8.0, "orb")
-				enemy["attack_cd"] = 2.0 + _rng.randf() * 0.7
-		elif kind == "boss":
-			_step_boss(enemy, target, dt)
-			continue
-		else:
-			var speed: float = (116.0 if kind == "crawler" else 78.0) * movement_scale
-			var move_direction: float = direction
-			if kind == "spitter" and absf(offset.x) < 300.0:
-				move_direction = -direction * 0.5 if absf(offset.x) < 180.0 else 0.0
-			velocity.x = move_toward(velocity.x, move_direction * speed, 750.0 * dt)
-			velocity.y = minf(1000.0, velocity.y + GRAVITY * dt)
-			var grounded: bool = bool(enemy.get("grounded", false))
-			if grounded and float(enemy["jump_cd"]) <= 0.0 and (offset.y < -48.0 or (kind == "crawler" and absf(offset.x) < 160.0)):
-				velocity.y = -650.0 if offset.y < -90.0 else -450.0
-				enemy["jump_cd"] = 1.35 + _rng.randf() * 0.8
-			var result: Dictionary = _move_body(position, velocity, dt, Vector2(15.0, 17.0))
-			position = result["pos"]
-			velocity = result["vel"]
-			enemy["grounded"] = result["grounded"]
-			if kind == "spitter" and offset.length() < 650.0 and float(enemy["attack_cd"]) <= 0.0:
-				_enemy_shoot(enemy, (offset + Vector2(target["vel"]) * 0.18).normalized(), 350.0, 11.0, "spit")
-				enemy["attack_cd"] = 2.5 + _rng.randf() * 0.6
-		enemy["pos"] = position
-		enemy["vel"] = velocity
-		if position.distance_to(target_pos) < 32.0:
-			_damage_player(target, 10.0 * elite_scale * _enemy_damage_scale(), position)
+		if float(enemy.get("telegraph", 0.0)) > 0.0:
+			enemy["telegraph"] = maxf(0.0, float(enemy["telegraph"]) - dt)
+			if float(enemy["telegraph"]) <= 0.0:
+				_release_enemy_attack(enemy, target)
+		elif float(enemy["attack_cd"]) <= 0.0 and float(enemy.get("charge_timer", 0.0)) <= 0.0:
+			if Vector2(enemy["pos"]).distance_to(target["pos"]) <= float(enemy.get("attack_range", 650.0)):
+				_begin_enemy_attack(enemy, target)
+		_move_enemy(enemy, target, dt)
 
 
-func _step_boss(enemy: Dictionary, target: Dictionary, dt: float) -> void:
+func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float) -> void:
 	var position: Vector2 = enemy["pos"]
-	var velocity: Vector2 = enemy["vel"]
 	var offset: Vector2 = Vector2(target["pos"]) - position
-	var enraged: bool = float(enemy["hp"]) < float(enemy["max_hp"]) * 0.45
-	var phase_time: float = float(enemy.get("phase_time", 0.0)) + dt
-	enemy["phase_time"] = phase_time
-	var telegraph: float = float(enemy.get("telegraph", 0.0))
-	if telegraph > 0.0:
-		telegraph = maxf(0.0, telegraph - dt)
-		enemy["telegraph"] = telegraph
-		velocity.x = move_toward(velocity.x, 0.0, 700.0 * dt)
-		if telegraph <= 0.0:
-			var aim: Vector2 = offset.normalized()
-			var count: int = 7 if enraged else 5
-			for index in range(count):
-				var spread: float = (index - (count - 1) * 0.5) * 0.18
-				_enemy_shoot(enemy, aim.rotated(spread), 340.0 if enraged else 280.0, 16.0, "boss_orb")
-			_emit("explosion", position, {"radius": 62.0, "team": "enemy", "visual_only": true})
-			enemy["attack_cd"] = 2.2 if enraged else 3.1
-	elif float(enemy["attack_cd"]) <= 0.0:
-		enemy["telegraph"] = 0.65
+	var velocity: Vector2 = enemy["vel"]
+	var boss: bool = str(enemy["kind"]) == "boss"
+	var elite_scale: float = 1.15 if bool(enemy["elite"]) else 1.0
+	var slow: float = float(enemy.get("slow_factor", 1.0)) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0
+	var winding: bool = float(enemy.get("telegraph", 0.0)) > 0.0
+	var charging: bool = float(enemy.get("charge_timer", 0.0)) > 0.0
+	if str(enemy.get("attack_kind", "")) in ["beam", "prism_beam", "prism_cross"] and (winding or float(enemy["attack_cd"]) > float(enemy["attack_cooldown"]) - 0.25):
+		# Beam geometry remains fixed through both warning and active frames.
+		# A hovering boss stops in place; a ground sentinel only starts landed.
+		enemy["vel"] = Vector2.ZERO
+		return
+	if charging:
+		enemy["charge_timer"] = maxf(0.0, float(enemy["charge_timer"]) - dt)
+		velocity.x = Vector2(enemy["attack_dir"]).x * float(enemy.get("charge_speed", 340.0)) * slow
+	elif bool(enemy.get("flying", false)):
+		var hover: float = -125.0 if not boss else -95.0
+		var desired: Vector2 = Vector2(target["pos"]) + Vector2(sin(float(state["time"]) * 0.9 + int(enemy["id"])) * 130.0, hover)
+		var desired_velocity: Vector2 = Vector2.ZERO if winding else (desired - position).limit_length(1.0) * float(enemy["move_speed"]) * elite_scale * slow
+		velocity = velocity.move_toward(desired_velocity, 380.0 * dt)
 	else:
-		var slow: float = float(enemy.get("slow_factor", 1.0)) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0
-		velocity.x = move_toward(velocity.x, signf(offset.x) * (125.0 if enraged else 82.0) * slow, 400.0 * dt)
-	velocity.y = minf(1000.0, velocity.y + GRAVITY * dt)
-	if bool(enemy.get("grounded", false)) and float(enemy["jump_cd"]) <= 0.0:
-		velocity.y = -700.0 if offset.y < -70.0 else -460.0
-		enemy["jump_cd"] = 2.4 if enraged else 3.6
-	var was_grounded: bool = bool(enemy.get("grounded", false))
-	var fall_speed: float = velocity.y
-	var result: Dictionary = _move_body(position, velocity, dt, Vector2(39.0, 44.0))
-	enemy["pos"] = result["pos"]
-	enemy["vel"] = result["vel"]
-	enemy["grounded"] = result["grounded"]
-	if bool(result["grounded"]) and not was_grounded and fall_speed > 300.0:
-		_explode(enemy["pos"], 95.0, 18.0 * _enemy_damage_scale(), -1, "enemy", 0)
-	if Vector2(enemy["pos"]).distance_to(target["pos"]) < 56.0:
-		_damage_player(target, 17.0 * _enemy_damage_scale(), enemy["pos"])
+		var move_direction: float = signf(offset.x)
+		if str(enemy["kind"]) in ["spitter", "sentinel", "skirmisher"] and absf(offset.x) < 290.0:
+			move_direction = -move_direction * 0.5 if absf(offset.x) < 160.0 else 0.0
+		if winding:
+			move_direction = 0.0
+		velocity.x = move_toward(velocity.x, move_direction * float(enemy["move_speed"]) * elite_scale * slow, 750.0 * dt)
+	if bool(enemy.get("flying", false)):
+		position += velocity * dt
+		position.x = clampf(position.x, 30.0, _world_size().x - 30.0)
+		position.y = clampf(position.y, 70.0, _floor_y() - 35.0)
+	else:
+		velocity.y = minf(1000.0, velocity.y + GRAVITY * dt)
+		if not winding and not charging and bool(enemy.get("grounded", false)) and float(enemy["jump_cd"]) <= 0.0 and offset.y < -48.0:
+			velocity.y = -690.0 if boss else -650.0
+			enemy["jump_cd"] = 1.7
+		var moved: Dictionary = _move_body(position, velocity, dt, Vector2(39.0, 44.0) if boss else Vector2(15.0, 17.0))
+		position = moved["pos"]
+		velocity = moved["vel"]
+		enemy["grounded"] = moved["grounded"]
+	enemy["pos"] = position
+	enemy["vel"] = velocity
+	# Contact is limited by each player's existing damage immunity. A charged
+	# dash additionally records victims, so it cannot multi-hit one teammate.
+	for player_value in Dictionary(state["players"]).values():
+		var player: Dictionary = player_value
+		if bool(player["dead"]) or position.distance_to(player["pos"]) >= (55.0 if boss else 31.0):
+			continue
+		if charging:
+			var hit_ids: Array = enemy.get("charge_hit_ids", [])
+			if int(player["id"]) in hit_ids:
+				continue
+			hit_ids.append(int(player["id"]))
+			enemy["charge_hit_ids"] = hit_ids
+		var damage: float = (17.0 if boss else (14.0 if charging else 10.0)) * elite_scale
+		_damage_player(player, damage * _enemy_damage_scale(), position)
+
+
+func _begin_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
+	if float(enemy["hp"]) <= 0.0:
+		return
+	var kind: String = str(enemy.get("primary_attack", "spit"))
+	if kind == "beam" and not bool(enemy.get("grounded", false)):
+		return
+	if str(enemy["kind"]) == "boss":
+		var cycle: int = int(enemy.get("attack_count", 0))
+		match str(enemy.get("boss_style", "spore")):
+			"stone": kind = "stone_spikes" if cycle % 2 == 0 else "stone_charge"
+			"prism": kind = "prism_beam" if cycle % 2 == 0 else "prism_cross"
+			_: kind = "spore_volley" if cycle % 2 == 0 else "spore_bloom"
+		enemy["attack_count"] = cycle + 1
+	var windup: float = float(enemy.get("windup", 0.8))
+	enemy["telegraph"] = windup
+	enemy["telegraph_max"] = windup
+	enemy["attack_kind"] = kind
+	enemy["attack_target"] = Vector2(target["pos"])
+	enemy["attack_dir"] = WeaponPose.normalized_aim(Vector2(target["pos"]) - Vector2(enemy["pos"]))
+	if kind in ["pounce", "charge", "stone_charge"]:
+		enemy["attack_dir"] = Vector2(-1.0 if Vector2(target["pos"]).x < Vector2(enemy["pos"]).x else 1.0, 0.0)
+	enemy["charge_hit_ids"] = []
+	# Lock the target and danger geometry once. Dodging after the warning
+	# starts must work; attacks never re-aim at the release frame.
+	match kind:
+		"mortar":
+			_spawn_hazard(enemy, "spore_mortar", target["pos"], "circle", Vector2.RIGHT, 0.0, 48.0, windup, 12.0)
+		"burrow":
+			var ground_mark: Vector2 = Vector2(Vector2(target["pos"]).x, _surface_below(Vector2(target["pos"]).x, Vector2(target["pos"]).y - 8.0) - 17.0)
+			enemy["attack_target"] = ground_mark
+			_spawn_hazard(enemy, "burrow", ground_mark, "circle", Vector2.RIGHT, 0.0, 48.0, windup, 13.0)
+		"beam":
+			_spawn_hazard(enemy, "beam", enemy["pos"], "line", enemy["attack_dir"], 720.0, 12.0, windup, 12.0)
+		"blink":
+			var side: float = -1.0 if _rng.randf() < 0.5 else 1.0
+			var blink_x: float = clampf(Vector2(target["pos"]).x + side * 190.0, 40.0, _world_size().x - 40.0)
+			enemy["blink_target"] = Vector2(blink_x, _surface_below(blink_x, Vector2(target["pos"]).y - 8.0) - 17.0)
+		"spore_bloom":
+			for x in [-105.0, 0.0, 105.0]:
+				_spawn_hazard(enemy, "boss_spore", Vector2(target["pos"]) + Vector2(x, 0), "circle", Vector2.RIGHT, 0.0, 54.0, windup, 15.0)
+		"stone_spikes":
+			for x in [-150.0, 0.0, 150.0]:
+				var spike_x: float = clampf(Vector2(target["pos"]).x + x, 20.0, _world_size().x - 20.0)
+				var spike_position: Vector2 = Vector2(spike_x, _surface_below(spike_x, Vector2(target["pos"]).y - 8.0) - 17.0)
+				_spawn_hazard(enemy, "stone_spike", spike_position, "circle", Vector2.UP, 0.0, 42.0, windup, 16.0)
+		"prism_beam", "prism_cross":
+			_spawn_hazard(enemy, "boss_beam", enemy["pos"], "line", enemy["attack_dir"], 850.0, 17.0, windup, 16.0)
+			if kind == "prism_cross":
+				_spawn_hazard(enemy, "boss_beam", enemy["pos"], "line", Vector2(enemy["attack_dir"]).rotated(PI * 0.5), 620.0, 14.0, windup, 14.0)
+				_spawn_hazard(enemy, "boss_beam", enemy["pos"], "line", Vector2(enemy["attack_dir"]).rotated(-PI * 0.5), 620.0, 14.0, windup, 14.0)
+
+
+func _release_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
+	var aim: Vector2 = enemy.get("attack_dir", Vector2.RIGHT)
+	var kind: String = str(enemy.get("attack_kind", ""))
+	enemy["attack_cd"] = float(enemy.get("attack_cooldown", 3.0))
+	match kind:
+		"pounce":
+			enemy["vel"] = Vector2(signf(aim.x) * 320.0, -330.0)
+			enemy["charge_timer"] = 0.35
+			enemy["charge_speed"] = 320.0
+			enemy["attack_dir"] = Vector2(signf(aim.x) if absf(aim.x) > 0.05 else 1.0, 0)
+		"charge", "stone_charge":
+			enemy["charge_timer"] = 0.58 if kind == "charge" else 0.72
+			enemy["charge_speed"] = 430.0 if kind == "charge" else 370.0
+			enemy["attack_dir"] = Vector2(signf(aim.x) if absf(aim.x) > 0.05 else 1.0, 0)
+		"spit":
+			_enemy_shoot(enemy, aim, 270.0, 10.0, "spit")
+		"triple", "salvo":
+			for spread in [-0.2, 0.0, 0.2]:
+				_enemy_shoot(enemy, aim.rotated(spread), 235.0 if kind == "triple" else 285.0, 7.0, "crystal" if kind == "triple" else "pulse")
+		"spore_volley":
+			var count: int = 7 if float(enemy["hp"]) < float(enemy["max_hp"]) * 0.45 else 5
+			for index in range(count):
+				_enemy_shoot(enemy, aim.rotated((index - (count - 1) * 0.5) * 0.21), 225.0, 12.0, "boss_spore_orb")
+		"burrow":
+			var marked: Vector2 = enemy["attack_target"]
+			enemy["pos"] = Vector2(clampf(marked.x, 30.0, _world_size().x - 30.0), _surface_below(marked.x, marked.y - 8.0) - 17.0)
+			enemy["vel"] = Vector2.ZERO
+			_emit("dash", enemy["pos"], {"aim": Vector2.UP, "enemy": true, "kind": "burrow"})
+		"blink":
+			enemy["pos"] = enemy["blink_target"]
+			enemy["vel"] = Vector2.ZERO
+			enemy["telegraph"] = 0.7
+			enemy["telegraph_max"] = 0.7
+			enemy["attack_kind"] = "salvo"
+			enemy["attack_target"] = Vector2(target["pos"])
+			enemy["attack_dir"] = WeaponPose.normalized_aim(Vector2(target["pos"]) - Vector2(enemy["pos"]))
+			_emit("dash", enemy["pos"], {"aim": enemy["attack_dir"], "enemy": true, "kind": "blink"})
+		"mend":
+			var healed: int = 0
+			var budget: float = float(enemy.get("heal_budget", 0.0))
+			for ally_value in Array(state["enemies"]):
+				var ally: Dictionary = ally_value
+				if healed >= 3 or budget <= 0.0:
+					break
+				if int(ally["id"]) == int(enemy["id"]) or str(ally["kind"]) == "boss" or float(ally["hp"]) <= 0.0 or float(ally["hp"]) >= float(ally["max_hp"]):
+					continue
+				if Vector2(ally["pos"]).distance_to(enemy["pos"]) > 260.0:
+					continue
+				var amount: float = minf(8.0, minf(budget, float(ally["max_hp"]) - float(ally["hp"])))
+				ally["hp"] = float(ally["hp"]) + amount
+				budget -= amount
+				healed += 1
+			enemy["heal_budget"] = budget
+			if healed > 0:
+				_emit("explosion", enemy["pos"], {"radius": 260.0, "team": "enemy", "healing": true, "visual_only": true})
+			_enemy_shoot(enemy, aim, 230.0, 8.0, "energy")
+
+
+func _cancel_enemy_attack(enemy: Dictionary) -> void:
+	enemy["telegraph"] = 0.0
+	enemy["charge_timer"] = 0.0
+	enemy["attack_cd"] = maxf(0.6, float(enemy.get("attack_cd", 0.0)))
+	var owner: int = int(enemy["id"])
+	state["hazards"] = Array(state.get("hazards", [])).filter(func(hazard: Dictionary) -> bool: return int(hazard["owner"]) != owner)
+
+
+func _spawn_hazard(enemy: Dictionary, kind: String, position: Vector2, shape: String, direction: Vector2, length: float, radius: float, delay: float, damage: float) -> Dictionary:
+	var hazards: Array = state.get("hazards", [])
+	if hazards.size() >= MAX_HAZARDS:
+		return {}
+	var hazard: Dictionary = {"id": _id(), "kind": kind, "shape": shape, "pos": position,
+		"dir": WeaponPose.normalized_aim(direction), "length": length, "radius": radius,
+		"delay": maxf(0.55, delay), "telegraph_max": maxf(0.55, delay), "active": false,
+		"ttl": 0.22, "damage": damage, "owner": int(enemy["id"]), "hit_ids": [], "biome": str(enemy.get("biome", state.get("biome", "rainforest")))}
+	hazards.append(hazard)
+	state["hazards"] = hazards
+	return hazard
+
+
+func _step_hazards(dt: float) -> void:
+	var living: Dictionary = {}
+	for enemy_value in Array(state["enemies"]):
+		var enemy: Dictionary = enemy_value
+		if float(enemy["hp"]) > 0.0:
+			living[int(enemy["id"])] = true
+	var kept: Array = []
+	for hazard_value in Array(state.get("hazards", [])):
+		var hazard: Dictionary = hazard_value
+		if not living.has(int(hazard["owner"])):
+			continue
+		if not bool(hazard["active"]):
+			hazard["delay"] = maxf(0.0, float(hazard["delay"]) - dt)
+			if float(hazard["delay"]) > 0.0:
+				kept.append(hazard)
+				continue
+			hazard["active"] = true
+			_emit("explosion", hazard["pos"], {"radius": hazard["radius"], "team": "enemy", "kind": hazard["kind"], "visual_only": true})
+		hazard["ttl"] = float(hazard["ttl"]) - dt
+		for player_value in Dictionary(state["players"]).values():
+			var player: Dictionary = player_value
+			if bool(player["dead"]) or int(player["id"]) in Array(hazard["hit_ids"]):
+				continue
+			var hit: bool = false
+			if str(hazard["shape"]) == "line":
+				hit = _segment_circle(hazard["pos"], Vector2(hazard["pos"]) + Vector2(hazard["dir"]) * float(hazard["length"]), player["pos"], float(hazard["radius"]) + 15.0) >= 0.0
+			else:
+				hit = Vector2(player["pos"]).distance_to(hazard["pos"]) <= float(hazard["radius"]) + 15.0
+			if hit:
+				hazard["hit_ids"].append(int(player["id"]))
+				_damage_player(player, float(hazard["damage"]) * _enemy_damage_scale(), hazard["pos"])
+		if float(hazard["ttl"]) > 0.0:
+			kept.append(hazard)
+	state["hazards"] = kept
 
 
 func _enemy_shoot(enemy: Dictionary, aim: Vector2, speed: float, damage: float, kind: String) -> void:
-	_spawn_projectile(Vector2(enemy["pos"]) + aim * (_enemy_radius(enemy) + 3.0), aim * speed, "enemy", kind, damage * _enemy_damage_scale(), -1, 4.0, 6.0 if kind != "boss_orb" else 9.0)
-	_emit("shoot", enemy["pos"], {"aim": aim, "kind": kind, "enemy": true})
-
+	var direction: Vector2 = WeaponPose.normalized_aim(aim)
+	var muzzle: Vector2 = Vector2(enemy["pos"]) + direction * (_enemy_radius(enemy) + 3.0)
+	var before: int = Array(state["projectiles"]).size()
+	_spawn_projectile(muzzle, direction * speed, "enemy", kind, damage * _enemy_damage_scale(), -1, 4.0, 9.0 if kind.begins_with("boss") else 6.0)
+	var metadata: Dictionary = {"enemy_id": int(enemy["id"]), "biome": str(enemy.get("biome", "")), "boss_style": str(enemy.get("boss_style", ""))}
+	if Array(state["projectiles"]).size() > before:
+		state["projectiles"].back().merge(metadata)
+	metadata.merge({"aim": direction, "kind": kind, "enemy": true})
+	_emit("shoot", muzzle, metadata)
 
 func _cleanup_enemies() -> void:
 	var kept: Array = []
@@ -936,18 +1096,19 @@ func _step_director(dt: float) -> void:
 	var position: Vector2 = _director_spawn_position(reference, protected_ids)
 	if not position.is_finite():
 		return
-	var kind: String = "crawler"
+	var pool: Array[String] = EnemyCatalog.pool(str(state.get("biome", "rainforest")))
+	var kind: String = pool[0]
 	var roll: float = _rng.randf()
 	if roll > 0.77:
-		kind = "spitter"
+		kind = pool[1]
 	elif roll > 0.52:
-		kind = "drone"
+		kind = pool[2]
 	if position.y - target_pos.y > 240.0:
 		# A ground enemy several storeys below an isolated balcony cannot
 		# participate. Use a flying approach instead of filling the entity
 		# budget with unreachable enemies on the distant safety floor.
-		kind = "drone"
-	if kind == "drone":
+		kind = EnemyCatalog.flying_kind(str(state.get("biome", "rainforest")))
+	if bool(EnemyCatalog.definition(kind).get("flying", false)):
 		position.y = clampf(target_pos.y - _rng.randf_range(100.0, 230.0), 100.0, _floor_y() - 80.0)
 	var enemy: Dictionary = _spawn_enemy(kind, position, _rng.randf() < minf(0.24, 0.025 + (difficulty - 1.0) * 0.05))
 	if enemy.is_empty():
@@ -986,11 +1147,11 @@ func _spawn_enemy(kind: String, position: Vector2, elite: bool = false) -> Dicti
 	var enemies: Array = state["enemies"]
 	if enemies.size() >= MAX_ENEMIES and kind != "boss":
 		return {}
-	var base: float = 36.0
-	match kind:
-		"drone": base = 28.0
-		"spitter": base = 48.0
-		"boss": base = 700.0 + (int(state["stage"]) - 1) * 260.0
+	var biome: String = str(state.get("biome", "rainforest"))
+	var definition: Dictionary = EnemyCatalog.boss_definition(biome) if kind == "boss" else EnemyCatalog.definition(kind)
+	if definition.is_empty():
+		return {}
+	var base: float = float(definition.get("health", 36.0))
 	var count: int = maxi(1, Dictionary(state["players"]).size())
 	var health: float = base * (1.0 + (count - 1) * 0.6) * (1.0 + (float(state["difficulty"]) - 1.0) * 0.28)
 	if elite:
@@ -998,7 +1159,14 @@ func _spawn_enemy(kind: String, position: Vector2, elite: bool = false) -> Dicti
 	var enemy: Dictionary = {"id": _id(), "kind": kind, "pos": position, "vel": Vector2.ZERO,
 		"hp": health, "max_hp": health, "elite": elite, "attack_cd": 1.0 + _rng.randf(),
 		"jump_cd": 1.0, "grounded": false, "flash": 0.0, "telegraph": 0.0, "phase_time": 0.0, "challenge_id": -1,
-		"spawn_difficulty": float(state["difficulty"])}
+		"spawn_difficulty": float(state["difficulty"]), "biome": str(definition.get("biome", biome)),
+		"name": str(definition.get("name", kind)), "boss_style": str(definition.get("boss_style", "")),
+		"radius": float(definition.get("radius", 19.0)), "flying": bool(definition.get("flying", false)),
+		"move_speed": float(definition.get("speed", 78.0)), "attack_range": float(definition.get("range", 950.0)),
+		"windup": float(definition.get("windup", 0.9)), "attack_cooldown": float(definition.get("cooldown", 3.1)),
+		"primary_attack": str(definition.get("attack_kind", "")), "attack_kind": "", "attack_dir": Vector2.RIGHT,
+		"attack_target": position, "telegraph_max": float(definition.get("windup", 0.9)), "blink_target": position,
+		"charge_timer": 0.0, "charge_hit_ids": [], "attack_count": 0, "heal_budget": 48.0 if kind == "conductor" else 0.0}
 	enemies.append(enemy)
 	return enemy
 
@@ -1269,9 +1437,10 @@ func _start_challenge(chest: Dictionary, player: Dictionary) -> void:
 	for index in range(4):
 		var x: float = clampf(Vector2(chest["pos"]).x + (-1.0 if index % 2 == 0 else 1.0) * (140.0 + index * 28.0), 40.0, _world_size().x - 40.0)
 		x = clampf(x, supporting.position.x + 40.0, supporting.end.x - 40.0)
-		var kind: String = "drone" if index == 3 else ("spitter" if index == 2 else "crawler")
+		var stage_pool: Array[String] = EnemyCatalog.pool(str(state.get("biome", "rainforest")))
+		var kind: String = stage_pool[index % stage_pool.size()]
 		var y: float = _surface_below(x, Vector2(chest["pos"]).y - 35.0) - 17.0
-		var enemy: Dictionary = _spawn_enemy(kind, Vector2(x, y if kind != "drone" else y - 100.0), index == 0)
+		var enemy: Dictionary = _spawn_enemy(kind, Vector2(x, y - 100.0 if bool(EnemyCatalog.definition(kind).get("flying", false)) else y), index == 0)
 		enemy["challenge_id"] = int(chest["id"])
 	_emit("interact", chest["pos"], {"player": player["id"], "kind": "combat"})
 
@@ -1406,6 +1575,7 @@ func _build_stage(stage: int) -> void:
 	state["chests"] = []
 	state["deployables"] = []
 	state["effects"] = []
+	state["hazards"] = []
 	state["boss_alive"] = false
 	_spawn_clock = 0.3
 	state["director"] = {"mode": "rest", "resting": true, "explorers": [], "event_active": false,
@@ -1753,6 +1923,8 @@ func _step_effects(dt: float) -> void:
 
 
 func _enemy_radius(enemy: Dictionary) -> float:
+	if enemy.has("radius"):
+		return float(enemy["radius"])
 	match str(enemy["kind"]):
 		"boss": return 44.0
 		"drone": return 18.0

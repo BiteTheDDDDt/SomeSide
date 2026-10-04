@@ -16,6 +16,8 @@ const ItemIcons = preload("res://scripts/item_icons.gd")
 const Biomes = preload("res://scripts/biome_renderer.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const Appearance = preload("res://scripts/player_appearance.gd")
+const Entities = preload("res://scripts/entity_renderer.gd")
+const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
 
@@ -282,6 +284,12 @@ func push_events(events: Array) -> void:
 				_spark(position_value, ORANGE, clampi(int(12.0 * strength), 7, 30), 175.0, 0.48)
 				_ring(position_value, Color(ORANGE, 0.65), 34.0 + strength * 10.0, 0.35)
 			"explosion":
+				if str(event.get("team",""))=="enemy" and bool(event.get("healing",false)):
+					# Enemy repair reads as a small amber machine pulse, never the
+					# player's large green field or friendly healing crosses.
+					_ring(position_value,Color("e8bd8c"),34.0,0.65)
+					_spark(position_value,Color("ddaf8d"),6,45.0,0.45)
+					continue
 				var healing: bool = event.get("healing", false)
 				var shielding: bool = event.get("shield", false)
 				var effect_color: Color = Color("b6e89f") if healing else (Color("90caff") if shielding else GOLD)
@@ -310,8 +318,9 @@ func push_events(events: Array) -> void:
 					swipe.merge({"owner":event.get("player", -1), "weapon":event.weapon})
 				_add_effect(swipe)
 			"dash":
-				_spark(position_value, TEAL, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
-				_add_effect({"kind":"dash", "pos":position_value, "angle":direction.angle(), "color":TEAL, "strength":strength, "age":0.0, "life":0.22})
+				var dash_color: Color = Color("eea27c") if bool(event.get("enemy",false)) else TEAL
+				_spark(position_value, dash_color, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
+				_add_effect({"kind":"dash", "pos":position_value, "angle":direction.angle(), "color":dash_color, "strength":strength, "age":0.0, "life":0.22})
 			"pickup":
 				_spark(position_value, TEAL, 11, 75.0, 0.5)
 				_ring(position_value, TEAL, 32.0, 0.45)
@@ -339,9 +348,6 @@ func _draw() -> void:
 	if _font == null:
 		_font = ThemeDB.fallback_font
 	var world: Vector2 = _frame.get("world_size", Vector2(3200.0, 1100.0))
-	if _current_biome == "rainforest":
-		_draw_sky()
-		_draw_distant_world()
 	Biomes.background(self, _current_biome, camera_position, screen_size, world, _clock)
 	Biomes.landmarks(self, _frame.get("landmarks", []), _current_biome, _clock)
 	_draw_terrain()
@@ -353,8 +359,8 @@ func _draw() -> void:
 	_draw_players()
 	_draw_effects()
 	_draw_projectiles()
-	_draw_threat_overlays()
 	_draw_atmosphere()
+	_draw_threat_overlays()
 
 
 func _draw_sky() -> void:
@@ -435,58 +441,7 @@ func _draw_terrain() -> void:
 	var platforms: Array = _frame.get("platforms", [])
 	var world: Vector2 = _frame.get("world_size", Vector2(3200.0, 1100.0))
 	for index: int in range(platforms.size()):
-		var rectangle: Rect2 = platforms[index]
-		if _current_biome != "rainforest":
-			Biomes.platform(self, rectangle, index, _current_biome, _clock, screen_size, world)
-			continue
-		var screen_rect: Rect2 = Rect2(world_to_screen(rectangle.position), rectangle.size)
-		if screen_rect.end.x < -80.0 or screen_rect.position.x > screen_size.x + 80.0 or screen_rect.position.y > screen_size.y + 180.0:
-			continue
-		var left: float = screen_rect.position.x
-		var right: float = screen_rect.end.x
-		var top: float = screen_rect.position.y
-		var is_floor: bool = rectangle.size.y > 60.0 or rectangle.position.y >= world.y - 160.0
-		if not is_floor and screen_rect.end.y < -120.0:
-			continue
-		var depth: float = maxf(screen_rect.size.y, 37.0) if not is_floor else maxf(screen_size.y - top + 100.0, 110.0)
-		var polygon: PackedVector2Array = PackedVector2Array([Vector2(left, top + 4.0), Vector2(right, top + 4.0), Vector2(right - 8.0, top + depth * 0.55)])
-		var segments: int = maxi(3, int(rectangle.size.x / 48.0))
-		for segment: int in range(segments, -1, -1):
-			var fraction: float = float(segment) / float(segments)
-			var jag: float = sin(float(segment * 31 + index * 19)) * 13.0
-			polygon.append(Vector2(lerpf(left + 12.0, right - 12.0, fraction), top + depth + jag))
-		polygon.append(Vector2(left + 4.0, top + depth * 0.52))
-		draw_colored_polygon(polygon, Color("091f26"))
-		draw_colored_polygon(PackedVector2Array([Vector2(left + 3.0, top + 5.0), Vector2(right - 3.0, top + 5.0), Vector2(right - 14.0, top + 19.0), Vector2(left + 10.0, top + 23.0)]), Color("1c3c3c"))
-		# Strata in the rock, broken into facets rather than rectangular blocks.
-		for segment: int in range(segments):
-			var x: float = lerpf(left + 8.0, right - 35.0, float(segment) / float(segments))
-			var shard_depth: float = minf(depth - 3.0, 36.0 + absf(sin(float(segment * 11 + index))) * 51.0)
-			draw_colored_polygon(PackedVector2Array([Vector2(x, top + 18.0), Vector2(x + 28.0, top + 14.0), Vector2(x + 39.0, top + shard_depth), Vector2(x + 9.0, top + shard_depth - 11.0)]), Color("102b32"))
-			if segment % 3 == 0:
-				draw_line(Vector2(x + 6.0, top + 17.0), Vector2(x + 13.0, top + shard_depth - 8.0), Color("234544"), 1.0, true)
-		# Continuous bright top edge is the player's landing affordance.
-		draw_line(Vector2(left + 2.0, top + 1.0), Vector2(right - 2.0, top + 1.0), Color("508f75"), 3.0, true)
-		draw_line(Vector2(left + 7.0, top + 4.0), Vector2(right - 7.0, top + 4.0), Color("2a6358"), 2.0)
-		for tuft: int in range(maxi(2, int(rectangle.size.x / 34.0))):
-			var x: float = left + 12.0 + float(tuft) * 34.0 + sin(float(tuft + index) * 7.23) * 7.0
-			if x > right - 8.0:
-				break
-			var tall: float = 4.0 + absf(sin(float(tuft * 19 + index))) * 8.0
-			var sway: float = sin(_clock * 1.5 + x * 0.03) * 2.0
-			draw_line(Vector2(x, top), Vector2(x - 3.0 + sway, top - tall), Color("397b65"), 1.5, true)
-			draw_line(Vector2(x + 2.0, top), Vector2(x + 5.0 + sway, top - tall * 0.8), Color("579a78"), 1.0, true)
-			if tuft % 7 == 2:
-				_draw_flora(Vector2(x, top), 0.72 + absf(sin(float(tuft))) * 0.5, tuft + index)
-		if not is_floor:
-			for vine: int in range(2):
-				var x: float = left + screen_rect.size.x * (0.28 + float(vine) * 0.48)
-				var length: float = 30.0 + absf(sin(float(index + vine) * 8.51)) * 40.0
-				var points: PackedVector2Array = PackedVector2Array()
-				for step: int in range(8):
-					points.append(Vector2(x + sin(float(step) * 0.7 + _clock * 0.7) * 3.0, top + 19.0 + float(step) / 7.0 * length))
-				draw_polyline(points, Color("315d4c"), 1.5, true)
-				draw_circle(points[7], 2.0, Color("7cb996"), true, -1.0, true)
+		Biomes.platform(self, platforms[index], index, _current_biome, _clock, screen_size, world)
 
 
 func _draw_flora(p: Vector2, scale_value: float, seed_value: int) -> void:
@@ -833,36 +788,11 @@ func _draw_players() -> void:
 		var vel: Vector2 = player.get("vel", Vector2.ZERO)
 		var grounded: bool = player.get("grounded", false)
 		var running: float = clampf(absf(vel.x) / 100.0, 0.0, 1.0)
-		var step: float = sin(_clock * 16.0) * running if grounded else 0.35
 		var bob: float = absf(cos(_clock * 16.0)) * running * 1.0 if grounded else 0.0
 		p.y -= bob
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
 		Appearance.draw_layer(self, appearance, true, _clock)
-		# The scarf and backpack silhouette keep the tiny pilot readable.
-		var scarf_wave: float = sin(_clock * 9.0) * 2.0 + running * 6.0
-		draw_colored_polygon(PackedVector2Array([Vector2(-5.0, -11.0), Vector2(-17.0 - running * 6.0, -8.0 + scarf_wave), Vector2(-13.0 - running * 8.0, -3.0 + scarf_wave), Vector2(-5.0, -5.0)]), Color("cb815b") if character == "ranger" else Color("629a97"))
-		draw_colored_polygon(PackedVector2Array([Vector2(-12.0, -8.0), Vector2(-5.0, -10.0), Vector2(-4.0, 7.0), Vector2(-13.0, 8.0)]), INK)
-		draw_rect(Rect2(-11.0, -5.0, 6.0, 10.0), Color("435b54"))
-		draw_line(Vector2(-10.0, -3.0), Vector2(-10.0, 3.0), color_value, 1.5, true)
-		# Articulated feet and knees.
-		for side: float in [-1.0, 1.0]:
-			var hip: Vector2 = Vector2(side * 3.0, 6.0)
-			var knee: Vector2 = Vector2(side * 4.0 + step * side * 4.0, 13.0)
-			var foot: Vector2 = Vector2(side * 4.0 + step * side * 7.0, 20.0 - maxf(0.0, step * side) * 3.0)
-			draw_polyline(PackedVector2Array([hip, knee, foot]), INK, 8.0, true)
-			draw_polyline(PackedVector2Array([hip, knee, foot]), Color("456564") if side > 0.0 else Color("2d4649"), 5.0, true)
-			draw_line(foot + Vector2(-2.0, 0.0), foot + Vector2(4.0, 0.0), Color("a1b0a0"), 3.0, true)
-		draw_colored_polygon(PackedVector2Array([Vector2(-9.0, -10.0), Vector2(7.0, -11.0), Vector2(10.0, 4.0), Vector2(5.0, 10.0), Vector2(-7.0, 9.0)]), INK)
-		draw_colored_polygon(PackedVector2Array([Vector2(-6.0, -8.0), Vector2(5.0, -9.0), Vector2(7.0, 3.0), Vector2(3.0, 7.0), Vector2(-5.0, 7.0)]), Color("506962") if character == "ranger" else Color("a27c52"))
-		draw_line(Vector2(-3.0, -5.0), Vector2(3.0, -5.0), color_value, 2.0, true)
-		draw_line(Vector2(-7.0, 5.0), Vector2(6.0, 5.0), Color("b1b495"), 2.0, true)
-		# Asymmetric helmet, dark faceplate, luminous visor.
-		draw_colored_polygon(PackedVector2Array([Vector2(-8.0, -21.0), Vector2(4.0, -23.0), Vector2(11.0, -17.0), Vector2(9.0, -8.0), Vector2(-7.0, -8.0), Vector2(-11.0, -15.0)]), INK)
-		draw_colored_polygon(PackedVector2Array([Vector2(-7.0, -20.0), Vector2(3.0, -21.0), Vector2(8.0, -17.0), Vector2(7.0, -11.0), Vector2(-6.0, -10.0), Vector2(-8.0, -15.0)]), Color("78918a") if character == "ranger" else Color("d0ab79"))
-		draw_colored_polygon(PackedVector2Array([Vector2(-1.0, -18.0), Vector2(8.0, -17.0), Vector2(7.0, -12.0), Vector2(-2.0, -12.0)]), Color("112c35"))
-		draw_line(Vector2(1.0, -16.0), Vector2(7.0, -15.0), color_value, 2.0, true)
-		draw_line(Vector2(-6.0, -22.0), Vector2(-8.0, -28.0), Color("6a8b83"), 1.5, true)
-		draw_circle(Vector2(-8.0, -28.0), 1.4, color_value, true, -1.0, true)
+		Entities.player_body(self, player, _clock)
 		draw_set_transform(Vector2.ZERO)
 		# Accessories mirror with the body; the weapon uses the shared fixed shoulder.
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
@@ -894,197 +824,209 @@ func _draw_players() -> void:
 func _draw_enemies() -> void:
 	for value: Variant in _frame.get("enemies", []):
 		var enemy: Dictionary = value
+		if float(enemy.get("hp",1.0))<=0.0: continue
 		var p: Vector2 = world_to_screen(_entity_draw_position("e" + str(enemy.get("id", 0)), enemy.get("pos", Vector2.ZERO)))
-		if not _visible(p, 130.0):
-			continue
-		var kind: String = enemy.get("kind", "crawler")
-		var elite: bool = enemy.get("elite", false)
-		var id_value: int = enemy.get("id", 0)
+		var bounds: Rect2 = Entities.enemy_bounds(enemy)
+		if not Rect2(p+bounds.position,bounds.size).grow(28.0).intersects(Rect2(Vector2.ZERO,screen_size)): continue
+		var kind: String = str(enemy.get("kind", "crawler"))
+		var elite: bool = bool(enemy.get("elite", false))
 		var vel: Vector2 = enemy.get("vel", Vector2.ZERO)
-		var facing: float = 1.0 if vel.x >= 0.0 else -1.0
-		var accent: Color = Color("f4c181") if elite else Color("eb926f")
-		var body: Color = Color("855d52") if elite else Color("506964")
-		if float(enemy.get("flash", 0.0)) > 0.0:
-			body = body.lerp(CREAM, 0.7)
-		var motion: float = sin(_clock * 12.0 + float(id_value))
-		if elite:
-			_glow(p, 37.0 if kind != "boss" else 90.0, Color(0.96, 0.41, 0.15, 0.025), 3)
-		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
-		match kind:
-			"drone":
-				for side: float in [-1.0, 1.0]:
-					draw_colored_polygon(PackedVector2Array([Vector2(side * 7.0, -2.0), Vector2(side * 21.0, -12.0 + motion * 2.0), Vector2(side * 27.0, -8.0 + motion * 2.0), Vector2(side * 18.0, 3.0), Vector2(side * 10.0, 6.0)]), INK)
-					draw_line(Vector2(side * 12.0, -1.0), Vector2(side * 22.0, -8.0 + motion * 2.0), body, 3.0, true)
-					draw_line(Vector2(side * 16.0, 3.0), Vector2(side * 15.0, 10.0 + sin(_clock * 7.0) * 2.0), Color(accent, 0.6), 2.0, true)
-				draw_colored_polygon(PackedVector2Array([Vector2(0.0, -13.0), Vector2(11.0, -4.0), Vector2(9.0, 8.0), Vector2(0.0, 14.0), Vector2(-9.0, 8.0), Vector2(-11.0, -4.0)]), INK)
-				draw_colored_polygon(PackedVector2Array([Vector2(0.0, -10.0), Vector2(8.0, -3.0), Vector2(6.0, 6.0), Vector2(0.0, 10.0), Vector2(-6.0, 6.0), Vector2(-8.0, -3.0)]), body)
-				draw_circle(Vector2(0.0, 0.0), 4.0, accent, true, -1.0, true)
-				draw_circle(Vector2(1.0, -1.0), 1.5, CREAM, true, -1.0, true)
-			"spitter":
-				for side: float in [-1.0, 1.0]:
-					draw_polyline(PackedVector2Array([Vector2(side * 7.0, 5.0), Vector2(side * 16.0, 10.0), Vector2(side * 20.0 + motion * side * 2.0, 18.0)]), INK, 5.0, true)
-					draw_polyline(PackedVector2Array([Vector2(side * 7.0, 5.0), Vector2(side * 16.0, 10.0), Vector2(side * 20.0 + motion * side * 2.0, 18.0)]), body, 2.0, true)
-				draw_circle(Vector2(-3.0, -2.0), 15.0, INK, true, -1.0, true)
-				draw_circle(Vector2(-4.0, -3.0), 12.0, Color("66866d"), true, -1.0, true)
-				draw_colored_polygon(PackedVector2Array([Vector2(0.0, -10.0), Vector2(15.0, -15.0), Vector2(23.0, -10.0), Vector2(19.0, -2.0), Vector2(4.0, 2.0)]), INK)
-				draw_colored_polygon(PackedVector2Array([Vector2(1.0, -8.0), Vector2(14.0, -12.0), Vector2(19.0, -9.0), Vector2(17.0, -5.0), Vector2(3.0, 0.0)]), body)
-				draw_line(Vector2(12.0, -12.0), Vector2(17.0, -10.0), accent, 2.0, true)
-				for spot: int in range(3):
-					draw_circle(Vector2(-9.0 + float(spot) * 5.0, -3.0 + sin(float(spot)) * 5.0), 2.5, Color("b6c28b"), true, -1.0, true)
-			"boss":
-				_draw_boss(accent, motion)
-			_:
-				for leg: int in range(3):
-					var x: float = -12.0 + float(leg) * 11.0
-					var swing: float = sin(_clock * 14.0 + float(leg) * 2.0 + float(id_value)) * 4.0
-					var points: PackedVector2Array = PackedVector2Array([Vector2(x, 2.0), Vector2(x - 8.0 + swing, 10.0), Vector2(x - 4.0 + swing, 17.0)])
-					draw_polyline(points, INK, 5.0, true)
-					draw_polyline(points, body, 2.5, true)
-				draw_colored_polygon(PackedVector2Array([Vector2(-20.0, 2.0), Vector2(-17.0, -9.0), Vector2(-5.0, -14.0), Vector2(9.0, -11.0), Vector2(18.0, -4.0), Vector2(19.0, 6.0), Vector2(-8.0, 8.0)]), INK)
-				draw_colored_polygon(PackedVector2Array([Vector2(-16.0, 1.0), Vector2(-14.0, -7.0), Vector2(-4.0, -11.0), Vector2(8.0, -8.0), Vector2(14.0, -3.0), Vector2(14.0, 4.0), Vector2(-7.0, 5.0)]), body)
-				draw_line(Vector2(-9.0, -9.0), Vector2(-6.0, 3.0), Color("293f41"), 2.0, true)
-				draw_line(Vector2(-2.0, -10.0), Vector2(0.0, 3.0), Color("293f41"), 2.0, true)
-				draw_circle(Vector2(10.0, -3.0), 2.5, accent, true, -1.0, true)
-				draw_polyline(PackedVector2Array([Vector2(14.0, 4.0), Vector2(23.0, 3.0), Vector2(20.0, 9.0)]), Color("a1b2a0"), 2.0, true)
+		var heading: Vector2 = enemy.get("attack_dir",vel) if float(enemy.get("telegraph",0.0))>0.0 else vel
+		var facing: float = 1.0 if heading.x >= 0.0 else -1.0
+		var accent: Color = Color("ffd08b") if elite else Color("efa67d")
+		draw_set_transform(p,0.0,Vector2(facing,1.0))
+		Entities.enemy(self,enemy,_clock)
 		draw_set_transform(Vector2.ZERO)
-		if kind == "boss" and float(enemy.get("telegraph", 0.0)) > 0.0:
-			var warning: float = 1.0 - float(enemy.get("telegraph", 0.0)) / 0.65
-			_glow(p, 60.0 + warning * 28.0, Color(1.0, 0.35, 0.18, 0.045), 3)
-			draw_arc(p, 71.0 - warning * 20.0, 0.0, TAU, 48, Color(1.0, 0.7, 0.42, 0.3 + warning * 0.6), 2.0, true)
-			var boss_world_position: Vector2 = enemy.get("pos", Vector2.ZERO)
-			var target_direction: Vector2 = Vector2.LEFT
-			var nearest: float = INF
-			var players: Dictionary = _frame.get("players", {})
-			for player_value: Variant in players.values():
-				var player: Dictionary = player_value
-				if bool(player.get("dead", false)):
-					continue
-				var target_offset: Vector2 = Vector2(player.get("pos", Vector2.ZERO)) - boss_world_position
-				if target_offset.length_squared() < nearest:
-					nearest = target_offset.length_squared()
-					target_direction = target_offset.normalized()
-			var enraged: bool = float(enemy.get("hp", 1.0)) < float(enemy.get("max_hp", 1.0)) * 0.45
-			var ray_count: int = 7 if enraged else 5
-			for ray: int in range(ray_count):
-				var angle: float = target_direction.angle() + (float(ray) - float(ray_count - 1) * 0.5) * 0.18
-				var direction: Vector2 = Vector2.from_angle(angle)
-				draw_line(p + direction * 56.0, p + direction * 140.0, Color(1.0, 0.55, 0.35, 0.12 + warning * 0.2), 1.0, true)
-		var hp: float = float(enemy.get("hp", 100.0))
+		var hp: float = float(enemy.get("hp",100.0))
+		var max_hp: float = maxf(1.0,float(enemy.get("max_hp",100.0)))
 		var status_index: int = 0
+		var top: float = bounds.position.y-10.0
 		for status: String in ["slow_timer", "poison_timer", "burn_timer", "stun_timer"]:
-			if float(enemy.get(status,0.0)) <= 0.0: continue
-			var status_color: Color = Color("b3e6fa")
-			if status == "poison_timer": status_color = Color("a6d884")
-			elif status == "burn_timer": status_color = Color("ffa77a")
-			elif status == "stun_timer": status_color = Color("c7a8f0")
-			var status_p: Vector2 = p + Vector2(-10.0 + float(status_index)*7.0,-88.0 if kind=="boss" else -35.0)
-			draw_colored_polygon(PackedVector2Array([status_p+Vector2(0,-3),status_p+Vector2(2,0),status_p+Vector2(0,3),status_p+Vector2(-2,0)]),status_color)
-			status_index += 1
-		var max_hp: float = maxf(1.0, float(enemy.get("max_hp", 100.0)))
-		if hp < max_hp or kind == "boss" or elite:
-			var width: float = 92.0 if kind == "boss" else 28.0
-			var bar_p: Vector2 = p + Vector2(-width * 0.5, -77.0 if kind == "boss" else -26.0)
-			draw_rect(Rect2(bar_p - Vector2.ONE, Vector2(width + 2.0, 5.0)), INK)
-			draw_rect(Rect2(bar_p, Vector2(width, 3.0)), Color("37403a"))
-			draw_rect(Rect2(bar_p, Vector2(width * clampf(hp / max_hp, 0.0, 1.0), 3.0)), accent)
-			if kind == "boss":
-				_world_label(p + Vector2(0.0, -88.0), "空壳守望者", GOLD, 13)
-
-
-func _draw_boss(accent: Color, motion: float) -> void:
-	for side: float in [-1.0, 1.0]:
-		draw_polyline(PackedVector2Array([Vector2(side * 20.0, 16.0), Vector2(side * 32.0, 33.0), Vector2(side * 39.0 + motion * 3.0, 44.0)]), INK, 16.0, true)
-		draw_polyline(PackedVector2Array([Vector2(side * 20.0, 16.0), Vector2(side * 32.0, 33.0), Vector2(side * 39.0 + motion * 3.0, 44.0)]), Color("566b64"), 10.0, true)
-		draw_colored_polygon(PackedVector2Array([Vector2(side * 22.0, -30.0), Vector2(side * 45.0, -42.0), Vector2(side * 56.0, -11.0), Vector2(side * 46.0, 20.0), Vector2(side * 33.0, 9.0)]), INK)
-		draw_colored_polygon(PackedVector2Array([Vector2(side * 28.0, -27.0), Vector2(side * 43.0, -35.0), Vector2(side * 49.0, -10.0), Vector2(side * 42.0, 13.0), Vector2(side * 37.0, 5.0)]), Color("62766b"))
-		draw_line(Vector2(side * 41.0, -24.0), Vector2(side * 44.0, 3.0), accent, 2.0, true)
-		draw_colored_polygon(PackedVector2Array([Vector2(side * 13.0, -40.0), Vector2(side * 25.0, -64.0), Vector2(side * 30.0, -61.0), Vector2(side * 24.0, -31.0)]), Color("7a8b76"))
-	draw_colored_polygon(PackedVector2Array([Vector2(-25.0, -32.0), Vector2(-11.0, -45.0), Vector2(13.0, -45.0), Vector2(30.0, -25.0), Vector2(25.0, 20.0), Vector2(0.0, 31.0), Vector2(-23.0, 20.0)]), INK)
-	draw_colored_polygon(PackedVector2Array([Vector2(-21.0, -27.0), Vector2(-8.0, -40.0), Vector2(10.0, -40.0), Vector2(24.0, -22.0), Vector2(19.0, 16.0), Vector2(0.0, 23.0), Vector2(-18.0, 15.0)]), Color("4f6861"))
-	draw_colored_polygon(PackedVector2Array([Vector2(-16.0, -23.0), Vector2(0.0, -29.0), Vector2(17.0, -23.0), Vector2(11.0, -15.0), Vector2(-11.0, -15.0)]), INK)
-	draw_line(Vector2(-11.0, -22.0), Vector2(11.0, -22.0), accent, 3.0, true)
-	_glow(Vector2(0.0, 0.0), 28.0, Color(accent, 0.045), 3)
-	draw_colored_polygon(PackedVector2Array([Vector2(0.0, -11.0), Vector2(9.0, 0.0), Vector2(0.0, 15.0), Vector2(-9.0, 0.0)]), accent)
-	draw_colored_polygon(PackedVector2Array([Vector2(0.0, -7.0), Vector2(4.0, 0.0), Vector2(0.0, 9.0), Vector2(-4.0, 0.0)]), CREAM)
+			if float(enemy.get(status,0.0))<=0.0: continue
+			var color_value: Color = {"slow_timer":Color("b3e6fa"),"poison_timer":Color("a6d884"),"burn_timer":Color("ffa77a"),"stun_timer":Color("c7a8f0")}[status]
+			var spot: Vector2 = p+Vector2(-10.0+status_index*7.0,top-8.0)
+			draw_colored_polygon(PackedVector2Array([spot+Vector2(0,-3),spot+Vector2(2,0),spot+Vector2(0,3),spot+Vector2(-2,0)]),color_value)
+			status_index+=1
+		if hp<max_hp or kind=="boss" or elite:
+			var width: float = 92.0 if kind=="boss" else 28.0
+			var bar_p: Vector2 = p+Vector2(-width*0.5,top)
+			draw_rect(Rect2(bar_p-Vector2.ONE,Vector2(width+2,5)),INK)
+			draw_rect(Rect2(bar_p,Vector2(width,3)),Color("3a3e43"))
+			draw_rect(Rect2(bar_p,Vector2(width*clampf(hp/max_hp,0.0,1.0),3)),accent)
+			if kind=="boss":
+				var title: String = str(enemy.get("name", {"spore":"孢冠母巢","stone":"裂岩巨像","prism":"寂光执政官"}.get(str(enemy.get("boss_style","spore")),"守望者")))
+				_world_label(p+Vector2(0,top-10),title,GOLD,13)
 
 
 func _draw_projectiles() -> void:
 	for value: Variant in _frame.get("projectiles", []):
 		var projectile: Dictionary = value
-		var rendered: Vector2 = _entity_draw_position("b" + str(projectile.get("id", 0)), projectile.get("pos", Vector2.ZERO))
+		var rendered: Vector2 = _entity_draw_position("b"+str(projectile.get("id",0)),projectile.get("pos",Vector2.ZERO))
 		var p: Vector2 = world_to_screen(rendered)
-		if not _visible(p, 50.0):
-			continue
-		var velocity: Vector2 = projectile.get("vel", Vector2.RIGHT)
-		var direction: Vector2 = velocity.normalized()
-		var friendly: bool = projectile.get("team", "player") == "player"
-		var radius: float = maxf(2.0, float(projectile.get("radius", 3.0)))
+		# Long precision tails can remain on screen after their core leaves it.
+		if not _visible(p,120.0): continue
+		var friendly: bool = str(projectile.get("team","player"))=="player"
+		var kind: String = str(projectile.get("kind","bullet"))
 		var strength: float = effect_strength(projectile) if friendly else 1.0
-		var color_value: Color = GOLD if friendly else Color("ed857b")
-		var kind: String = projectile.get("kind", "bullet")
-		if kind == "rail": color_value = Color("9bd6ff")
-		if kind == "storm": color_value = Color("89dbec")
-		if kind == "boomerang": color_value = Color("9be0cf")
-		if kind == "lance": color_value = Color("ffe2a0")
-		if "poison" in kind or "acid" in kind:
-			color_value = Color("b6d980")
-		_glow(p, radius * 2.0 + 5.0 + minf(strength, 2.2) * 3.0, Color(color_value, 0.045), 2)
-		var trail: float = projectile_trail_length(projectile, rendered, clampf(velocity.length() * 0.036 * sqrt(strength), 6.0, 135.0 if kind == "rail" else 60.0))
-		if kind == "boomerang":
-			draw_line(p-direction*trail,p,Color(color_value,0.3),2.0,true)
-			draw_set_transform(p,_clock*15.0 + float(projectile.get("id",0)))
-			draw_polyline(PackedVector2Array([Vector2(-8,-12),Vector2(7,0),Vector2(-8,12)]),INK,7.0,true)
-			draw_polyline(PackedVector2Array([Vector2(-8,-12),Vector2(7,0),Vector2(-8,12)]),color_value,3.5,true)
-			draw_arc(Vector2.ZERO,15.0,0.0,PI*1.25,22,Color(color_value,0.35),1.2,true)
-			draw_set_transform(Vector2.ZERO)
-			continue
-		if kind == "storm":
-			draw_line(p-direction*trail,p,Color(color_value,0.24),5.0,true)
-			for ray: int in range(3):
-				var arm: Vector2 = Vector2.from_angle(_clock*4.0+float(ray)*TAU/3.0)
-				draw_polyline(PackedVector2Array([p+arm*4.0,p+arm*12.0+arm.orthogonal()*4.0,p+arm*18.0]),Color(color_value,0.8),1.2,true)
-			draw_circle(p,maxf(radius,4.0),color_value,true,-1.0,true)
-			draw_circle(p,2.4,CREAM,true,-1.0,true)
-			continue
-		if kind == "lance":
-			var lance_tail: float = projectile_trail_length(projectile, rendered, 110.0)
-			draw_line(p-direction*lance_tail,p,Color(color_value,0.11),7.0+strength,true)
-			draw_line(p-direction*minf(85.0,lance_tail),p,Color(color_value,0.55),2.0+strength*0.4,true)
-			var normal: Vector2 = direction.orthogonal()*4.0
-			draw_colored_polygon(PackedVector2Array([p+direction*14.0,p-direction*minf(11.0,lance_tail)+normal,p-direction*minf(7.0,lance_tail),p-direction*minf(11.0,lance_tail)-normal]),CREAM)
-			draw_line(p-direction*minf(38.0,lance_tail),p+direction*12.0,CREAM,1.2,true)
-			continue
-		if kind == "grenade":
-			draw_circle(p, radius + 2.0, INK, true, -1.0, true)
-			draw_circle(p, radius, Color("a8b278"), true, -1.0, true)
-			draw_line(p + Vector2.from_angle(_clock * 8.0) * radius, p - Vector2.from_angle(_clock * 8.0) * radius, Color("46645a"), 1.8, true)
-			draw_circle(p - direction * radius, 1.7, GOLD, true, -1.0, true)
-			continue
-		draw_line(p - direction * trail, p, Color(color_value, 0.16), radius * 1.5 + minf(strength, 2.5) * 1.4, true)
-		draw_line(p - direction * trail * 0.8, p, Color(color_value, 0.78), maxf(1.5, radius * 0.55 + strength * 0.45), true)
-		draw_line(p - direction * trail * 0.3, p, CREAM if friendly else color_value, 1.2, true)
-		if friendly and strength >= 1.7:
-			var normal: Vector2 = direction.orthogonal() * (2.0 + strength)
-			draw_line(p - direction * trail * 0.75 + normal, p - direction * trail * 0.15 + normal * 0.5, Color(color_value, 0.26), 1.0, true)
-			if strength >= 2.2:
-				draw_line(p - direction * trail * 0.75 - normal, p - direction * trail * 0.15 - normal * 0.5, Color(color_value, 0.26), 1.0, true)
-		draw_circle(p, radius if not friendly else radius * 0.6, CREAM if friendly else color_value, true, -1.0, true)
-		if not friendly:
-			draw_circle(p, radius + 3.0, Color(color_value, 0.4), false, 1.0, true)
+		var velocity: Vector2 = projectile.get("vel",Vector2.RIGHT)
+		var requested: float = minf(velocity.length()*0.032*sqrt(strength),92.0 if kind in ["rail","lance"] else 42.0)
+		var tail: float = projectile_trail_length(projectile,rendered,requested)
+		ProjectileArt.draw(self,projectile,p,_clock,strength,tail)
 
 
 func _draw_threat_overlays() -> void:
-	# Enemy warnings are the final combat layer, above friendly proc effects.
+	# Fixed authority-authored geometry is drawn LAST, even over atmosphere and
+	# friendly effects. Accessibility FX settings never hide hostile telegraphs.
+	for value: Variant in _frame.get("hazards", []):
+		_draw_hazard(value)
 	for value: Variant in _frame.get("enemies", []):
 		var enemy: Dictionary = value
-		var remaining: float = float(enemy.get("telegraph", 0.0))
-		if str(enemy.get("kind", "")) != "boss" or remaining <= 0.0:
-			continue
-		var p: Vector2 = world_to_screen(_entity_draw_position("e" + str(enemy.get("id", 0)), enemy.get("pos", Vector2.ZERO)))
-		if not _visible(p, 90.0): continue
-		var warning: float = 1.0 - clampf(remaining / 0.65, 0.0, 1.0)
-		draw_arc(p, 71.0 - warning * 20.0, 0.0, TAU, 48, Color(1.0, 0.52, 0.33, 0.62 + warning * 0.3), 2.0, true)
-		draw_colored_polygon(PackedVector2Array([p+Vector2(0,-72),p+Vector2(-4,-81),p+Vector2(4,-81)]), Color("ffb180"))
+		if float(enemy.get("hp",0.0))<=0.0: continue
+		var remaining: float = float(enemy.get("telegraph",0.0))
+		if remaining<=0.0: continue
+		var p: Vector2 = world_to_screen(enemy.get("pos",Vector2.ZERO))
+		var target: Vector2 = world_to_screen(enemy.get("attack_target",enemy.get("pos",Vector2.ZERO)))
+		var direction: Vector2 = WeaponPose.normalized_aim(enemy.get("attack_dir",Vector2.RIGHT))
+		var progress: float = clampf(1.0-remaining/maxf(0.01,float(enemy.get("telegraph_max",0.8))),0.0,1.0)
+		var color_value: Color = Color("ffac7b")
+		var attack: String = str(enemy.get("attack_kind",""))
+		if _visible(p,100.0):
+			var warning_p: Vector2 = p+Vector2(0,Entities.enemy_bounds(enemy).position.y-13)
+			draw_colored_polygon(PackedVector2Array([warning_p+Vector2(0,-5),warning_p+Vector2(-4,3),warning_p+Vector2(4,3)]),Color(color_value,0.85))
+			draw_line(warning_p+Vector2(0,-2),warning_p+Vector2(0,0),INK,1.2,true)
+		match attack:
+			"charge", "stone_charge":
+				var reach: float = 249.4 if attack=="charge" else 266.4
+				_draw_warning_lane(p,p+direction*reach,25.0 if attack=="charge" else 43.0,progress)
+			"pounce":
+				if not _visible(p,160): continue
+				var path: PackedVector2Array = PackedVector2Array()
+				for i: int in range(13):
+					var t: float = i/12.0
+					path.append(p+direction*(112*t)+Vector2(0,-sin(t*PI)*28))
+				draw_polyline(path,Color(color_value,0.25+progress*0.45),1.3,true)
+				_draw_arrow(path[-1],direction,color_value,5.0)
+			"blink":
+				var destination: Vector2 = world_to_screen(enemy.get("blink_target",enemy.get("pos",Vector2.ZERO)))
+				if _visible(destination,45):
+					draw_arc(destination,24.0,0,TAU,32,Color(color_value,0.6),1.5,true)
+					draw_arc(destination,29.0,-PI*0.5,-PI*0.5+TAU*progress,32,Color(color_value,0.9),1.5,true)
+					for side: float in [-1.0,1.0]: draw_line(destination+Vector2(side*16,-17),destination+Vector2(side*16,17),Color(color_value,0.4),1.0,true)
+				_draw_dashes(p,destination,Color(color_value,0.16),1.0,22.0)
+			"spit", "triple", "salvo", "spore_volley", "mend":
+				if not _visible(p,190): continue
+				var count: int = 3 if attack in ["triple","salvo"] else (7 if attack=="spore_volley" and float(enemy.hp)<float(enemy.max_hp)*0.45 else (5 if attack=="spore_volley" else 1))
+				for index: int in range(count):
+					var spacing: float = 0.21 if attack=="spore_volley" else 0.2
+					var ray: Vector2 = direction.rotated((index-(count-1)*0.5)*spacing)
+					var start: float = 49.0 if str(enemy.get("kind",""))=="boss" else 23.0
+					var end: float = 145.0 if count>1 else 112.0
+					_draw_dashes(p+ray*start,p+ray*end,Color(color_value,0.22+progress*0.38),1.2,12.0)
+					_draw_arrow(p+ray*end,ray,Color(color_value,0.6),4.0)
+				if attack=="mend":
+					var linked: int=0
+					for ally: Dictionary in _frame.get("enemies",[]):
+						if int(ally.get("id",0))==int(enemy.get("id",0)) or str(ally.get("kind",""))=="boss" or float(ally.get("hp",0))<=0 or float(ally.get("hp",0))>=float(ally.get("max_hp",1)): continue
+						if Vector2(ally.pos).distance_to(enemy.pos)>260.0: continue
+						var end: Vector2 = world_to_screen(ally.pos)
+						_draw_dashes(p,end,Color("cdb291",0.3),1.0,16.0)
+						draw_arc(end,24,0,TAU,24,Color("e8bd8c",0.35),1.0,true)
+						linked+=1
+						if linked>=3: break
+
+
+func _draw_arrow(tip: Vector2, direction: Vector2, tint: Color, size_value: float) -> void:
+	var side: Vector2 = direction.orthogonal()*size_value*0.6
+	draw_polyline(PackedVector2Array([tip-direction*size_value+side,tip,tip-direction*size_value-side]),tint,1.2,true)
+
+
+func _draw_dashes(start: Vector2, finish: Vector2, tint: Color, width: float, spacing: float) -> void:
+	var distance: float = start.distance_to(finish)
+	if distance<0.1: return
+	var direction: Vector2 = (finish-start)/distance
+	var count: int = mini(64,ceili(distance/spacing))
+	for index: int in range(count):
+		var a: Vector2 = start+direction*(index*spacing)
+		var b: Vector2 = start+direction*minf(distance,index*spacing+spacing*0.52)
+		if Rect2(a,Vector2.ZERO).expand(b).grow(3).intersects(Rect2(Vector2.ZERO,screen_size)):
+			draw_line(a,b,tint,width,true)
+
+
+func _draw_warning_lane(start: Vector2, finish: Vector2, radius: float, progress: float) -> void:
+	if not Rect2(start,Vector2.ZERO).expand(finish).grow(radius).intersects(Rect2(Vector2.ZERO,screen_size)): return
+	var direction: Vector2 = (finish-start).normalized()
+	var side: Vector2 = direction.orthogonal()*radius
+	var tint: Color = Color("ff9b72")
+	draw_colored_polygon(PackedVector2Array([start-side,finish-side,finish+side,start+side]),Color(tint,0.025+progress*0.035))
+	_draw_dashes(start-side,finish-side,Color(tint,0.4+progress*0.3),1.0,16.0)
+	_draw_dashes(start+side,finish+side,Color(tint,0.4+progress*0.3),1.0,16.0)
+	for i: int in range(3): _draw_arrow(start.lerp(finish,(i+1)/3.0),direction,Color(tint,0.35+progress*0.4),8.0)
+
+
+func _draw_hazard(hazard: Dictionary) -> void:
+	var p: Vector2 = world_to_screen(hazard.get("pos",Vector2.ZERO))
+	var radius: float = clampf(float(hazard.get("radius",30.0)),1.0,400.0)
+	var active: bool = bool(hazard.get("active",false))
+	var progress: float = clampf(1.0-float(hazard.get("delay",0.0))/maxf(0.01,float(hazard.get("telegraph_max",0.8))),0.0,1.0)
+	var tint: Color = Color("ffa674")
+	var kind: String = str(hazard.get("kind",""))
+	if str(hazard.get("shape","circle"))=="line":
+		var direction: Vector2 = WeaponPose.normalized_aim(hazard.get("dir",Vector2.RIGHT))
+		var end: Vector2 = p+direction*clampf(float(hazard.get("length",0.0)),0.0,1200.0)
+		if not Rect2(p,Vector2.ZERO).expand(end).grow(radius+4).intersects(Rect2(Vector2.ZERO,screen_size)): return
+		var side: Vector2 = direction.orthogonal()*radius
+		draw_colored_polygon(PackedVector2Array([p-side,end-side,end+side,p+side]),Color(tint,0.11 if active else 0.035+0.025*progress))
+		# _segment_circle tests a capsule, including the radius beyond either
+		# segment endpoint. Render those half discs so leaving the flat beam
+		# end cannot look safe while the player's body still overlaps damage.
+		for cap: Dictionary in [{"center":p,"start":direction.angle()+PI*0.5},{"center":end,"start":direction.angle()-PI*0.5}]:
+			var center: Vector2 = cap.center
+			var begin: float = float(cap.start)
+			var points: PackedVector2Array = PackedVector2Array([center])
+			for index: int in range(19):
+				points.append(center+Vector2.from_angle(begin+PI*index/18.0)*radius)
+			draw_colored_polygon(points,Color(tint,0.11 if active else 0.035+0.025*progress))
+			draw_arc(center,radius,begin,begin+PI,18,Color(tint,0.9 if active else 0.45+progress*0.35),1.4 if active else 1.0,true)
+		if active:
+			draw_line(p,end,Color("7f3e49"),radius*1.25,true)
+			draw_line(p,end,Color("ff9f78"),radius*0.55,true)
+			draw_line(p,end,Color("ffe6b9"),2.0,true)
+			draw_line(p-side,end-side,Color(tint,0.9),1.4,true)
+			draw_line(p+side,end+side,Color(tint,0.9),1.4,true)
+		else:
+			_draw_dashes(p-side,end-side,Color(tint,0.45+progress*0.35),1.0,16.0)
+			_draw_dashes(p+side,end+side,Color(tint,0.45+progress*0.35),1.0,16.0)
+			draw_line(p,end,Color(tint,0.2+progress*0.3),1.0,true)
+			_draw_arrow(end,direction,Color(tint,0.8),9.0)
+			for index: int in range(1,5): _draw_arrow(p.lerp(end,index/5.0),direction,Color(tint,0.38),5.0)
+		return
+	if not _visible(p,radius+14): return
+	draw_circle(p,radius,Color(tint,0.09 if active else 0.035+progress*0.025),true,-1,true)
+	draw_arc(p,radius,0,TAU,48,Color(tint,0.88 if active else 0.55),1.8,true)
+	if not active:
+		draw_arc(p,radius+4,-PI*0.5,-PI*0.5+TAU*progress,48,Color(tint,0.95),2.0,true)
+		for index: int in range(8):
+			var angle: float = index*TAU/8.0
+			var direction: Vector2 = Vector2.from_angle(angle)
+			draw_line(p+direction*(radius-6),p+direction*radius,Color(tint,0.48),1.2,true)
+		draw_line(p+Vector2(-5,0),p+Vector2(5,0),Color(tint,0.7),1.0,true)
+		draw_line(p+Vector2(0,-5),p+Vector2(0,5),Color(tint,0.7),1.0,true)
+	else:
+		if kind in ["stone_spike","burrow"]:
+			for index: int in range(5):
+				var x: float = (index-2)*radius*0.29
+				var height: float = radius*(0.5+0.3*sin(index*2.7+0.8))
+				var base: Vector2 = p+Vector2(x,radius*0.3)
+				var points: PackedVector2Array = PackedVector2Array([base+Vector2(-6,0),base+Vector2(1,-height),base+Vector2(7,0)])
+				draw_colored_polygon(points,Color("b7907c"))
+				draw_line(base+Vector2(1,-height),base+Vector2(7,0),Color("ffbe86"),1.2,true)
+		else:
+			for index: int in range(6):
+				var direction: Vector2 = Vector2.from_angle(index*TAU/6.0+0.2)
+				var seed: Vector2 = p+direction*radius*0.52
+				draw_circle(seed,4.5,Color("65433f"),true,-1,true)
+				draw_arc(seed,4.5,0,TAU,12,Color("e6b78c"),1.3,true)
+			draw_arc(p,radius*0.64,0,TAU,32,Color(tint,0.35),1.0,true)
 
 
 func _draw_effects() -> void:
@@ -1214,26 +1156,7 @@ func _draw_effects() -> void:
 
 
 func _draw_atmosphere() -> void:
-	if _current_biome != "rainforest":
-		Biomes.atmosphere(self, _current_biome, camera_position, screen_size, _clock)
-		return
-	# Rain is deliberately sparse and faint so it cannot masquerade as enemy fire.
-	for index: int in range(74):
-		var speed: float = 105.0 + fposmod(float(index) * 31.8, 110.0)
-		var x: float = fposmod(float(index) * 191.71 - _clock * 19.0 - camera_position.x * 0.17, screen_size.x + 60.0) - 30.0
-		var y: float = fposmod(float(index) * 73.19 + _clock * speed - camera_position.y * 0.25, screen_size.y + 50.0) - 25.0
-		draw_line(Vector2(x, y), Vector2(x - 2.0, y + 9.0), Color(0.48, 0.77, 0.73, 0.07), 1.0, true)
-	for index: int in range(20):
-		var x: float = fposmod(float(index) * 173.23 + sin(_clock * 0.4 + float(index)) * 14.0 - camera_position.x * 0.6, screen_size.x)
-		var y: float = fposmod(float(index) * 251.3 - _clock * 4.0 - camera_position.y * 0.3, screen_size.y)
-		var alpha: float = (0.5 + sin(_clock * 1.2 + float(index) * 2.4) * 0.5) * 0.26
-		draw_circle(Vector2(x, y), 1.3, Color(0.72, 0.99, 0.78, alpha), true, -1.0, true)
-	# Gentle edge shading, transparent enough to retain off-axis threats.
-	for index: int in range(8):
-		var alpha: float = (1.0 - float(index) / 8.0) * 0.012
-		var inset: float = float(index) * 12.0
-		draw_rect(Rect2(inset, 0.0, 12.0, screen_size.y), Color(0.0, 0.02, 0.04, alpha))
-		draw_rect(Rect2(screen_size.x - inset - 12.0, 0.0, 12.0, screen_size.y), Color(0.0, 0.02, 0.04, alpha))
+	Biomes.atmosphere(self, _current_biome, camera_position, screen_size, _clock)
 
 
 func _glow(p: Vector2, radius: float, color_value: Color, layers: int = 3) -> void:

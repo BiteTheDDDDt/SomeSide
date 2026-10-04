@@ -5,28 +5,31 @@ param(
     [switch]$Exported,
     [switch]$Impaired,
     [switch]$Advanced,
+    [switch]$Biomes,
     [ValidateRange(0, 12)][int]$FinishAfter = 0
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Biomes -and ($Advanced -or $FinishAfter -gt 0)) { throw 'Use -Biomes separately from -Advanced or -FinishAfter so all three stages can be observed.' }
 $projectDirectory = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $enginePath = Join-Path $PSScriptRoot 'runtime\Godot_v4.7.2-stable_win64_console.exe'
 if ($Exported) {
-    $enginePath = Join-Path $projectDirectory 'dist\v0.6.0\SomeSide.exe'
+    $enginePath = Join-Path $projectDirectory 'dist\v0.7.0\SomeSide.exe'
     if (-not (Test-Path -LiteralPath $enginePath)) { throw 'Export the game before running with -Exported.' }
 } elseif (-not (Test-Path -LiteralPath $enginePath)) {
     & (Join-Path $PSScriptRoot 'install.ps1')
 }
 $resultPrefix = if ($Exported) { 'network-export-' } else { 'network-' }
 if ($Impaired) { $resultPrefix += 'impaired-' }
+if ($Biomes) { $resultPrefix += 'biomes-' }
 $resultDirectory = Join-Path $PSScriptRoot ('results\' + $resultPrefix + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Path $resultDirectory -Force | Out-Null
 $startedProcesses = @()
 $cases = @()
-$hostDuration = if ($Advanced) { 40 } else { 18 }
-$clientDuration = if ($Advanced) { 36 } else { 14 }
-$proxyDuration = if ($Advanced) { 44 } else { 22 }
-$processTimeout = if ($Advanced) { 55 } else { 35 }
+$hostDuration = if ($Biomes) { 52 } elseif ($Advanced) { 40 } else { 18 }
+$clientDuration = if ($Biomes) { 48 } elseif ($Advanced) { 36 } else { 14 }
+$proxyDuration = if ($Biomes) { 56 } elseif ($Advanced) { 44 } else { 22 }
+$processTimeout = if ($Biomes) { 65 } elseif ($Advanced) { 55 } else { 35 }
 
 function Start-SmokePeer([string]$Name, [string]$Role, [int]$Duration, [int]$PeerPort) {
     $reportPath = Join-Path $resultDirectory "$Name.json"
@@ -41,6 +44,7 @@ function Start-SmokePeer([string]$Name, [string]$Role, [int]$Duration, [int]$Pee
     )
     if ($Role -eq 'host' -and $FinishAfter -gt 0) { $argumentList += "--finish-after=$FinishAfter" }
     if ($Advanced) { $argumentList += '--smoke-advanced' }
+    if ($Biomes) { $argumentList += '--smoke-biomes' }
     $process = Start-Process -FilePath $enginePath -ArgumentList $argumentList -WorkingDirectory $projectDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     # Keep a handle open so Windows PowerShell can still read ExitCode after exit.
     $null = $process.Handle
@@ -105,6 +109,14 @@ try {
                 foreach ($kind in @('boomerang', 'storm', 'lance')) { $passed = $passed -and $kind -in $report.observed.projectile_kinds }
             }
         }
+        if ($passed -and $Biomes) {
+            $passed = $report.biomes -eq $true
+            foreach ($biome in @('rainforest', 'canyon', 'ruins')) { $passed = $passed -and $biome -in $report.biome_observed.biomes }
+            foreach ($kind in @('crawler', 'spitter', 'spore_moth', 'drone', 'charger', 'burrower', 'sentinel', 'skirmisher', 'conductor', 'boss')) { $passed = $passed -and $kind -in $report.biome_observed.enemy_kinds }
+            foreach ($style in @('spore', 'stone', 'prism')) { $passed = $passed -and $style -in $report.biome_observed.boss_styles }
+            foreach ($shape in @('line', 'circle')) { $passed = $passed -and $shape -in $report.biome_observed.hazard_shapes }
+            $passed = $passed -and @($report.biome_observed.attack_kinds).Count -ge 6
+        }
         $runtimeErrors = @()
         if (Test-Path -LiteralPath $case.Stderr) {
             $runtimeErrors = @(Select-String -LiteralPath $case.Stderr -Pattern '^(SCRIPT ERROR|ERROR):')
@@ -126,7 +138,7 @@ try {
         $allPassed = $allPassed -and $proxyPassed
         Write-Host ("UDP proxy: passed={0}, clients={1}" -f $proxyPassed, $proxyReport.clients)
     }
-    $summary = [pscustomobject]@{ passed = $allPassed; exported = [bool]$Exported; impaired = [bool]$Impaired; advanced = [bool]$Advanced; finish_after = $FinishAfter; clients = $Clients; port = $Port; proxy = $proxyReport; cases = $summaries }
+    $summary = [pscustomobject]@{ passed = $allPassed; exported = [bool]$Exported; impaired = [bool]$Impaired; advanced = [bool]$Advanced; biomes = [bool]$Biomes; finish_after = $FinishAfter; clients = $Clients; port = $Port; proxy = $proxyReport; cases = $summaries }
     $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $resultDirectory 'summary.json') -Encoding UTF8
     Write-Host "Reports: $resultDirectory"
     if (-not $allPassed) { exit 1 }

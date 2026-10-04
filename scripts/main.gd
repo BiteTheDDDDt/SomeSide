@@ -7,7 +7,8 @@ const Icons = preload("res://scripts/item_icons.gd")
 const MapView = preload("res://scripts/map_view.gd")
 const Content = preload("res://scripts/content.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
-const VERSION: String = "0.6.0"
+const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
+const VERSION: String = "0.7.0"
 const DEFAULT_PORT: int = 27841
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
@@ -82,6 +83,8 @@ var _inventory_filter: String = "owned"
 var _inventory_grid: GridContainer
 var _inventory_filters: Dictionary = {}
 var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "projectile_kinds": []}
+var _biome_observed: Dictionary = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
+var _biome_smoke_stage: int = 0
 
 func _ready() -> void:
 	Engine.max_fps = 120
@@ -187,6 +190,7 @@ func _physics_process(delta: float) -> void:
 	if paused and not online:
 		return
 	_tick += 1
+	_step_biome_smoke()
 	var command: Dictionary = _get_command()
 	if online and not hosting:
 		_predict_attack_feedback(command, delta)
@@ -246,6 +250,8 @@ func _get_command() -> Dictionary:
 		if _options.has("smoke-advanced"):
 			command.interact = false
 			command.skill = _tick >= 240 and _tick % 120 == 0
+		if _options.has("smoke-biomes"):
+			command.merge({"move": 0.0, "jump": false, "fire": false, "skill": false, "dash": false, "interact": false}, true)
 		if _options.has("demo"):
 			var gate_position: Vector2 = sim.state.get("gate", {}).get("pos", Vector2(2800, 999))
 			command.move = signf(gate_position.x - position.x) if absf(gate_position.x - position.x) > 90.0 else sin(_elapsed * 1.6) * 0.45
@@ -525,6 +531,8 @@ func _begin_run(members: Array, seed_value: int) -> void:
 func _begin_local(members: Array, seed_value: int) -> void:
 	sim.start_run(members, seed_value)
 	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "projectile_kinds": []}
+	_biome_observed = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
+	_biome_smoke_stage = 0
 	if _smoke in ["host", "client"] and _options.has("smoke-advanced"):
 		# Integration-only fixture: every peer starts with the same ordered
 		# roster so snapshots exercise the new attacks and timed world state.
@@ -607,6 +615,7 @@ func _receive_snapshot(snapshot: Dictionary) -> void:
 	_last_snapshot_tick = tick
 	_snapshots_received += 1
 	_observe_advanced_state(snapshot)
+	_observe_biome_state(snapshot)
 	var previous: Vector2 = sim.state.get("players", {}).get(local_id, {}).get("pos", Vector2.ZERO)
 	var old_stage: int = int(sim.state.get("stage", 1))
 	sim.apply_snapshot(snapshot)
@@ -732,6 +741,58 @@ func _parse_options() -> void:
 	elif _options.has("smoke-client"):
 		_smoke = "client"
 
+func _step_biome_smoke() -> void:
+	if _smoke != "host" or not _options.has("smoke-biomes"):
+		return
+	# A bounded integration fixture: real AI, three real stage transitions,
+	# invulnerable spectators, and no incidental exploration spawns.
+	var stage: int = clampi(1 + int(float(sim.state.time) / 12.0), 1, 3)
+	if stage == _biome_smoke_stage:
+		return
+	if int(sim.state.stage) != stage:
+		sim._build_stage(stage)
+	_biome_smoke_stage = stage
+	var anchor: Vector2 = Vector2(float(sim.state.world_size.x) * 0.42, float(sim.state.world_size.y) - 101.0)
+	var member_index: int = 0
+	for player: Dictionary in sim.state.players.values():
+		player.pos = anchor + Vector2(member_index * 24.0, 0.0)
+		player.vel = Vector2.ZERO
+		player.invuln = 1000.0
+		sim._reset_exploration(player, true)
+		member_index += 1
+	sim.state.enemies.clear()
+	sim.state.projectiles.clear()
+	sim.state.hazards.clear()
+	sim._spawn_clock = 9999.0
+	var biome: String = str(sim.state.biome)
+	var index: int = 0
+	for kind: String in EnemyCatalog.pool(biome):
+		var horizontal: float = [-250.0, 300.0, 460.0][index]
+		sim._spawn_enemy(kind, anchor + Vector2(horizontal, -160.0 if bool(EnemyCatalog.definition(kind).get("flying", false)) else -80.0))
+		index += 1
+	sim._spawn_enemy("boss", anchor + Vector2(570.0, -90.0))
+
+func _observe_biome_state(snapshot: Dictionary) -> void:
+	if not _options.has("smoke-biomes") or snapshot.is_empty():
+		return
+	var biome: String = str(snapshot.get("biome", ""))
+	if not biome.is_empty() and biome not in _biome_observed.biomes:
+		_biome_observed.biomes.append(biome)
+	for enemy: Dictionary in snapshot.get("enemies", []):
+		var kind: String = str(enemy.get("kind", ""))
+		if kind not in _biome_observed.enemy_kinds:
+			_biome_observed.enemy_kinds.append(kind)
+		var style: String = str(enemy.get("boss_style", ""))
+		if not style.is_empty() and style not in _biome_observed.boss_styles:
+			_biome_observed.boss_styles.append(style)
+		var attack: String = str(enemy.get("attack_kind", ""))
+		if float(enemy.get("telegraph", 0.0)) > 0.0 and not attack.is_empty() and attack not in _biome_observed.attack_kinds:
+			_biome_observed.attack_kinds.append(attack)
+	for hazard: Dictionary in snapshot.get("hazards", []):
+		var shape: String = str(hazard.get("shape", ""))
+		if shape not in _biome_observed.hazard_shapes:
+			_biome_observed.hazard_shapes.append(shape)
+
 func _observe_advanced_state(snapshot: Dictionary) -> void:
 	if not _options.has("smoke-advanced") or snapshot.is_empty():
 		return
@@ -750,6 +811,7 @@ func _process_automation() -> void:
 	if _smoke_finished:
 		return
 	_observe_advanced_state(sim.state)
+	_observe_biome_state(sim.state)
 	if _smoke == "host" and screen == "lobby" and roster.size() >= int(_options.get("expected-players", 2)) and _elapsed > 2.0:
 		_start_match()
 	if _options.has("capture") and not _captured and _elapsed > float(_options.get("capture-after", 4.0)):
@@ -775,6 +837,8 @@ func _finish_automation() -> void:
 	var report: Dictionary = {"passed": passed, "mode": _smoke, "started": _started, "max_players": _max_players, "snapshots": _snapshots_received, "inputs": _inputs_received, "events": _events_seen, "tick": _tick, "stage": sim.state.get("stage", 0), "kills": sim.state.get("kills", 0), "phase": sim.state.get("phase", ""), "screen": screen, "elapsed": _elapsed}
 	report["advanced"] = _options.has("smoke-advanced")
 	report["observed"] = _advanced_observed.duplicate(true)
+	report["biomes"] = _options.has("smoke-biomes")
+	report["biome_observed"] = _biome_observed.duplicate(true)
 	if _options.has("report"):
 		var file := FileAccess.open(str(_options.report), FileAccess.WRITE)
 		if file != null:
