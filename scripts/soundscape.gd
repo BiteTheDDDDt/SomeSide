@@ -2,6 +2,8 @@ class_name SideSoundscape
 extends Node
 
 var enabled: bool = true
+var wait_for_gesture: bool = OS.has_feature("web")
+var _gesture_received: bool = false
 var _streams: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
 var _cursor: int = 0
@@ -30,10 +32,19 @@ func _ready() -> void:
 	add_child(_ambient)
 	_ambient.stream = _make_ambient()
 	_ambient.volume_db = -15.0
-	if enabled and DisplayServer.get_name() != "headless":
+	if enabled and not wait_for_gesture and DisplayServer.get_name() != "headless":
+		_ambient.play()
+
+## All effects are complete PCM WAV samples, so Web's low-latency Sample
+## playback works without AudioStreamGenerator or a threaded audio mixer.
+func activate_from_gesture() -> void:
+	_gesture_received = true
+	if enabled and is_instance_valid(_ambient) and not _ambient.playing and DisplayServer.get_name() != "headless":
 		_ambient.play()
 
 func play_event(kind: String, distance: float = 0.0) -> void:
+	if wait_for_gesture and not _gesture_received:
+		return
 	if not enabled or not _streams.has(kind) or _players.is_empty():
 		return
 	var now: int = Time.get_ticks_msec()

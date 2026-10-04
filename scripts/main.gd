@@ -11,8 +11,10 @@ const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
-const VERSION: String = "0.12.0"
+const VERSION: String = "0.13.0"
 const DEFAULT_PORT: int = 27841
+const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
+const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
 const MUTED := Color("91aaa9")
@@ -96,6 +98,10 @@ var _last_coin_balance: int = -1
 var _coin_feedback: float = 0.0
 var _player_input = PlayerInput.new()
 var _controls_focused: bool = true
+# Tests can inject the platform flag before _ready without altering OS state.
+var _web_runtime: bool = OS.has_feature("web") or OS.has_feature("someside_web")
+var _fullscreen_button: Button
+var _profile_save_error: Error = OK
 var _loot_signature: Array = []
 var _fps_label: Label
 var _fps_settings_button: Button
@@ -129,6 +135,7 @@ func _ready() -> void:
 		heading_font = font
 	add_child(world)
 	sound.enabled = _smoke.is_empty()
+	sound.wait_for_gesture = _is_web()
 	add_child(sound)
 	_apply_settings()
 	var canvas := CanvasLayer.new()
@@ -343,7 +350,22 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 	world.push_events([event])
 	sound.play_event(str(event.type))
 
+func _is_web() -> bool:
+	return _web_runtime
+
 func _input(event: InputEvent) -> void:
+	if _is_web() and event.is_pressed() and not event.is_echo():
+		sound.activate_from_gesture()
+		# Fullscreen must stay inside the active browser input callback. The
+		# settings button is also usable when the browser reserves F11 itself.
+		if is_instance_valid(_fullscreen_button) and _fullscreen_button.is_visible_in_tree():
+			var mouse_press: bool = event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and _fullscreen_button.get_global_rect().has_point(event.position)
+			var key_press: bool = event is InputEventKey and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE] and _fullscreen_button.has_focus()
+			var touch_press: bool = event is InputEventScreenTouch and _fullscreen_button.get_global_rect().has_point(event.position)
+			if mouse_press or key_press or touch_press:
+				_toggle_fullscreen()
+				get_viewport().set_input_as_handled()
+				return
 	# This shortcut also works when a settings text field owns GUI focus.
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3 and _controls_focused:
 		_toggle_fps()
@@ -365,9 +387,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cycle_interaction()
 			get_viewport().set_input_as_handled()
 		if event.keycode == KEY_F11:
-			profile.fullscreen = not profile.fullscreen
-			_apply_settings()
-			_save_profile()
+			_toggle_fullscreen()
+			get_viewport().set_input_as_handled()
 		if event.keycode == KEY_ESCAPE:
 			if screen == "playing":
 				if paused:
@@ -391,12 +412,18 @@ func _notification(what: int) -> void:
 	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
 		_controls_focused = false
 		_reset_controls()
+		if _is_web() and screen == "playing" and not online and not paused and is_instance_valid(ui):
+			_show_pause()
 	elif what in [NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_WM_WINDOW_FOCUS_IN]:
 		_controls_focused = true
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_quit_game()
 
 func _quit_game(exit_code: int = 0) -> void:
+	if _is_web():
+		_disconnect()
+		_show_menu()
+		return
 	if _quitting:
 		return
 	_quitting = true
@@ -405,6 +432,9 @@ func _quit_game(exit_code: int = 0) -> void:
 	get_tree().quit(exit_code)
 
 func _host_lobby() -> void:
+	if _is_web():
+		_show_menu(WEB_COOP_MESSAGE)
+		return
 	_disconnect()
 	var peer := ENetMultiplayerPeer.new()
 	var error: Error = peer.create_server(_port, 3)
@@ -419,6 +449,9 @@ func _host_lobby() -> void:
 	_show_lobby()
 
 func _join_lobby(address: String) -> void:
+	if _is_web():
+		_show_menu(WEB_COOP_MESSAGE)
+		return
 	_disconnect()
 	_connect_address = address.strip_edges()
 	if _connect_address.is_empty():
@@ -764,6 +797,8 @@ func _load_profile() -> void:
 	profile.effects = clampf(float(profile.effects), 0.5, 1.5)
 	profile.shake = bool(profile.shake)
 	profile.show_fps = bool(profile.get("show_fps", true))
+	if _is_web():
+		profile.fullscreen = false
 	profile.character = profile.character if profile.character in ["ranger", "vanguard"] else "ranger"
 	profile.name = str(profile.name).substr(0, 18)
 	profile.language = Locale.choose_language(str(profile.get("language", "")), OS.get_locale())
@@ -777,15 +812,29 @@ func _save_profile() -> void:
 	var file := ConfigFile.new()
 	for key in profile:
 		file.set_value("profile", key, profile[key])
-	file.save("user://profile.cfg")
+	_profile_save_error = file.save("user://profile.cfg")
 
 func _apply_settings() -> void:
 	world.fx_scale = float(profile.effects)
 	world.shake_enabled = bool(profile.shake)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(float(profile.volume), 0.001)))
 	AudioServer.set_bus_mute(0, float(profile.volume) <= 0.001)
+	if not _is_web() and _smoke.is_empty() and DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if profile.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+
+func _toggle_fullscreen() -> void:
+	if _is_web() and DisplayServer.get_name() != "headless":
+		# Browser Esc may have exited fullscreen without changing the profile.
+		profile.fullscreen = DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN
+	else:
+		profile.fullscreen = not bool(profile.fullscreen)
 	if _smoke.is_empty() and DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if profile.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	_save_profile()
+
+func _open_windows_download() -> void:
+	if _smoke.is_empty():
+		OS.shell_open(WINDOWS_DOWNLOAD_URL)
 
 func _parse_options() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -896,6 +945,7 @@ func _finish_automation() -> void:
 	report["profile_language"] = str(profile.get("language", ""))
 	report["pixel_actors"] = PixelActorRenderer.stats()
 	report["fps"] = {"visible": is_instance_valid(_fps_label) and _fps_label.is_visible_in_tree(), "value": _fps_value}
+	report["performance"] = {"process_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, "physics_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, "draw_calls": Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), "scenery": world.scenery_cache_stats()}
 	report["advanced"] = _options.has("smoke-advanced")
 	report["observed"] = _advanced_observed.duplicate(true)
 	report["biomes"] = _options.has("smoke-biomes")
@@ -1053,24 +1103,31 @@ func _show_menu(message: String = "") -> void:
 	world.menu_preview = true
 	if sim.state.is_empty() or sim.state.get("phase", "playing") != "playing":
 		sim.start_run([{"id": 1, "name": "SomeSide", "character": "ranger"}], 73021)
-	var column: VBoxContainer = _page("SomeSide", "探索、战斗，与朋友一起抵达另一边。")
+	var column: VBoxContainer = _page("SomeSide", "探索、战斗，抵达另一边。" if _is_web() else "探索、战斗，与朋友一起抵达另一边。")
 	var character: String = "游侠 · RANGER" if profile.character == "ranger" else "先锋 · VANGUARD"
 	_label(column, Locale.format("当前角色：%s", [Locale.text(character)]), 14, MUTED)
 	_button(column, "单人游戏", _start_solo, true)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	column.add_child(row)
-	_button(row, "创建合作房间", _host_lobby)
-	_button(row, "加入房间", _show_join)
+	if _is_web():
+		var web_note: Label = _label(column, WEB_COOP_MESSAGE, 14, MUTED)
+		web_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		web_note.custom_minimum_size.x = 480
+		_button(column, "下载 Windows 版（含联机）", _open_windows_download)
+	else:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		column.add_child(row)
+		_button(row, "创建合作房间", _host_lobby)
+		_button(row, "加入房间", _show_join)
 	_button(column, "选择角色", _show_characters)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 12)
 	column.add_child(row2)
 	_button(row2, "操作指南", _show_guide)
 	_button(row2, "设置", _show_settings)
-	_button(row2, "退出", _quit_game)
+	if not _is_web():
+		_button(row2, "退出", _quit_game)
 	_gap(column, 3)
-	var details: String = "2–4 人合作  /  自由瞄准  /  遗物构筑"
+	var details: String = "浏览器单人版  /  自由瞄准  /  遗物构筑" if _is_web() else "2–4 人合作  /  自由瞄准  /  遗物构筑"
 	if int(profile.runs) > 0:
 		details = Locale.format("已远征 %d 次  ·  最远第 %d 区  ·  生还 %d 次", [int(profile.runs), int(profile.best_stage), int(profile.wins)])
 	_label(column, details, 13, MUTED)
@@ -1134,6 +1191,9 @@ func _text_field(parent: Node, value: String, placeholder: String = "") -> LineE
 	return field
 
 func _show_join() -> void:
+	if _is_web():
+		_show_menu(WEB_COOP_MESSAGE)
+		return
 	screen = "join"
 	var column: VBoxContainer = _page("加入房间", "输入朋友的房间地址。房主需要先创建房间。", 520)
 	_label(column, "房主 IP 地址", 15, TEAL)
@@ -1225,7 +1285,10 @@ func _show_settings(in_game: bool = false) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	else:
 		screen = "settings"
-	var column: VBoxContainer = _page("设置", "语言、声音与显示。更改自动保存。", 550, in_game)
+	var settings_description: String = "语言、声音与显示。更改自动保存。"
+	if _is_web() and (not OS.is_userfs_persistent() or _profile_save_error != OK):
+		settings_description = "此浏览器无法保存设置；关闭页面后更改可能丢失。"
+	var column: VBoxContainer = _page("设置", settings_description, 550, in_game)
 	column.add_theme_constant_override("separation", 7)
 	var language_row := HBoxContainer.new()
 	language_row.add_theme_constant_override("separation", 10)
@@ -1251,7 +1314,7 @@ func _show_settings(in_game: bool = false) -> void:
 	column.add_child(display_row)
 	_button(display_row, Locale.format("镜头震动  ·  %s", [Locale.text("开启" if profile.shake else "关闭")]), func(): profile.shake = not profile.shake; _apply_settings(); _save_profile(); _show_settings(_settings_in_game))
 	_fps_settings_button = _button(display_row, _fps_setting_text(), _toggle_fps)
-	_button(column, "切换窗口 / 全屏  ·  F11", func(): profile.fullscreen = not profile.fullscreen; _apply_settings(); _save_profile())
+	_fullscreen_button = _button(column, "切换全屏" if _is_web() else "切换窗口 / 全屏  ·  F11", _toggle_fullscreen)
 	_button(column, "返回战场" if in_game else "返回", _resume if in_game else _show_menu, true)
 
 func _set_language(language: String) -> void:
@@ -1328,7 +1391,7 @@ func _show_guide() -> void:
 		["Shift", "移动方向冲刺；静止时朝瞄准方向"],
 		["E", "拾取 / 使用设施 / 激活裂隙门 / 救援"],
 		["F   /   按住 Alt", "切换附近目标 / 展开道具与装备详情"],
-		["Tab / M / Esc / F11 / F3", "构筑 / 地图 / 菜单 / 全屏 / 帧率"]
+		["Tab / M / Esc / F3", "构筑 / 地图 / 菜单 / 帧率"] if _is_web() else ["Tab / M / Esc / F11 / F3", "构筑 / 地图 / 菜单 / 全屏 / 帧率"]
 	]
 	for entry in guide:
 		var row := HBoxContainer.new()
@@ -2036,7 +2099,7 @@ func _show_pause() -> void:
 	_button(panel, "继续游戏", _resume, true)
 	_button(panel, "设置", func(): _show_settings(true))
 	_button(panel, "返回主菜单", func(): _disconnect(); _show_menu())
-	_label(panel, "Esc 返回  ·  F11 全屏  ·  F3 帧率", 13, MUTED)
+	_label(panel, "Esc 返回  ·  F3 帧率" if _is_web() else "Esc 返回  ·  F11 全屏  ·  F3 帧率", 13, MUTED)
 
 func _resume() -> void:
 	_reset_controls()

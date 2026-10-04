@@ -15,7 +15,9 @@ if ($Biomes -and ($Advanced -or $FinishAfter -gt 0)) { throw 'Use -Biomes separa
 $projectDirectory = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $enginePath = Join-Path $PSScriptRoot 'runtime\Godot_v4.7.2-stable_win64_console.exe'
 if ($Exported) {
-    $enginePath = Join-Path $projectDirectory 'dist\v0.12.0\SomeSide.exe'
+    $projectVersion = [regex]::Match((Get-Content -LiteralPath (Join-Path $projectDirectory 'project.godot') -Raw), 'config/version="([^"]+)"').Groups[1].Value
+    if (-not $projectVersion) { throw 'Missing project version.' }
+    $enginePath = Join-Path $projectDirectory "dist\v$projectVersion\SomeSide.exe"
     if (-not (Test-Path -LiteralPath $enginePath)) { throw 'Export the game before running with -Exported.' }
 } elseif (-not (Test-Path -LiteralPath $enginePath)) {
     & (Join-Path $PSScriptRoot 'install.ps1')

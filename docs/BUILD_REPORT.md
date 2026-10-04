@@ -1,52 +1,48 @@
-# SomeSide 0.12.0 构建验收报告
+# SomeSide v0.13.0 构建与验收
 
-验证日期：2026-10-05。Godot 4.7.2 stable，Windows x64 / OpenGL Compatibility。上版记录见 `BUILD_REPORT_v0.11.0.md`，Git 标签 `v0.11.0`。
+Godot 4.7.2 stable official `ed1daf0bf`。新增 itch.io HTML5 网页单人版，同时生成 Windows 单人 / 2–4 人合作包。旧记录见 [BUILD_REPORT_v0.12.0.md](BUILD_REPORT_v0.12.0.md)。
 
-## 动画与素材
+## 网页运行
 
-- 两名角色各从 6 帧增至 16 帧：4 帧待机、8 帧跑步，以及独立的起跳、下落、冲刺和落地姿态。九种普通敌人与三种首领各从 4 帧增至 8 帧；总计从 60 增至 128 个实际不同的姿态。
-- 普通敌人使用六帧移动/飞行动作，独立蓄力与释放姿态；首领使用四帧常态、两帧蓄力、两帧攻击。动作不会借重复索引虚增帧数。
-- 六张新 RGBA 精灵表通过内置 imagegen 生成，保留原始像素与透明通道；提示词及两次布局修正记录见 `assets/sprites/ART_PROMPTS_v0.12.md`。三张旧表保留在 Git，但从当前发布包排除。
-- 裁剪使用明确矩形而不是假定规则网格；锚点按身体特征与地面接触校准。128 个烘焙帧均为独立像素内容，96 个敌人/首领帧没有相邻身体像素污染。夜蛾用眼部定位，消除约 5px 的飞行头部漂移；两名角色跑步脚底跨度为 0，头胸区域质心变化小于 0.6px。
-- 源纹理 RGBA 尺寸成本 37,744,608 bytes（约 36 MiB），上限仍为 64 MiB；逻辑像素缓存 3,045,048 bytes（约 2.9 MiB），上限仍为 8 MiB。这是预算估算，不等于驱动总显存用量。
+- WebAssembly + WebGL 2 / Compatibility，使用官方单线程模板，不需要跨源隔离响应头或 PWA。安装脚本提取 Web 模板前校验官方 SHA512。
+- 中英加载进度、启动失败提示、重试与 Windows 下载链接。部分 WASM 下载错误未进入引擎 `startGame` 的拒绝回调，现增加仅加载期间有效的异常监听；后续进度不会覆盖错误提示。
+- 游戏初始语言跟随浏览器，后续优先使用保存设置；IndexedDB 保存语言、音量、FPS 等偏好。浏览器明确报告无法持久化时，设置页会提示。
+- 完整 PCM WAV 音频首次游戏内按键或点击后启用；全屏由实际输入触发，不在刷新时自动恢复。失焦暂停单人游戏并清除按键。
+- 网页版不使用当前 UDP/ENet 合作，菜单明确提供单人入口与 Windows 下载。未部署 WebSocket/WebRTC 服务。保留两名角色、三关、40 件物品、九种普通敌人、三名首领及 v0.12 的 128 姿态素材。
 
-## 播放与附着
+## 绘制与性能
 
-每个实体在各自绘制节点上保存独立动作时钟，进入动作从首帧开始。跑步按移动速度积分推进，改变速度或方向不会突然重置步态；跳跃、落地和攻击播放一次并保持末帧。怪物蓄力和攻击使用同步的实际计时，避免联机中从随机中间帧开始。缓存最多 256 个记录，跨关、重开、传送、时钟回退、长时间离屏或资源重载会重置。
+网页远景使用带留白的纹理缓存，连续平移并在换缓存时以 0.22 秒淡入；大跨度镜头跳转在新缓存就绪前回退到完整绘制。平台植被保留在缓存内，省去细小风摆的逐帧曲线重建。角色、战斗、粒子、输入、碰撞和模拟未降频，原生版继续原绘制路径。
 
-落地蹲身有独立的逻辑像素肩点 `[0,7]`，普通姿态沿用 `[0,-5]`；身体、手持武器、枪口光与新弹视觉起点取自同一动画帧。动作不锁定输入；物理枪口、鼠标瞄准、碰撞、数值及网络协议不变。
+1280×720 下单背景 6,995,968 bytes；过渡最多两个，共 13,991,936 bytes，上限 16 MiB。地形原有 48 MiB / 40 项上限保持。精灵为 14 actors / 6 sheets，源纹理约 36 MiB、逻辑帧约 2.9 MiB。
 
-保留 v0.11 的位置插值和物理像素对齐。原生检查进一步发现一个 1.5× 窗口缩放边界：新图集中最近邻采样恰好落在纹素分界时，GPU UV 舍入会改变一列像素。用 1/1024 源纹素的固定 UV 偏移确定取样方向，保持整数绘制几何和缓存大小；诊断差异像素由 67 降为 0。
+同机 Chrome / AMD Radeon 610M / D3D11 短时演示：缓存前末段约 20 FPS、1052 次绘制，首次缓存候选约 28 FPS、578 次绘制。最终 Chrome / Edge 演示末段分别为 28 / 31 FPS。这些是短跑观察，不是固定场景统计或稳定帧率保证；Web 性能仍可能低于原生，复杂战斗可能下降。证据：`tools/results/web-profile/report.json`、`web-cached/report.json`、两份最终浏览器报告。
 
 ## 验证
 
-- 完整逻辑回归 **24 套 / 1268 项通过 / 0 失败 / 无运行时错误**，包括新增 48 项动作计时、速度变化、落地附着、枪口与状态隔离验证。证据：`tools/results/v0.12-final-tests.log`、`v0.12-test-summary.json`。随后 UV 边界修复重新通过原生运动 93/93、原生精灵 25/25、动画逻辑 48/48，未放宽原有断言。
-- 全部 128 姿态 × 1×/1.5×/2× 窗口缩放 × 16 个亚像素相位：**384 组检查全部稳定**。证据：`sampling-v012-all-frames.json`、`sampling-v012-before.json`、`sampling-v012-after.json`、`v012-motion-native-fixed.log`。
-- 独立内容检查 14 actors / 128 unique frames / 6 sheets / errors=[]，邻帧污染为零。证据：`animation-v012-review.json`、`animation-core-v012-review.json`、`animation-neighbors-v012-review.json`。
-- 六张原生图册展示全部 128 姿态，120 张连续截图覆盖所有动作切换、落地持枪、九种敌人与三个首领。证据：`animation-v012/contact-*.png`、`animation-v012/frame-*.png`、`v012-animation-capture-final.log`。预览：`animation-v012-preview.gif`。源 PNG 没有经过程序改绘；GIF 只组装游戏渲染截图。
-- 最终 EXE 原生实战七秒、420 tick、三次击杀，14 actors / 6 sheets / 0 errors，exit 0、stderr 空；界面与 FPS 可见。证据：`v012-export-play.{json,png,log,err}`。此段运行的读数不作为性能保证。
-- 最终 EXE 英文主机与三个中文客户端真实本机 ENet 合作，经过三关、观察九种普通敌人/三首领及危险预警；四端 passed=true、exit=0、runtime_errors=0，资源均完整。证据：`network-export-biomes-bilingual-20261005-023824/summary.json`。未验收公共互联网环境。
+- 完整 **26 套 / 1325 项通过 / 0 失败 / 0 运行时错误 / 0 警告**。新增 Web 适配 33 项、背景缓存 24 项，覆盖平台入口、输入、音频等待、连续移动、淡入、瞬移边界、预算、场景清理、快照只读和原生路径。证据：`tools/results/test-v0.13.0-final.log`、`test-v0.13.0-final-summary.json`。
+- 最终构建：Chrome 154.0.8037.93 在不同站点来源的 iframe 内运行，无 COOP/COEP。14 项自动检查通过，并目视复核实际键鼠战斗、背包、地图、失焦暂停、中英菜单，以及 960×540 / 1280×720 / 1920×1080 布局。全屏、刷新后的语言和 FPS 保存通过；AudioContext 运行且数字输出信号非零。无浏览器/网络/Godot 运行时错误。证据：`tools/results/web-chrome-final/report.json` 及截图。
+- 最终构建：Edge 154.0.4258.53 实战演示 542 tick，中文系统语言识别、14 个像素角色加载、运行时检查通过。证据：`tools/results/web-edge-final/report.json`。
+- 中英两语言分别注入 WASM 404、JS 404、WebGL 不支持：**6 场景 / 44 项通过**。WASM 失败约 3.6 秒后显示重试及下载链接；重复重试仍可恢复提示，无未捕获异常。证据：`tools/results/web-loader-v013-fixed/report.json`。
+- 最终 Windows EXE：英文主机 + 三个中文客户端真实本机 ENet，四端 `passed=true`、退出 0。证据：`tools/results/network-export-bilingual-20261005-031749/summary.json`。
+- Web ZIP 根目录为 `index.html`，11 文件，解压总计 62,040,747 bytes，最大单文件 WASM 39,514,754 bytes。相对依赖、大小、文件头及 itch 限制检查通过；包内哈希与导出一致。`dist/.gdignore` 防止重复导入输出图标，包内无 PNG 导入旁文件。证据：`tools/results/web-zip-audit.json`、`package-v013-verification.json`。
 
-## 性能复核
-
-同机 RTX 5070 Ti Laptop GPU，1280×720，移动镜头，无垂直同步或帧率上限；每场预热 120 帧、采样 360 帧。固定快照，关闭物理、网络和音频。密集场景含四名角色、44 敌人、160 弹丸、24 掉落物、六危险区，以下衡量画面和 HUD，不等同完整实战 FPS。
-
-| 场景 | v0.11 p50 / p95 ms | v0.12 p50 / p95 ms |
-| --- | --- | --- |
-| 安静雨林 | 7.930 / 10.627 | 7.828 / 9.645 |
-| 密集雨林 | 19.004 / 23.179 | 20.460 / 24.248 |
-| 密集峡谷 | 15.220 / 19.214 | 15.992 / 19.327 |
-| 密集遗迹 | 19.207 / 22.700 | 18.113 / 21.930 |
-
-本版改善动作连贯性，不宣称提高渲染 FPS。密集场景仍可能超过 16.67ms。证据：`perf-v11-final-moving.json`、`perf-v12-final-moving.json`，最终 stderr 空；v0.12 日志沿用旧基准的 PERF_V11 文本前缀，JSON 路径、版本与源码哈希均为本版，后续工具输出前缀已校正。
+浏览器使用全新独立 profile 和临时本机服务器；测试进程已关闭。未测试 Safari、手机触屏或公共互联网多人连接，未上传或修改 itch 页面。存储受浏览器隐私设置影响，不承诺跨设备同步。
 
 ## 发布产物
 
-- `dist/v0.12.0/SomeSide.exe`：131,330,104 bytes，文件及产品版本 0.12.0.0。
-- EXE SHA256：`BFD1A22D9D23BA68BF1F90D4188475E8A65D08C173C3853DB596743FECF51E10`
-- `dist/SomeSide-v0.12.0-windows-x64.zip`：60,139,898 bytes。
-- ZIP SHA256：`A829C8FD13654EDF6952657A2FA407BB428924B431C1E36D3C9BA1F12FF9C6B2`
+| 文件 | 大小 |
+| --- | ---: |
+| `dist/SomeSide-v0.13.0-web.zip` | 32,328,862 bytes |
+| `dist/SomeSide-v0.13.0-windows-x64.zip` | 60,145,720 bytes |
+| `dist/v0.13.0/SomeSide.exe` | 131,335,784 bytes |
 
-ZIP 包含 SomeSide.exe、双语 README、Godot 和字体许可证四项；包内 EXE 哈希与已验收独立版一致。导出包含精灵清单和六张 v2 图，排除旧 v1 图、开发工具与用户封面。证据：`v0.12-export.log`、`v0.12-package.log`、`v0.12-package-verification.json`。发布包无需另装引擎；本次未上传 itch.io。
+Web ZIP SHA256：`A04A607788B9334341F7FCE967557E20C40296A37C443CBA9544287AD7E601A6`
 
-源码、素材、导入设置、回归测试和可复用验证工具纳入 Git；本地截图、日志与发布产物按既有 `.gitignore` 保留。用户 `cover.png` 及其导入文件未修改、未纳入本次提交。
+Windows ZIP SHA256：`ABA0B60FDCAF560D270F537E450D7093700ABBD6016EABA5429FFDA14F2743DD`
+
+EXE SHA256：`CFC5C5B9E211574F3CB8F893FD095510D72BEA1BD81F385E52CE877DBF268FE8`
+
+两包保留 Godot 与字体许可，旧发行包保留。源码、测试与工具纳入 Git，运行时下载、证据和产物留在本地。用户 `cover.png` 及导入文件未修改、未纳入提交。
+
+上传步骤及双语页面说明见 [ITCH_WEB.zh-CN.md](ITCH_WEB.zh-CN.md)。依据：[itch.io HTML5 上传说明](https://itch.io/docs/creators/html5)、[Godot Web 导出说明](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html)。

@@ -1,7 +1,8 @@
-SomeSide 0.12.0 - Windows x64
+SomeSide 0.13.0 - Windows x64
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
+另有浏览器单人版；2–4 人合作请使用此 Windows 下载版。
 首次启动按系统语言选择：中文系统使用中文，其他语言默认英文。
 可在设置中切换简体中文 / English；之后优先使用已保存的选择。
 右上角金色数字独立显示当前金币余额。
@@ -72,6 +73,8 @@ F3：显示 / 隐藏实际帧率
 ENGLISH QUICK START
 
 Extract the ZIP and open SomeSide.exe. No Godot installation is required.
+A single-player browser build is also available; use this Windows download
+for 2–4 player co-op.
 On first launch, Chinese system locales use Simplified Chinese; all other
 system languages default to English. Change the language in Settings.
 Your saved preference is used on later launches. Co-op players can use

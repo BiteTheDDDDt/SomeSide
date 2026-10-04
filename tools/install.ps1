@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$Templates)
+param([switch]$Templates, [switch]$WebTemplates)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -38,16 +38,19 @@ if (-not (Test-Path -LiteralPath $enginePath)) {
 # Self-contained mode keeps editor settings and templates out of the user profile.
 New-Item -ItemType File -Path (Join-Path $runtimeDirectory '_sc_') -Force | Out-Null
 
-if ($Templates) {
+if ($Templates -or $WebTemplates) {
     $templateDirectory = Join-Path $runtimeDirectory 'templates'
-    $releaseTemplate = Join-Path $templateDirectory 'windows_release_x86_64.exe'
-    if (-not (Test-Path -LiteralPath $releaseTemplate)) {
+    $templateNames = @()
+    if ($Templates) { $templateNames += @('windows_release_x86_64.exe', 'windows_debug_x86_64.exe') }
+    if ($WebTemplates) { $templateNames += @('web_nothreads_release.zip', 'web_nothreads_debug.zip') }
+    $missing = @($templateNames | Where-Object { -not (Test-Path -LiteralPath (Join-Path $templateDirectory $_)) })
+    if ($missing.Count -gt 0) {
         $templateArchive = Get-VerifiedArchive "Godot_v$version-stable_export_templates.tpz"
         New-Item -ItemType Directory -Path $templateDirectory -Force | Out-Null
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zip = [IO.Compression.ZipFile]::OpenRead($templateArchive)
         try {
-            foreach ($templateName in @('windows_release_x86_64.exe', 'windows_debug_x86_64.exe')) {
+            foreach ($templateName in $missing) {
                 $entry = $zip.GetEntry("templates/$templateName")
                 if ($null -eq $entry) { throw "Official archive lacks templates/$templateName" }
                 [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $templateDirectory $templateName), $true)

@@ -396,4 +396,12 @@ const TEXTS: Dictionary = {
 	"用时": "Time",
 	"击破": "Kills",
 	"再玩一次": "Play Again",
+	"探索、战斗，抵达另一边。": "Explore, fight, and reach the other side.",
+	"浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。": "Play solo in your browser. Download the Windows version for 2–4 player co-op.",
+	"下载 Windows 版（含联机）": "Download Windows (with co-op)",
+	"浏览器单人版  /  自由瞄准  /  遗物构筑": "Browser solo  /  Free aiming  /  Relic builds",
+	"此浏览器无法保存设置；关闭页面后更改可能丢失。": "This browser cannot save settings; changes may be lost when you close the page.",
+	"切换全屏": "Toggle Fullscreen",
+	"构筑 / 地图 / 菜单 / 帧率": "Build / map / menu / FPS",
+	"Esc 返回  ·  F3 帧率": "Esc: Back  ·  F3: FPS",
 }

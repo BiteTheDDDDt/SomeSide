@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Run', 'Editor', 'Test', 'Export')]
+    [ValidateSet('Run', 'Editor', 'Test', 'Export', 'ExportWeb')]
     [string]$Mode = 'Run',
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$GameArguments = @()
@@ -17,6 +17,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $projectDirectory 'project.godot')))
     throw "Cannot find project.godot in $projectDirectory"
 }
 
+$projectVersion = [regex]::Match((Get-Content -LiteralPath (Join-Path $projectDirectory 'project.godot') -Raw), 'config/version="([^"]+)"').Groups[1].Value
+if (-not $projectVersion) { throw 'Missing project version.' }
+if ($Mode -in @('Export', 'ExportWeb')) {
+    $distRoot = Join-Path $projectDirectory 'dist'
+    New-Item -ItemType Directory -Path $distRoot -Force | Out-Null
+    # Exported PNG icons are output, not project source assets.
+    New-Item -ItemType File -Path (Join-Path $distRoot '.gdignore') -Force | Out-Null
+}
+
 switch ($Mode) {
     'Run' {
         & $enginePath --path $projectDirectory @GameArguments
@@ -25,7 +34,7 @@ switch ($Mode) {
         & $enginePath --editor --path $projectDirectory @GameArguments
     }
     'Test' {
-        foreach ($testScript in @('test_simulation.gd', 'test_movement.gd', 'test_input.gd', 'test_controls.gd', 'test_loot.gd', 'test_content.gd', 'test_rewards.gd', 'test_enemies.gd', 'test_stress.gd', 'test_director.gd', 'test_weapon_pose.gd', 'test_weapon_feedback.gd', 'test_appearance.gd', 'test_enemy_visuals.gd', 'test_visuals.gd', 'test_render_cache.gd', 'test_sprite_atlas.gd', 'test_ui.gd', 'test_localization.gd', 'test_fps.gd', 'test_combat_fx.gd', 'test_pixel_actors.gd', 'test_actor_motion.gd', 'test_actor_animation.gd')) {
+        foreach ($testScript in @('test_simulation.gd', 'test_movement.gd', 'test_input.gd', 'test_controls.gd', 'test_loot.gd', 'test_content.gd', 'test_rewards.gd', 'test_enemies.gd', 'test_stress.gd', 'test_director.gd', 'test_weapon_pose.gd', 'test_weapon_feedback.gd', 'test_appearance.gd', 'test_enemy_visuals.gd', 'test_visuals.gd', 'test_render_cache.gd', 'test_sprite_atlas.gd', 'test_ui.gd', 'test_localization.gd', 'test_fps.gd', 'test_combat_fx.gd', 'test_pixel_actors.gd', 'test_actor_motion.gd', 'test_actor_animation.gd', 'test_web_runtime.gd', 'test_web_background.gd')) {
             $testOutput = @(& $enginePath --headless --path $projectDirectory --script ('res://tests/' + $testScript) @GameArguments 2>&1)
             $testExitCode = $LASTEXITCODE
             $testOutput | Write-Output
@@ -43,13 +52,24 @@ switch ($Mode) {
         if (-not (Test-Path -LiteralPath $templatePath)) {
             & (Join-Path $PSScriptRoot 'install.ps1') -Templates
         }
-        New-Item -ItemType Directory -Path (Join-Path $projectDirectory 'dist\v0.12.0') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $projectDirectory "dist\v$projectVersion") -Force | Out-Null
         & $enginePath --headless --path $projectDirectory --editor --import
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        & $enginePath --headless --path $projectDirectory --export-release 'Windows Desktop' 'dist/v0.12.0/SomeSide.exe' @GameArguments
+        & $enginePath --headless --path $projectDirectory --export-release 'Windows Desktop' "dist/v$projectVersion/SomeSide.exe" @GameArguments
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\GODOT-LICENSE.txt') -Destination (Join-Path $projectDirectory 'dist\v0.12.0\GODOT-LICENSE.txt') -Force
-        Copy-Item -LiteralPath (Join-Path $projectDirectory 'assets\fonts\OFL.txt') -Destination (Join-Path $projectDirectory 'dist\v0.12.0\FONT-OFL.txt') -Force
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\GODOT-LICENSE.txt') -Destination (Join-Path $projectDirectory "dist\v$projectVersion\GODOT-LICENSE.txt") -Force
+        Copy-Item -LiteralPath (Join-Path $projectDirectory 'assets\fonts\OFL.txt') -Destination (Join-Path $projectDirectory "dist\v$projectVersion\FONT-OFL.txt") -Force
+    }
+    'ExportWeb' {
+        & (Join-Path $PSScriptRoot 'install.ps1') -WebTemplates
+        $webDirectory = Join-Path $projectDirectory "dist\v$projectVersion-web"
+        New-Item -ItemType Directory -Path $webDirectory -Force | Out-Null
+        & $enginePath --headless --path $projectDirectory --editor --import
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        & $enginePath --headless --path $projectDirectory --export-release 'Web' (Join-Path $webDirectory 'index.html') @GameArguments
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\GODOT-LICENSE.txt') -Destination $webDirectory -Force
+        Copy-Item -LiteralPath (Join-Path $projectDirectory 'assets\fonts\OFL.txt') -Destination (Join-Path $webDirectory 'FONT-OFL.txt') -Force
     }
 }
 exit $LASTEXITCODE

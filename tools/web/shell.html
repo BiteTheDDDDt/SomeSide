@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07131c">
+  <title>$GODOT_PROJECT_NAME</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #07131c; color: #edf5f4; font-family: system-ui, sans-serif; }
+    #canvas { display: block; outline: none; }
+    #status { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at 50% 70%, #10303a, #07131c 72%); }
+    .card { width: min(480px, 100%); border-top: 2px solid #69d9bd; padding: 32px 12px; }
+    h1 { font-size: clamp(36px, 8vw, 64px); letter-spacing: -3px; margin: 0 0 24px; font-weight: 800; }
+    #message { color: #d5e6e6; line-height: 1.6; margin: 0 0 18px; overflow-wrap: anywhere; }
+    progress { display: block; width: 100%; height: 6px; border: none; background: #1a3540; accent-color: #69d9bd; }
+    progress::-webkit-progress-bar { background: #1a3540; }
+    progress::-webkit-progress-value { background: #69d9bd; }
+    .hint { color: #8ca7b0; font-size: 13px; line-height: 1.7; margin-top: 22px; }
+    #fallback { display: none; gap: 18px; flex-wrap: wrap; align-items: center; margin-top: 24px; }
+    button, a { font: inherit; font-size: 14px; color: #f0cc83; }
+    button { padding: 10px 20px; background: #17353c; border: 1px solid #37616b; border-radius: 4px; cursor: pointer; }
+    a { text-underline-offset: 4px; }
+  </style>
+  $GODOT_HEAD_INCLUDE
+</head>
+<body>
+  <canvas id="canvas" tabindex="0" aria-label="SomeSide"></canvas>
+  <div id="status" role="status" aria-live="polite">
+    <div class="card">
+      <h1>SomeSide<span style="color:#69d9bd">.</span></h1>
+      <p id="message">Loading game…</p>
+      <progress id="progress" aria-label="Loading"></progress>
+      <p class="hint" id="hint">Keyboard &amp; mouse · Browser single player<br>Co-op is available in the Windows download.</p>
+      <div id="fallback"><button id="retry" type="button">Retry</button><a id="download" href="https://bitetheddddt.itch.io/someside" target="_blank" rel="noopener">Windows download</a></div>
+    </div>
+  </div>
+  <noscript>This game needs JavaScript. / 请开启 JavaScript 后游玩。</noscript>
+  <script src="$GODOT_URL"></script>
+  <script>
+    const GODOT_CONFIG = $GODOT_CONFIG;
+    const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+    (() => {
+      const zh = /^zh(?:-|$)/i.test(navigator.language || 'en');
+      document.documentElement.lang = zh ? 'zh-CN' : 'en';
+      const status = document.getElementById('status');
+      const message = document.getElementById('message');
+      const progress = document.getElementById('progress');
+      const canvas = document.getElementById('canvas');
+      let initializing = true;
+      const label = (en, cn) => zh ? cn : en;
+      message.textContent = label('Loading game…', '正在加载游戏…');
+      document.getElementById('hint').textContent = label('Keyboard & mouse · Browser single player. Co-op is available in the Windows download.', '键盘与鼠标操作 · 网页版单人游玩，Windows 下载版支持合作联机。');
+      document.getElementById('retry').textContent = label('Retry', '重试');
+      document.getElementById('download').textContent = label('Windows download', '下载 Windows 版');
+      document.getElementById('retry').onclick = () => location.reload();
+      canvas.addEventListener('contextmenu', event => event.preventDefault());
+      canvas.addEventListener('pointerdown', () => canvas.focus());
+      function stopWatchingStartup() {
+        initializing = false;
+        window.removeEventListener('error', startupError);
+        window.removeEventListener('unhandledrejection', startupError);
+      }
+      function startupError(event) {
+        if (!initializing) return;
+        event.preventDefault();
+        fail(event.reason || event.error || event.message || 'Download failed.');
+      }
+      function fail(error) {
+        stopWatchingStartup();
+        console.error(error);
+        status.style.display = 'grid';
+        progress.hidden = true;
+        progress.style.display = 'none';
+        message.textContent = label('Unable to start. Try a current desktop browser with WebGL 2 enabled, or use the Windows download. ', '启动失败。请使用支持 WebGL 2 的新版桌面浏览器，或下载 Windows 版。') + String(error.message || error);
+        document.getElementById('fallback').style.display = 'flex';
+      }
+      // Some engine download failures escape startGame's returned promise.
+      // Keep these listeners only while loading, not during normal gameplay.
+      window.addEventListener('error', startupError);
+      window.addEventListener('unhandledrejection', startupError);
+      if (typeof Engine === 'undefined') {
+        fail(label('The game loader could not be downloaded.', '游戏加载程序下载失败。'));
+        return;
+      }
+      const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
+      if (missing.length) { fail(missing.join(', ')); return; }
+      const engine = new Engine(GODOT_CONFIG);
+      engine.startGame({
+        canvas,
+        onProgress(current, total) {
+          if (!initializing) return;
+          if (total > 0) {
+            progress.value = current; progress.max = total;
+            message.textContent = current < total
+              ? label('Loading game… ', '正在加载游戏… ') + Math.floor(current / total * 100) + '%'
+              : label('Preparing the world…', '正在准备游戏世界…');
+          } else { progress.removeAttribute('value'); }
+        },
+      }).then(() => {
+        if (!initializing) return;
+        stopWatchingStartup(); status.style.display = 'none'; canvas.focus();
+      }, fail);
+    })();
+  </script>
+</body>
+</html>

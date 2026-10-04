@@ -14,6 +14,9 @@ var interaction_target: Dictionary = {}
 ## Native scenery textures remove repeated triangulation/material draws.
 ## This switch exists for fidelity/performance regression captures.
 var scenery_cache_enabled: bool = true
+## Web avoids rebuilding curved background/foliage geometry on every frame.
+## The separate switch also permits focused presentation tests on desktop.
+var web_background_cache_enabled: bool = OS.has_feature("web")
 
 const ItemIcons = preload("res://scripts/item_icons.gd")
 const Biomes = preload("res://scripts/biome_renderer.gd")
@@ -67,6 +70,14 @@ var _background_clock: float = -1.0
 var _cache_builds_this_frame: int = 0
 var _scenery_layout_signature: int = 0
 var _background_live: bool = true
+const WEB_BACKGROUND_MARGIN: Vector2 = Vector2(256.0, 128.0)
+const WEB_BACKGROUND_PARALLAX: float = 0.18
+const WEB_BACKGROUND_BLEND_TIME: float = 0.22
+const WEB_BACKGROUND_MAX_BYTES: int = 16 * 1024 * 1024
+var _web_background: Dictionary = {}
+var _web_background_pending: Dictionary = {}
+var _web_background_blend_start: float = -1.0
+var _web_background_builds: int = 0
 
 class SceneryBake:
 	extends Node2D
@@ -81,12 +92,29 @@ class SceneryBake:
 	var platform_index: int
 	var landmark: Dictionary
 	var clock_value: float
+	var background_margin: Vector2 = Vector2.ZERO
+	var freeze_foliage: bool = false
 	func world_to_screen(p: Vector2) -> Vector2:
 		return p-offset
 	func _draw() -> void:
-		if mode=="background": Art.background(self,biome,camera,screen_size,world,clock_value)
+		if mode=="web_background":
+			# Extend the original sky colors behind the padded art. Art retains its
+			# original logical viewport, so padding never moves or enlarges its moon.
+			var top: Color = Color("091c28")
+			var bottom: Color = Color("294b4b")
+			if biome=="canyon": top=Color("252232"); bottom=Color("815c46")
+			elif biome=="ruins": top=Color("111526"); bottom=Color("39334d")
+			var width: float = screen_size.x+background_margin.x*2.0
+			draw_rect(Rect2(0,0,width,background_margin.y+1.0),top)
+			for band: int in range(48):
+				draw_rect(Rect2(0,background_margin.y+band*screen_size.y/48.0,width,screen_size.y/48.0+1.0),top.lerp(bottom,float(band)/47.0))
+			draw_rect(Rect2(0,background_margin.y+screen_size.y,width,background_margin.y+1.0),bottom)
+			draw_set_transform(background_margin)
+			Art.background(self,biome,camera,screen_size,world,clock_value)
+			draw_set_transform(Vector2.ZERO)
+		elif mode=="background": Art.background(self,biome,camera,screen_size,world,clock_value)
 		elif mode=="landmark": Art.landmarks(self,[landmark],biome,clock_value)
-		else: Art.platform(self,rectangle,platform_index,biome,clock_value,screen_size,world,true)
+		else: Art.platform(self,rectangle,platform_index,biome,0.0 if freeze_foliage else clock_value,screen_size,world,not freeze_foliage)
 
 
 func _ready() -> void:
@@ -156,10 +184,89 @@ func _clear_scenery_cache() -> void:
 	_background_cache.clear()
 	_background_camera=Vector2.INF
 	_background_clock=-1.0
+	_clear_web_background()
 
 
 func scenery_cache_stats() -> Dictionary:
-	return {"entries":_scenery_cache.size(),"bytes":_scenery_bytes,"max_entries":SCENERY_CACHE_ENTRIES,"max_bytes":SCENERY_CACHE_BYTES}
+	var background_bytes: int = int(_web_background.get("bytes",0))+int(_web_background_pending.get("bytes",0))
+	return {"entries":_scenery_cache.size(),"bytes":_scenery_bytes,"max_entries":SCENERY_CACHE_ENTRIES,"max_bytes":SCENERY_CACHE_BYTES,"background_bytes":background_bytes,"background_entries":int(not _web_background.is_empty())+int(not _web_background_pending.is_empty()),"background_builds":_web_background_builds,"background_max_bytes":WEB_BACKGROUND_MAX_BYTES,"cached_foliage":web_background_cache_enabled}
+
+
+func _clear_web_background() -> void:
+	if not _web_background.is_empty(): _web_background.viewport.queue_free()
+	if not _web_background_pending.is_empty(): _web_background_pending.viewport.queue_free()
+	_web_background.clear()
+	_web_background_pending.clear()
+	_web_background_blend_start=-1.0
+
+
+func _web_background_size() -> Vector2i:
+	return Vector2i((screen_size+WEB_BACKGROUND_MARGIN*2.0).ceil())
+
+
+func _new_web_background() -> Dictionary:
+	var size_value: Vector2i = _web_background_size()
+	# Two complete textures coexist only during a short, bounded crossfade.
+	if size_value.x<=0 or size_value.y<=0 or size_value.x>4096 or size_value.y>4096 or size_value.x*size_value.y*8>WEB_BACKGROUND_MAX_BYTES:
+		return {}
+	var entry: Dictionary = _new_scenery_bake(size_value,Vector2.ZERO,"web_background")
+	entry.painter.screen_size=screen_size
+	entry.painter.background_margin=WEB_BACKGROUND_MARGIN
+	entry.painter.camera=camera_position
+	entry.painter.clock_value=_clock
+	entry["camera"]=camera_position
+	entry["screen_size"]=screen_size
+	_web_background_builds+=1
+	return entry
+
+
+func _web_background_offset(entry: Dictionary) -> Vector2:
+	return -WEB_BACKGROUND_MARGIN+(Vector2(entry.camera)-camera_position)*WEB_BACKGROUND_PARALLAX
+
+
+func _web_background_covers(entry: Dictionary) -> bool:
+	return Rect2(_web_background_offset(entry),Vector2(entry.viewport.size)).encloses(Rect2(Vector2.ZERO,screen_size))
+
+
+func _web_background_mix() -> float:
+	if _web_background_blend_start<0.0: return 0.0
+	return clampf((_clock-_web_background_blend_start)/WEB_BACKGROUND_BLEND_TIME,0.0,1.0)
+
+
+func _prepare_web_background() -> void:
+	if not _web_background.is_empty() and Vector2(_web_background.screen_size)!=screen_size:
+		_clear_web_background()
+	if _web_background.is_empty():
+		_web_background=_new_web_background()
+		return
+	if not _web_background_pending.is_empty():
+		if Engine.get_process_frames()>=int(_web_background_pending.ready):
+			if _web_background_blend_start<0.0: _web_background_blend_start=_clock
+			if _web_background_mix()>=1.0:
+				_web_background.viewport.queue_free()
+				_web_background=_web_background_pending
+				_web_background_pending={}
+				_web_background_blend_start=-1.0
+		return
+	var distance_value: Vector2 = ((camera_position-Vector2(_web_background.camera))*WEB_BACKGROUND_PARALLAX).abs()
+	if distance_value.x>WEB_BACKGROUND_MARGIN.x*0.45 or distance_value.y>WEB_BACKGROUND_MARGIN.y*0.45:
+		_web_background_pending=_new_web_background()
+		_web_background_blend_start=-1.0
+
+
+func _draw_web_background() -> bool:
+	if _web_background.is_empty() or Engine.get_process_frames()<int(_web_background.ready): return false
+	# A same-stage teleport can outrun the padding; use the full live fallback
+	# during replacement instead of ever exposing an unpainted edge.
+	if not _web_background_covers(_web_background):
+		if not _web_background_pending.is_empty() and Engine.get_process_frames()>=int(_web_background_pending.ready) and _web_background_covers(_web_background_pending):
+			draw_texture(_web_background_pending.texture,_web_background_offset(_web_background_pending))
+			return true
+		return false
+	draw_texture(_web_background.texture,_web_background_offset(_web_background))
+	if not _web_background_pending.is_empty() and Engine.get_process_frames()>=int(_web_background_pending.ready):
+		draw_texture(_web_background_pending.texture,_web_background_offset(_web_background_pending),Color(1,1,1,_web_background_mix()))
+	return true
 
 
 func _new_scenery_bake(size_value: Vector2i, origin: Vector2, mode: String) -> Dictionary:
@@ -175,6 +282,7 @@ func _new_scenery_bake(size_value: Vector2i, origin: Vector2, mode: String) -> D
 	painter.screen_size=Vector2(size_value)
 	painter.biome=_current_biome
 	painter.world=_frame.get("world_size",Vector2(3200,1100))
+	painter.freeze_foliage=web_background_cache_enabled and mode=="terrain"
 	viewport.add_child(painter)
 	return {"viewport":viewport,"painter":painter,"texture":viewport.get_texture(),"ready":Engine.get_process_frames()+2,"last":Engine.get_process_frames(),"bytes":size_value.x*size_value.y*4,"origin":origin}
 
@@ -221,21 +329,24 @@ func _static_landmark(landmark: Dictionary) -> bool:
 func _prepare_scenery_cache() -> void:
 	if not scenery_cache_enabled or not is_inside_tree(): return
 	_cache_builds_this_frame=0
-	if _background_cache.is_empty() or Vector2(_background_cache.painter.screen_size)!=screen_size:
-		if not _background_cache.is_empty(): _background_cache.viewport.queue_free()
-		_background_cache=_new_scenery_bake(Vector2i(screen_size),Vector2.ZERO,"background")
-		_background_camera=Vector2.INF
-	# Parallax is updated on every visible camera change. The only autonomous
-	# movement in this layer is a very slow vine (<0.12 px per refresh).
-	_background_live=not _background_camera.is_finite() or _background_camera.distance_squared_to(camera_position)>0.0025
-	if not _background_live and (_background_clock<0 or _background_cache.painter.camera.distance_squared_to(camera_position)>0.0025 or (_current_biome=="rainforest" and _clock-_background_clock>1.0/30.0)):
-		_background_cache.painter.camera=camera_position
-		_background_cache.painter.clock_value=_clock
-		_background_cache.painter.queue_redraw()
-		_background_cache.viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
-		_background_clock=_clock
-	if _background_live: _background_clock=-1.0
-	_background_camera=camera_position
+	if web_background_cache_enabled:
+		_prepare_web_background()
+	else:
+		if _background_cache.is_empty() or Vector2(_background_cache.painter.screen_size)!=screen_size:
+			if not _background_cache.is_empty(): _background_cache.viewport.queue_free()
+			_background_cache=_new_scenery_bake(Vector2i(screen_size),Vector2.ZERO,"background")
+			_background_camera=Vector2.INF
+		# Parallax is updated on every visible camera change. The only autonomous
+		# movement in this layer is a very slow vine (<0.12 px per refresh).
+		_background_live=not _background_camera.is_finite() or _background_camera.distance_squared_to(camera_position)>0.0025
+		if not _background_live and (_background_clock<0 or _background_cache.painter.camera.distance_squared_to(camera_position)>0.0025 or (_current_biome=="rainforest" and _clock-_background_clock>1.0/30.0)):
+			_background_cache.painter.camera=camera_position
+			_background_cache.painter.clock_value=_clock
+			_background_cache.painter.queue_redraw()
+			_background_cache.viewport.render_target_update_mode=SubViewport.UPDATE_ONCE
+			_background_clock=_clock
+		if _background_live: _background_clock=-1.0
+		_background_camera=camera_position
 	var platforms: Array=_frame.get("platforms",[])
 	for index: int in range(platforms.size()):
 		var rectangle: Rect2=platforms[index]
@@ -697,7 +808,9 @@ func _draw() -> void:
 	if _font == null:
 		_font = ThemeDB.fallback_font
 	var world: Vector2 = _frame.get("world_size", Vector2(3200.0, 1100.0))
-	if scenery_cache_enabled and not _background_live and not _background_cache.is_empty() and Engine.get_process_frames()>=int(_background_cache.ready):
+	if scenery_cache_enabled and web_background_cache_enabled and _draw_web_background():
+		pass
+	elif scenery_cache_enabled and not _background_live and not _background_cache.is_empty() and Engine.get_process_frames()>=int(_background_cache.ready):
 		draw_texture(_background_cache.texture,Vector2.ZERO)
 	else:
 		Biomes.background(self, _current_biome, camera_position, screen_size, world, _clock)
@@ -808,7 +921,8 @@ func _draw_terrain() -> void:
 			var width: float=minf(512.0,rectangle.size.x-tile*512.0)
 			var destination: Vector2=world_to_screen(rectangle.position+Vector2(tile*512,-64))
 			draw_texture_rect_region(entry.texture,Rect2(destination,Vector2(width,256)),Rect2(96,0,width,256))
-		Biomes.platform_animated(self,rectangle,index,_current_biome,_clock,screen_size)
+		if not web_background_cache_enabled:
+			Biomes.platform_animated(self,rectangle,index,_current_biome,_clock,screen_size)
 
 
 func _draw_flora(p: Vector2, scale_value: float, seed_value: int) -> void:
