@@ -8,7 +8,8 @@ const MapView = preload("res://scripts/map_view.gd")
 const Content = preload("res://scripts/content.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
-const VERSION: String = "0.7.0"
+const Locale = preload("res://scripts/localization.gd")
+const VERSION: String = "0.8.0"
 const DEFAULT_PORT: int = 27841
 const INK := Color("0b1e27")
 const PAPER := Color("e8ede5")
@@ -29,7 +30,7 @@ var online: bool = false
 var hosting: bool = false
 var local_id: int = 1
 var roster: Array = []
-var profile: Dictionary = {"name": "Traveller", "character": "ranger", "volume": 0.65, "effects": 1.0, "shake": true, "fullscreen": false, "runs": 0, "best_stage": 0, "wins": 0}
+var profile: Dictionary = {"name": "Traveller", "character": "ranger", "volume": 0.65, "effects": 1.0, "shake": true, "fullscreen": false, "runs": 0, "best_stage": 0, "wins": 0, "language": ""}
 var paused: bool = false
 var _hud_labels: Dictionary = {}
 var _hp_bar: ProgressBar
@@ -85,6 +86,10 @@ var _inventory_filters: Dictionary = {}
 var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "projectile_kinds": []}
 var _biome_observed: Dictionary = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 var _biome_smoke_stage: int = 0
+var _settings_in_game: bool = false
+var _coin_panel: PanelContainer
+var _last_coin_balance: int = -1
+var _coin_feedback: float = 0.0
 
 func _ready() -> void:
 	Engine.max_fps = 120
@@ -139,6 +144,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_elapsed += delta
+	_coin_feedback = maxf(0.0, _coin_feedback - delta)
+	if _hud_labels.has("coins") and is_instance_valid(_hud_labels.coins):
+		_hud_labels.coins.add_theme_color_override("font_color", AMBER.lerp(Color("fff2bc"), _coin_feedback / 0.55))
 	_visual_error = _visual_error.lerp(Vector2.ZERO, 1.0 - exp(-18.0 * delta))
 	var render_state: Dictionary = sim.state
 	if online and not hosting and screen in ["playing", "results"] and sim.state.get("players", {}).has(local_id):
@@ -155,7 +163,7 @@ func _process(delta: float) -> void:
 	world.set_frame(render_state, local_id, delta)
 	if is_instance_valid(_map_view):
 		_map_view.set_frame(sim.state, local_id)
-		_map_title.text = "%02d  /  %s" % [int(sim.state.get("stage", 1)), str(sim.state.get("stage_name", "远征地图"))]
+		_map_title.text = "%02d  /  %s" % [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "远征地图")))]
 	ui.queue_redraw()
 	if screen == "playing":
 		if sim.state.get("players", {}).has(local_id) and is_instance_valid(_loot_panel):
@@ -360,7 +368,7 @@ func _host_lobby() -> void:
 	var peer := ENetMultiplayerPeer.new()
 	var error: Error = peer.create_server(_port, 3)
 	if error != OK:
-		_show_menu("无法创建房间：端口 %d 可能已被占用（%s）。" % [_port, error_string(error)])
+		_show_menu(Locale.format("无法创建房间：端口 %d 可能已被占用（%s）。", [_port, error_string(error)]))
 		return
 	multiplayer.multiplayer_peer = peer
 	online = true
@@ -378,14 +386,14 @@ func _join_lobby(address: String) -> void:
 	var peer := ENetMultiplayerPeer.new()
 	var error: Error = peer.create_client(_connect_address, _port)
 	if error != OK:
-		_show_menu("无法连接：%s" % error_string(error))
+		_show_menu(Locale.format("无法连接：%s", [error_string(error)]))
 		return
 	multiplayer.multiplayer_peer = peer
 	online = true
 	hosting = false
 	_network_wait = 12.0
 	screen = "connecting"
-	var column: VBoxContainer = _page("建立连接", "正在寻找 %s:%d …" % [_connect_address, _port])
+	var column: VBoxContainer = _page("建立连接", Locale.format("正在寻找 %s:%d …", [_connect_address, _port]))
 	_button(column, "取消", func(): _disconnect(); _show_menu(), false)
 
 func _on_connected() -> void:
@@ -563,7 +571,7 @@ func _begin_local(members: Array, seed_value: int) -> void:
 	screen = "playing"
 	world.menu_preview = false
 	_build_hud()
-	_notify(str(sim.state.get("stage_name", "远征开始")) + " · M 地图 · Alt 详情 · 时间会提高威胁", 4.0)
+	_notify(Locale.format("%s · M 地图 · Alt 详情 · 时间会提高威胁", [Locale.text(str(sim.state.get("stage_name", "远征开始")))]), 4.0)
 	print("SOMESIDE_RUN_STARTED peers=", members.size(), " local=", local_id)
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 1)
@@ -674,17 +682,19 @@ func _consume_events(events: Array) -> void:
 		if kind == "pickup" and int(event.get("player", -1)) == local_id and not str(event.get("item", "")).is_empty():
 			var definition: Dictionary = Simulation.loot_definition(str(event.item))
 			var category: String = str(definition.get("category", "passive"))
-			_notify(("获得遗物 · " if category == "passive" else "已装备 · ") + Content.rarity_name(str(definition.get("rarity", "common"))) + " · " + str(definition.get("name", event.item)))
+			_notify(Locale.format("获得遗物 · %s · %s" if category == "passive" else "已装备 · %s · %s", [Locale.text(Content.rarity_name(str(definition.get("rarity", "common")))), Locale.text(str(definition.get("name", event.item)))]))
 		elif kind == "notice" and int(event.get("player", -1)) == local_id:
-			_notify(str(event.get("message", "")), 3.0)
+			var message_key: String = str(event.get("message_key", event.get("message", "")))
+			var message_args: Array = event.get("message_args", [])
+			_notify(Locale.text(message_key) if message_args.is_empty() else Locale.format(message_key, message_args), 3.0)
 		elif kind == "stage":
-			_notify("第 %d 区 · %s" % [int(sim.state.get("stage", 1)), str(sim.state.get("stage_name", "新的远征"))], 4.0)
+			_notify(Locale.format("第 %d 区 · %s", [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "新的远征")))]), 4.0)
 		elif kind == "gate":
 			_notify("裂隙已稳定！靠近裂隙门按 E 进入下一关。" if event.get("ready", false) else "裂隙门已激活。留在附近充能，击败守卫。", 5.0)
 		elif kind == "revive":
 			if event.get("phoenix", false):
-				var saved_name: String = "你" if int(event.get("player", -1)) == local_id else str(sim.state.get("players", {}).get(int(event.get("player", -1)), {}).get("name", "队友"))
-				_notify("不灭余火触发 · %s抵挡了一次致命伤。" % saved_name)
+				var saved_name: String = Locale.text("你") if int(event.get("player", -1)) == local_id else str(sim.state.get("players", {}).get(int(event.get("player", -1)), {}).get("name", Locale.text("队友")))
+				_notify(Locale.format("不灭余火触发 · %s抵挡了一次致命伤。", [saved_name]))
 			else:
 				_notify("正在重建队友的共鸣 …" if event.get("started", false) else "队友已重返战场。")
 
@@ -713,9 +723,13 @@ func _load_profile() -> void:
 	profile.shake = bool(profile.shake)
 	profile.character = profile.character if profile.character in ["ranger", "vanguard"] else "ranger"
 	profile.name = str(profile.name).substr(0, 18)
+	profile.language = Locale.choose_language(str(profile.get("language", "")), OS.get_locale())
+	var requested_language: String = str(_options.get("language", ""))
+	Locale.set_language(requested_language if requested_language in ["zh", "en"] else str(profile.language))
 
 func _save_profile() -> void:
-	if not _smoke.is_empty():
+	# Explicit test locales never overwrite the player's real preferences.
+	if not _smoke.is_empty() or _options.has("language"):
 		return
 	var file := ConfigFile.new()
 	for key in profile:
@@ -835,6 +849,8 @@ func _finish_automation() -> void:
 	elif _smoke == "client":
 		passed = _started and _snapshots_received > 10
 	var report: Dictionary = {"passed": passed, "mode": _smoke, "started": _started, "max_players": _max_players, "snapshots": _snapshots_received, "inputs": _inputs_received, "events": _events_seen, "tick": _tick, "stage": sim.state.get("stage", 0), "kills": sim.state.get("kills", 0), "phase": sim.state.get("phase", ""), "screen": screen, "elapsed": _elapsed}
+	report["language"] = Locale.current_language
+	report["profile_language"] = str(profile.get("language", ""))
 	report["advanced"] = _options.has("smoke-advanced")
 	report["observed"] = _advanced_observed.duplicate(true)
 	report["biomes"] = _options.has("smoke-biomes")
@@ -860,7 +876,7 @@ func _style(color: Color, border: Color = Color.TRANSPARENT, radius: int = 6) ->
 
 func _label(parent: Node, text: String, size: int = 18, color: Color = PAPER) -> Label:
 	var label := Label.new()
-	label.text = text
+	label.text = Locale.text(text)
 	label.add_theme_font_override("font", heading_font if size >= 24 else font)
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
@@ -870,7 +886,7 @@ func _label(parent: Node, text: String, size: int = 18, color: Color = PAPER) ->
 
 func _button(parent: Node, text: String, action: Callable, primary: bool = false) -> Button:
 	var button := Button.new()
-	button.text = text
+	button.text = Locale.text(text)
 	button.custom_minimum_size = Vector2(0, 48)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -900,6 +916,11 @@ func _clear_ui() -> void:
 		ui.remove_child(child)
 		child.queue_free()
 	_hud_labels.clear()
+	_coin_panel = null
+	_last_coin_balance = -1
+	_coin_feedback = 0.0
+	overlay = null
+	hud = null
 	_slot_ui.clear()
 	_loot_ui.clear()
 	_relic_tiles.clear()
@@ -915,8 +936,13 @@ func _clear_ui() -> void:
 	_hud_clock = 0.0
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
-func _page(title: String, subtitle: String, width: float = 480.0) -> VBoxContainer:
-	_clear_ui()
+func _page(title: String, subtitle: String, width: float = 480.0, preserve_game: bool = false) -> VBoxContainer:
+	if preserve_game:
+		if is_instance_valid(overlay):
+			ui.remove_child(overlay)
+			overlay.queue_free()
+	else:
+		_clear_ui()
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ui.add_child(overlay)
@@ -951,6 +977,7 @@ func _page(title: String, subtitle: String, width: float = 480.0) -> VBoxContain
 	return column
 
 func _show_menu(message: String = "") -> void:
+	_settings_in_game = false
 	screen = "menu"
 	paused = false
 	world.menu_preview = true
@@ -958,7 +985,7 @@ func _show_menu(message: String = "") -> void:
 		sim.start_run([{"id": 1, "name": "SomeSide", "character": "ranger"}], 73021)
 	var column: VBoxContainer = _page("SomeSide", "雨幕之外，总有另一边。\n一场关于远征、共鸣与生还的合作冒险。")
 	var character: String = "游侠 · RANGER" if profile.character == "ranger" else "先锋 · VANGUARD"
-	_label(column, "当前旅者  /  " + character, 15, AMBER)
+	_label(column, Locale.format("当前旅者  /  %s", [Locale.text(character)]), 15, AMBER)
 	_button(column, "开始独行     →", _start_solo, true)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
@@ -975,7 +1002,7 @@ func _show_menu(message: String = "") -> void:
 	_gap(column, 3)
 	var details: String = "2–4 人合作  /  自由瞄准  /  遗物构筑"
 	if int(profile.runs) > 0:
-		details = "已远征 %d 次  ·  最远第 %d 区  ·  生还 %d 次" % [int(profile.runs), int(profile.best_stage), int(profile.wins)]
+		details = Locale.format("已远征 %d 次  ·  最远第 %d 区  ·  生还 %d 次", [int(profile.runs), int(profile.best_stage), int(profile.wins)])
 	_label(column, details, 13, MUTED)
 	if not message.is_empty():
 		var error_label: Label = _label(column, message, 14, AMBER)
@@ -986,28 +1013,30 @@ func _show_menu(message: String = "") -> void:
 
 func _show_characters() -> void:
 	screen = "characters"
-	var column: VBoxContainer = _page("选择旅者", "相同的世界，两种截然不同的生存方式。")
+	var page_width: float = 550 if Locale.current_language == "en" else 480
+	var column: VBoxContainer = _page("选择旅者", "相同的世界，两种截然不同的生存方式。", page_width)
+	column.add_theme_constant_override("separation", 8)
 	for definition in Simulation.character_catalog():
 		var selected: bool = str(profile.character) == str(definition.id)
 		var panel := PanelContainer.new()
 		panel.add_theme_stylebox_override("panel", _style(Color("12313a"), TEAL if selected else Color("2b484f")))
 		column.add_child(panel)
 		var content := VBoxContainer.new()
-		content.add_theme_constant_override("separation", 8)
+		content.add_theme_constant_override("separation", 6)
 		panel.add_child(content)
-		_label(content, ("●  " if selected else "○  ") + str(definition.name), 23, definition.get("color", TEAL))
+		_label(content, ("●  " if selected else "○  ") + Locale.text(str(definition.name)), 23, definition.get("color", TEAL))
 		var description: Label = _label(content, str(definition.description), 15, MUTED)
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		description.custom_minimum_size.x = 420
+		description.custom_minimum_size.x = page_width - 36
 		var character_id: String = str(definition.id)
 		_button(content, "已选中" if selected else "选择", func(): profile.character = character_id; _save_profile(); _show_characters(), selected)
-	_gap(column)
+	_gap(column, 8)
 	_button(column, "返回", _show_menu)
 
 func _text_field(parent: Node, value: String, placeholder: String = "") -> LineEdit:
 	var field := LineEdit.new()
 	field.text = value
-	field.placeholder_text = placeholder
+	field.placeholder_text = Locale.text(placeholder)
 	field.custom_minimum_size.y = 48
 	field.add_theme_font_override("font", font)
 	field.add_theme_font_size_override("font_size", 18)
@@ -1038,13 +1067,13 @@ func _show_lobby() -> void:
 	world.menu_preview = true
 	var subtitle: String = "队员准备后，由房主启动远征。"
 	var column: VBoxContainer = _page("远征小队", subtitle, 530)
-	var address_text: String = "房主 %s  ·  UDP %d" % [_connect_address, _port]
+	var address_text: String = Locale.format("房主 %s  ·  UDP %d", [_connect_address, _port])
 	if hosting:
 		var addresses: Array[String] = []
 		for address in IP.get_local_addresses():
 			if address.contains(".") and not address.begins_with("127.") and not address.begins_with("169.254"):
 				addresses.append(address)
-		address_text = "你的局域网地址  " + (", ".join(addresses.slice(0, 2)) if not addresses.is_empty() else "127.0.0.1") + "  :  " + str(_port)
+		address_text = Locale.format("你的局域网地址  %s  :  %d", [", ".join(addresses.slice(0, 2)) if not addresses.is_empty() else "127.0.0.1", _port])
 	var address_label: Label = _label(column, address_text, 14, TEAL)
 	address_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	address_label.custom_minimum_size.x = 530
@@ -1059,9 +1088,9 @@ func _show_lobby() -> void:
 				me = member
 			var role: String = "游侠" if member.character == "ranger" else "先锋"
 			var state_text: String = "准备就绪" if member.get("ready", false) else "等待准备"
-			_label(row, "%02d    %s%s  /  %s    ·    %s" % [index + 1, str(member.name), " (你)" if member.id == local_id else "", role, state_text], 16, TEAL if member.get("ready", false) else PAPER)
+			_label(row, "%02d    %s%s  /  %s    ·    %s" % [index + 1, str(member.name), Locale.text(" (你)") if member.id == local_id else "", Locale.text(role), Locale.text(state_text)], 16, TEAL if member.get("ready", false) else PAPER)
 		else:
-			_label(row, "%02d    等待旅者加入 …" % (index + 1), 16, MUTED)
+			_label(row, Locale.format("%02d    等待旅者加入 …", [index + 1]), 16, MUTED)
 	var change_row := HBoxContainer.new()
 	change_row.add_theme_constant_override("separation", 10)
 	column.add_child(change_row)
@@ -1087,28 +1116,78 @@ func _lobby_change_character() -> void:
 	else:
 		_set_member.rpc_id(1, str(profile.character), false)
 
-func _show_settings() -> void:
-	screen = "settings"
-	var column: VBoxContainer = _page("设置", "调整身份、声音与战斗表现。设置自动保存。", 530)
-	column.add_theme_constant_override("separation", 8)
+func _show_settings(in_game: bool = false) -> void:
+	_settings_in_game = in_game
+	if in_game:
+		paused = true
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		screen = "settings"
+	var column: VBoxContainer = _page("设置", "调整身份、声音与战斗表现。设置自动保存。", 550, in_game)
+	column.add_theme_constant_override("separation", 7)
+	var language_row := HBoxContainer.new()
+	language_row.add_theme_constant_override("separation", 10)
+	column.add_child(language_row)
+	var language_label: Label = _label(language_row, "语言 / Language", 15, TEAL)
+	language_label.custom_minimum_size.x = 140
+	language_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	for language in [["zh", "简体中文"], ["en", "English"]]:
+		var code: String = language[0]
+		var option: Button = _button(language_row, language[1], func(): _set_language(code), Locale.current_language == code)
+		option.custom_minimum_size.y = 40
 	_label(column, "旅者名称", 15, TEAL)
 	var field: LineEdit = _text_field(column, str(profile.name))
 	field.max_length = 18
 	field.text_changed.connect(func(value: String): profile.name = value.strip_edges() if not value.strip_edges().is_empty() else "Traveller"; _save_profile())
-	_gap(column, 4)
 	_settings_slider(column, "主音量", float(profile.volume), 0.0, 1.0, func(value: float): profile.volume = value; _apply_settings(); _save_profile())
 	_settings_slider(column, "特效强度", float(profile.effects), 0.5, 1.5, func(value: float): profile.effects = value; _apply_settings(); _save_profile())
-	_label(column, "叠层会增强局部光效；可降低强度或关闭镜头震动。", 13, MUTED)
-	_button(column, "镜头震动  ·  " + ("开启" if profile.shake else "关闭"), func(): profile.shake = not profile.shake; _apply_settings(); _save_profile(); _show_settings())
+	var effect_hint: Label = _label(column, "叠层会增强局部光效；可降低强度或关闭镜头震动。", 13, MUTED)
+	effect_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect_hint.custom_minimum_size.x = 550
+	_button(column, Locale.format("镜头震动  ·  %s", [Locale.text("开启" if profile.shake else "关闭")]), func(): profile.shake = not profile.shake; _apply_settings(); _save_profile(); _show_settings(_settings_in_game))
 	_button(column, "切换窗口 / 全屏  ·  F11", func(): profile.fullscreen = not profile.fullscreen; _apply_settings(); _save_profile())
-	_button(column, "返回", _show_menu, true)
+	_button(column, "返回战场" if in_game else "返回", _resume if in_game else _show_menu, true)
+
+func _set_language(language: String) -> void:
+	if language not in ["zh", "en"]:
+		return
+	profile.language = language
+	Locale.set_language(language)
+	_save_profile()
+	# Rebuild only presentation. A live expedition and its network identity stay intact.
+	if screen == "playing":
+		var was_paused: bool = paused
+		var had_settings: bool = _settings_in_game
+		var had_map: bool = is_instance_valid(_map_view)
+		var had_inventory: bool = is_instance_valid(_inventory_grid)
+		var inventory_filter: String = _inventory_filter
+		_build_hud()
+		paused = was_paused
+		if had_settings:
+			_show_settings(true)
+		elif had_map:
+			_show_map()
+		elif had_inventory:
+			_show_inventory()
+			_populate_inventory(inventory_filter)
+		elif was_paused:
+			_show_pause()
+		return
+	match screen:
+		"settings": _show_settings()
+		"characters": _show_characters()
+		"guide": _show_guide()
+		"join": _show_join()
+		"lobby": _show_lobby()
+		"results": _show_results()
+		_: _show_menu()
 
 func _settings_slider(parent: Node, title: String, value: float, minimum: float, maximum: float, action: Callable) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	parent.add_child(row)
 	var label: Label = _label(row, title, 15, TEAL)
-	label.custom_minimum_size.x = 100
+	label.custom_minimum_size.x = 140
 	var slider := HSlider.new()
 	slider.min_value = minimum
 	slider.max_value = maximum
@@ -1123,7 +1202,8 @@ func _settings_slider(parent: Node, title: String, value: float, minimum: float,
 
 func _show_guide() -> void:
 	screen = "guide"
-	var column: VBoxContainer = _page("生还手册", "保持移动。瞄准弱点。让遗物产生共鸣。", 590)
+	var guide_width: float = 800 if Locale.current_language == "en" else 590
+	var column: VBoxContainer = _page("生还手册", "保持移动。瞄准弱点。让遗物产生共鸣。", guide_width)
 	column.add_theme_constant_override("separation", 9)
 	var guide: Array = [
 		["A / D   或   ← / →", "移动；方向与瞄准完全独立"],
@@ -1141,11 +1221,13 @@ func _show_guide() -> void:
 		column.add_child(row)
 		var key: Label = _label(row, entry[0], 16, AMBER)
 		key.custom_minimum_size.x = 190
-		_label(row, entry[1], 15, PAPER)
+		var instruction: Label = _label(row, entry[1], 15, PAPER)
+		instruction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_gap(column, 6)
 	var tip: Label = _label(column, "三处区域路线不同，按 M 找路，基础单跳即可通行。停留不持续补怪，强度仍随时间增长。遗物图标常驻左下角，悬停查看效果；Tab 查看构筑与图鉴。白 / 绿 / 紫 / 金代表四级稀有度，红字另示代价。裂隙充能并击败守卫后可前进。", 15, MUTED)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip.custom_minimum_size.x = 590
+	tip.custom_minimum_size.x = guide_width
 	_button(column, "我准备好了", _show_menu, true)
 
 func _icon(parent: Node, id: String, size: int = 48) -> TextureRect:
@@ -1241,6 +1323,7 @@ func _build_hud() -> void:
 	var expedition: VBoxContainer = _hud_panel(Vector2(1012, 18), Vector2(250, 32))
 	_hud_labels["expedition"] = _label(expedition, "", 12, MUTED)
 	_hud_labels.expedition.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_build_coin_hud()
 	var objective: VBoxContainer = _hud_panel(Vector2(480, 18), Vector2(320, 34))
 	_objective_panel = objective.get_parent()
 	_hud_labels["objective"] = _label(objective, "", 12, PAPER)
@@ -1271,12 +1354,57 @@ func _build_hud() -> void:
 	_hud_labels.hint.position = Vector2(18, 620)
 	_notice = _label(hud, "", 13, AMBER)
 	_notice.position = Vector2(370, 65)
-	_notice.size = Vector2(540, 36)
+	_notice.size = Vector2(540, 54)
 	_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_build_loot_panel()
 	_update_hud()
 	_update_inspection_visibility()
+
+func _build_coin_hud() -> void:
+	_coin_panel = PanelContainer.new()
+	_coin_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style: StyleBoxFlat = _style(Color(0.055, 0.075, 0.075, 0.88), Color(0.76, 0.56, 0.28, 0.5), 7)
+	style.content_margin_left = 10
+	style.content_margin_right = 12
+	style.content_margin_top = 3
+	style.content_margin_bottom = 3
+	_coin_panel.add_theme_stylebox_override("panel", style)
+	hud.add_child(_coin_panel)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_coin_panel.add_child(row)
+	var icon := Control.new()
+	icon.custom_minimum_size = Vector2(26, 32)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+	icon.draw.connect(func():
+		icon.draw_circle(Vector2(13, 16), 11, Color("9f622d"))
+		icon.draw_circle(Vector2(13, 14), 10, Color("f5c76c"))
+		icon.draw_circle(Vector2(13, 14), 7, Color("b77c38"), false, 1.4, true)
+		icon.draw_line(Vector2(13, 9), Vector2(13, 19), Color("fff0aa"), 2.3, true)
+		icon.draw_line(Vector2(10, 11), Vector2(15, 11), Color("fff0aa"), 1.4, true)
+	)
+	_hud_labels["coins"] = _label(row, "0", 24, AMBER)
+	_hud_labels.coins.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_hud_labels.coins.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hud_labels.coins.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_coin_panel.position = Vector2(1130, 55)
+	_coin_panel.custom_minimum_size = Vector2(132, 40)
+
+func _update_coins(balance: int) -> void:
+	if not is_instance_valid(_coin_panel):
+		return
+	if _last_coin_balance >= 0 and balance != _last_coin_balance:
+		_coin_feedback = 0.55
+	_last_coin_balance = balance
+	_hud_labels.coins.text = str(balance)
+	# Keep every digit, including unusually large saved/test balances.
+	var width: float = maxf(132.0, heading_font.get_string_size(str(balance), HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 58.0)
+	_coin_panel.custom_minimum_size.x = width
+	_coin_panel.size = Vector2(width, 40)
+	_coin_panel.position.x = 1262.0 - width
 
 func _update_inspection_visibility() -> void:
 	if not is_instance_valid(_relic_strip):
@@ -1285,10 +1413,10 @@ func _update_inspection_visibility() -> void:
 	_relic_strip.visible = not _relic_tiles.is_empty()
 	_hud_labels.relics.visible = expanded and _relic_strip.visible
 	_hud_labels.hint.visible = expanded
-	_hud_labels.hint.text = "[Tab] 构筑 / 图鉴  ·  [F] 切换目标  ·  悬停图标查看效果"
-	_hud_labels.hint.text += "  ·  [M] 地图"
+	_hud_labels.hint.text = Locale.text("[Tab] 构筑 / 图鉴  ·  [F] 切换目标  ·  悬停图标查看效果")
+	_hud_labels.hint.text += Locale.text("  ·  [M] 地图")
 	var mode: String = str(sim.state.get("director", {}).get("mode", "rest"))
-	_hud_labels.hint.text += "   /   " + {"rest": "停留 · 环境怪不再补充", "exploring": "探索中", "event": "事件战斗中"}.get(mode, "")
+	_hud_labels.hint.text += "   /   " + Locale.text({"rest": "停留 · 环境怪不再补充", "exploring": "探索中", "event": "事件战斗中"}.get(mode, ""))
 
 
 func _build_loot_panel() -> void:
@@ -1392,7 +1520,7 @@ func _update_slot(key: String, id: String, cooldown: float, maximum: float) -> v
 		var frame: StyleBoxFlat = slot.panel.get_theme_stylebox("panel").duplicate()
 		frame.border_color = Content.rarity_color(str(definition.get("rarity", "common"))) if key != "dash" else Color("30444c")
 		slot.panel.add_theme_stylebox_override("panel", frame)
-	slot.name.text = "相位冲刺" if key == "dash" else str(definition.get("name", id))
+	slot.name.text = Locale.text("相位冲刺" if key == "dash" else str(definition.get("name", id)))
 	var unavailable: bool = cooldown > 0.1 and key != "weapon"
 	slot.cooldown.text = str(ceili(cooldown)) if unavailable else ""
 	slot.icon.modulate = Color(0.4, 0.5, 0.52, 0.8) if unavailable else Color.WHITE
@@ -1406,16 +1534,17 @@ func _update_hud() -> void:
 	_hp_bar.value = float(player.hp)
 	_hud_labels.health.text = "%d / %d" % [ceili(float(player.hp)), ceili(float(player.max_hp))]
 	if float(player.get("shield", 0.0)) > 0.0:
-		_hud_labels.health.text += "   +%d 护盾" % ceili(float(player.shield))
+		_hud_labels.health.text += Locale.format("   +%d 护盾", [ceili(float(player.shield))])
 	var elapsed: int = int(sim.state.get("time", 0.0))
 	var difficulty: float = float(sim.state.get("difficulty", 1.0))
-	_hud_labels.expedition.text = "%02d/03  %02d:%02d  威胁%.1f  ◈%d" % [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, difficulty, int(player.coins)]
+	_hud_labels.expedition.text = Locale.format("%02d/03  %02d:%02d  威胁%.1f", [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, difficulty])
+	_update_coins(int(player.coins))
 	_hud_labels.expedition.add_theme_color_override("font_color", Color("ee9488") if difficulty >= 4 else (AMBER if difficulty >= 2 else MUTED))
 	var gate: Dictionary = sim.state.get("gate", {})
 	_objective_panel.visible = bool(gate.get("active", false)) or bool(player.dead)
-	_hud_labels.objective.text = "裂隙 %d%%  ·  %s" % [int(float(gate.get("charge", 0.0)) * 100.0), "击败守卫" if sim.state.get("boss_alive", false) else "留在附近充能"]
+	_hud_labels.objective.text = Locale.format("裂隙 %d%%  ·  %s", [int(float(gate.get("charge", 0.0)) * 100.0), Locale.text("击败守卫" if sim.state.get("boss_alive", false) else "留在附近充能")])
 	if gate.get("ready", false):
-		_hud_labels.objective.text = "裂隙就绪  ·  靠近按 E 前进"
+		_hud_labels.objective.text = Locale.text("裂隙就绪  ·  靠近按 E 前进")
 	_gate_bar.visible = bool(gate.get("active", false)) and not bool(player.dead)
 	_gate_bar.value = clampf(float(gate.get("charge", 0.0)), 0.0, 1.0) * 100.0
 	var teammates: Array[String] = []
@@ -1423,17 +1552,17 @@ func _update_hud() -> void:
 		if id == local_id:
 			continue
 		var member: Dictionary = sim.state.players[id]
-		teammates.append(str(member.name).substr(0, 10) + "  " + ("✚ 待救援" if member.dead else "%d HP" % ceili(float(member.hp))))
+		teammates.append(str(member.name).substr(0, 10) + "  " + (Locale.text("✚ 待救援") if member.dead else "%d HP" % ceili(float(member.hp))))
 	_hud_labels.team.text = "\n".join(teammates)
 	var weapon: String = str(player.get("weapon", "pulse_rifle"))
 	var equipment: String = str(player.get("equipment", "grenade"))
 	_update_slot("weapon", weapon, float(player.fire_cd), float(Simulation.loot_definition(weapon).get("fire_interval", 0.19)))
 	_update_slot("equipment", equipment, float(player.skill_cd), float(Simulation.loot_definition(equipment).get("cooldown", 8.0)))
 	_update_slot("dash", "dash", float(player.dash_cd), Simulation.DASH_COOLDOWN)
-	_hud_labels.relics.text = "遗物 %d 件  ·  %d 种" % [_item_total(player.items), player.items.size()]
+	_hud_labels.relics.text = Locale.format("遗物 %d 件  ·  %d 种", [_item_total(player.items), player.items.size()])
 	_refresh_relics(player.items)
 	if player.dead:
-		_hud_labels.objective.text = "等待队友靠近按 E 救援"
+		_hud_labels.objective.text = Locale.text("等待队友靠近按 E 救援")
 
 
 func _refresh_interaction_focus() -> void:
@@ -1484,8 +1613,8 @@ func _update_interaction_panel(player: Dictionary) -> void:
 	if not hovered.is_empty():
 		expanded = true
 		var definition: Dictionary = Simulation.loot_definition(str(hovered.id))
-		var suffix: String = " · 已装备" if hovered.get("equipped", false) else " ×" + str(hovered.count)
-		target = {"kind": "inspect", "item": hovered.id, "title": str(definition.name) + suffix, "description": definition.description, "warning": definition.get("warning", ""), "category": definition.category, "prompt": "[Tab] 查看完整构筑", "affordable": true}
+		var suffix: String = Locale.text(" · 已装备") if hovered.get("equipped", false) else " ×" + str(hovered.count)
+		target = {"kind": "inspect", "item": hovered.id, "title": Locale.text(str(definition.name)) + suffix, "description": definition.description, "warning": definition.get("warning", ""), "category": definition.category, "prompt": "[Tab] 查看完整构筑", "affordable": true}
 	_loot_panel.visible = not target.is_empty()
 	if target.is_empty():
 		return
@@ -1503,26 +1632,26 @@ func _update_interaction_panel(player: Dictionary) -> void:
 	_loot_ui.icon.texture = Icons.texture(icon_id, 100)
 	var rarity: String = str(definition.get("rarity", "common"))
 	var rarity_tint: Color = Content.rarity_color(rarity) if not definition.is_empty() else AMBER
-	_loot_ui.category.text = (Content.rarity_name(rarity) + "  ·  " if not definition.is_empty() else "") + category_text
+	_loot_ui.category.text = (Locale.text(Content.rarity_name(rarity)) + "  ·  " if not definition.is_empty() else "") + Locale.text(category_text)
 	_loot_ui.category.visible = true
 	_loot_ui.category.add_theme_color_override("font_color", rarity_tint)
 	var card_frame: StyleBoxFlat = _loot_panel.get_theme_stylebox("panel")
 	card_frame.border_color = Color(rarity_tint, 0.6)
-	_loot_ui.name.text = str(target.get("title", definition.get("name", "")))
+	_loot_ui.name.text = Locale.text(str(target.get("title", definition.get("name", ""))))
 	_loot_ui.name.add_theme_color_override("font_color", rarity_tint)
-	_loot_ui.description.text = str(target.get("description", definition.get("description", "")))
+	_loot_ui.description.text = Locale.text(str(target.get("description", definition.get("description", ""))))
 	_loot_ui.description.max_lines_visible = -1 if expanded else 2
 	_loot_ui.description.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING if expanded else TextServer.OVERRUN_TRIM_ELLIPSIS
 	var warning: String = str(target.get("warning", definition.get("warning", "")))
 	if category in ["weapon", "equipment"] and str(target.get("kind", "")) == "pickup":
 		warning = str(definition.get("warning", ""))
 	_loot_ui.warning.visible = not warning.is_empty()
-	_loot_ui.warning.text = warning
+	_loot_ui.warning.text = Locale.text(warning)
 	_loot_ui.replace.visible = category in ["weapon", "equipment"] and str(target.get("kind", "")) == "pickup"
 	if _loot_ui.replace.visible:
 		var old: Dictionary = Simulation.loot_definition(str(player.get(category, "")))
-		_loot_ui.replace.text = "替换「%s · %s」；旧装备落地，冷却保留。" % [Content.rarity_name(str(old.get("rarity", "common"))), str(old.get("name", "当前装备"))]
-	_loot_ui.action.text = str(target.get("prompt", "[ E ] 交互"))
+		_loot_ui.replace.text = Locale.format("替换「%s · %s」；旧装备落地，冷却保留。", [Locale.text(Content.rarity_name(str(old.get("rarity", "common")))), Locale.text(str(old.get("name", "当前装备")))])
+	_loot_ui.action.text = Locale.text(str(target.get("prompt", "[ E ] 交互")))
 	_loot_ui.action.add_theme_color_override("font_color", TEAL if target.get("affordable", true) else Color("ff9b9b"))
 	_loot_ui.alternatives.visible = true
 	var selection_index: int = 0
@@ -1530,7 +1659,7 @@ func _update_interaction_panel(player: Dictionary) -> void:
 		if _same_interaction(_interaction_options[index], target):
 			selection_index = index
 			break
-	_loot_ui.alternatives.text = "移开鼠标收起  ·  Tab 查看构筑" if not hovered.is_empty() else ("松开 Alt 收起" if expanded else "按住 Alt 查看完整说明")
+	_loot_ui.alternatives.text = Locale.text("移开鼠标收起  ·  Tab 查看构筑" if not hovered.is_empty() else ("松开 Alt 收起" if expanded else "按住 Alt 查看完整说明"))
 	if _interaction_options.size() > 1 and str(target.get("kind", "")) != "inspect":
 		_loot_ui.alternatives.text += "  ·  [F] %d/%d" % [selection_index + 1, _interaction_options.size()]
 	var actor_x: float = world.world_to_screen(player.pos).x
@@ -1548,7 +1677,7 @@ func _item_total(items: Dictionary) -> int:
 	return count
 
 func _interaction_hint(_player: Dictionary) -> String:
-	return str(sim.interaction_for(local_id).get("prompt", "Space 跳跃 · E 交互 · Tab 背包"))
+	return str(sim.interaction_for(local_id).get("prompt", Locale.text("Space 跳跃 · E 交互 · Tab 背包")))
 
 func _inventory_card(parent: Node, definition: Dictionary, count: int, equipped: bool = false) -> void:
 	var panel := PanelContainer.new()
@@ -1571,8 +1700,8 @@ func _inventory_card(parent: Node, definition: Dictionary, count: int, equipped:
 	words.add_theme_constant_override("separation", 4)
 	row.add_child(words)
 	var category: String = {"passive": "被动遗物 · 可叠加", "weapon": "主武器 · 单一槽位", "equipment": "主动装备 · 单一槽位"}.get(str(definition.get("category", "passive")), "遗物")
-	_label(words, Content.rarity_name(rarity) + "  /  " + category, 11, tint)
-	var title: Label = _label(words, str(definition.name) + ("  ·  已装备" if equipped else ("  ×" + str(count) if count > 0 else "  ·  未持有")), 16, PAPER if count > 0 else MUTED)
+	_label(words, Locale.text(Content.rarity_name(rarity)) + "  /  " + Locale.text(category), 11, tint)
+	var title: Label = _label(words, Locale.text(str(definition.name)) + (Locale.text("  ·  已装备") if equipped else ("  ×" + str(count) if count > 0 else Locale.text("  ·  未持有"))), 16, PAPER if count > 0 else MUTED)
 	title.custom_minimum_size.x = 414
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var description: Label = _label(words, str(definition.description), 14, PAPER if count > 0 else MUTED)
@@ -1600,12 +1729,12 @@ func _show_inventory() -> void:
 	overlay.add_child(content)
 	_label(content, "旅者构筑", 30, PAPER)
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
-	_label(content, "%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s" % ["游侠" if player.get("character", "ranger") == "ranger" else "先锋", ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), "合作远征仍在继续" if online else "远征已暂停"], 14, MUTED)
+	_label(content, Locale.format("%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s", [Locale.text("游侠" if player.get("character", "ranger") == "ranger" else "先锋"), ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), Locale.text("合作远征仍在继续" if online else "远征已暂停")]), 14, MUTED)
 	_inventory_filters.clear()
 	var filters := HBoxContainer.new()
 	filters.add_theme_constant_override("separation", 10)
 	content.add_child(filters)
-	var tabs: Array = [["owned", "当前持有"], ["passive", "遗物图鉴 · %d" % Simulation.item_catalog().size()], ["weapon", "主武器 · %d" % Simulation.weapon_catalog().size()], ["equipment", "主动装备 · %d" % Simulation.equipment_catalog().size()]]
+	var tabs: Array = [["owned", "当前持有"], ["passive", Locale.format("遗物图鉴 · %d", [Simulation.item_catalog().size()])], ["weapon", Locale.format("主武器 · %d", [Simulation.weapon_catalog().size()])], ["equipment", Locale.format("主动装备 · %d", [Simulation.equipment_catalog().size()])]]
 	for entry in tabs:
 		var filter_key: String = entry[0]
 		var button: Button = _button(filters, entry[1], func(): _populate_inventory(filter_key))
@@ -1616,7 +1745,7 @@ func _show_inventory() -> void:
 	rarity_legend.add_theme_constant_override("separation", 20)
 	content.add_child(rarity_legend)
 	for rarity in ["common", "uncommon", "rare", "legendary"]:
-		_label(rarity_legend, "◆ " + Content.rarity_name(rarity), 12, Content.rarity_color(rarity))
+		_label(rarity_legend, "◆ " + Locale.text(Content.rarity_name(rarity)), 12, Content.rarity_color(rarity))
 	_label(rarity_legend, "叠层数量在角标显示；红字表示副作用。", 12, MUTED)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(1080, 320)
@@ -1680,10 +1809,10 @@ func _show_map() -> void:
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.color = Color(0.015, 0.04, 0.065, 0.98)
 	overlay.add_child(shade)
-	var title: Label = _label(overlay, "%02d  /  %s" % [int(sim.state.get("stage", 1)), str(sim.state.get("stage_name", "远征地图"))], 30, PAPER)
+	var title: Label = _label(overlay, "%02d  /  %s" % [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "远征地图")))], 30, PAPER)
 	_map_title = title
 	title.position = Vector2(70, 34)
-	var subtitle: Label = _label(overlay, "寻找通往高处裂隙的路线，探索分支补给。" + ("合作远征仍在继续。" if online else "远征已暂停。"), 14, MUTED)
+	var subtitle: Label = _label(overlay, Locale.text("寻找通往高处裂隙的路线，探索分支补给。") + " " + Locale.text("合作远征仍在继续。" if online else "远征已暂停。"), 14, MUTED)
 	subtitle.position = Vector2(70, 82)
 	_map_view = MapView.new()
 	_map_view.position = Vector2(70, 123)
@@ -1701,7 +1830,7 @@ func _show_map() -> void:
 
 func _notify(message: String, duration: float = 3.5) -> void:
 	if is_instance_valid(_notice):
-		_notice.text = message
+		_notice.text = Locale.text(message)
 		_notice.modulate.a = 1.0
 		_notice_time = duration
 
@@ -1724,11 +1853,13 @@ func _show_pause() -> void:
 	_label(panel, "合作远征仍在继续。" if online else "雨幕等待你的归来。", 16, MUTED)
 	_gap(panel)
 	_button(panel, "继续远征", _resume, true)
+	_button(panel, "设置", func(): _show_settings(true))
 	_button(panel, "返回主菜单", func(): _disconnect(); _show_menu())
 	_label(panel, "Esc 返回  ·  F11 全屏", 13, MUTED)
 
 func _resume() -> void:
 	paused = false
+	_settings_in_game = false
 	_map_view = null
 	_map_title = null
 	_inventory_grid = null
@@ -1751,10 +1882,10 @@ func _show_results() -> void:
 		_run_saved = true
 	var column: VBoxContainer = _page("抵达另一边" if won else "雨幕将你记住", "远征成功。带着共鸣，走向下一个黎明。" if won else "这一次，旅途止步于此。下一次会更远。")
 	var elapsed: int = int(sim.state.get("time", 0.0))
-	_label(column, "第 %d 区   /   %02d:%02d   /   %d 击破" % [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, int(sim.state.get("kills", 0))], 21, AMBER)
+	_label(column, Locale.format("第 %d 区   /   %02d:%02d   /   %d 击破", [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, int(sim.state.get("kills", 0))]), 21, AMBER)
 	_gap(column)
 	for player in sim.state.get("players", {}).values():
-		_label(column, "%s   ·   %d 件遗物   ·   %d 击破" % [str(player.name), _item_total(player.get("items", {})), int(player.get("kills", 0))], 16, PAPER)
+		_label(column, Locale.format("%s   ·   %d 件遗物   ·   %d 击破", [str(player.name), _item_total(player.get("items", {})), int(player.get("kills", 0))]), 16, PAPER)
 	_gap(column, 15)
 	if online:
 		if hosting:

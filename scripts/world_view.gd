@@ -18,6 +18,7 @@ const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const Appearance = preload("res://scripts/player_appearance.gd")
 const Entities = preload("res://scripts/entity_renderer.gd")
 const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
+const Locale = preload("res://scripts/localization.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
 
@@ -777,7 +778,7 @@ func _draw_players() -> void:
 				_focus_marker(core, Vector2(21.0, 18.0), color_value)
 				_key_hint(p + Vector2(0.0, -37.0), color_value)
 			elif int(key) == _local_id:
-				_world_label(p + Vector2(0.0, -31.0), "信号中断", Color(color_value, 0.9), 12)
+				_world_label(p + Vector2(0.0, -31.0), Locale.text("信号中断"), Color(color_value, 0.9), 12)
 			var revive: float = float(player.get("revive", 0.0))
 			if revive > 0.0:
 				draw_arc(core, 16.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(revive, 0.0, 1.0), 24, color_value, 2.0, true)
@@ -855,7 +856,7 @@ func _draw_enemies() -> void:
 			draw_rect(Rect2(bar_p,Vector2(width*clampf(hp/max_hp,0.0,1.0),3)),accent)
 			if kind=="boss":
 				var title: String = str(enemy.get("name", {"spore":"孢冠母巢","stone":"裂岩巨像","prism":"寂光执政官"}.get(str(enemy.get("boss_style","spore")),"守望者")))
-				_world_label(p+Vector2(0,top-10),title,GOLD,13)
+				_world_label(p+Vector2(0,top-10),Locale.text(title),GOLD,13)
 
 
 func _draw_projectiles() -> void:

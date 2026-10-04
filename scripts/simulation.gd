@@ -5,6 +5,7 @@ const Content = preload("res://scripts/content.gd")
 const StageLayouts = preload("res://scripts/stage_layouts.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
+const Locale = preload("res://scripts/localization.gd")
 
 ## Authoritative, scene-independent game rules. State contains only serializable
 ## values. All positions are centers; platforms are one-way from above.
@@ -1240,64 +1241,66 @@ func interaction_candidates(player_id: int) -> Array:
 func _interaction_record(kind: String, target: Dictionary, player: Dictionary) -> Dictionary:
 	var result: Dictionary = {"kind": kind, "id": int(target.get("id", -1)), "pos": target["pos"], "title": "", "description": "", "prompt": "", "warning": "", "item": "", "category": "", "affordable": true}
 	if kind == "revive":
-		result["title"] = "救援 · " + str(target.get("name", "旅者"))
-		result["description"] = "靠近按 E 启动1.8秒重建；队友恢复55%生命。全员倒下则救援中止。"
-		result["prompt"] = "E · 启动救援" if float(target.get("revive_timer", 0.0)) <= 0.0 else "正在重建 · %.1f秒" % float(target["revive_timer"])
+		result["title"] = Locale.text("救援 · ") + str(target.get("name", Locale.text("旅者")))
+		result["description"] = Locale.text("靠近按 E 启动1.8秒重建；队友恢复55%生命。全员倒下则救援中止。")
+		result["prompt"] = Locale.text("E · 启动救援") if float(target.get("revive_timer", 0.0)) <= 0.0 else Locale.format("正在重建 · %.1f秒", [float(target["revive_timer"])])
 		result["affordable"] = float(target.get("revive_timer", 0.0)) <= 0.0
 		return result
 	if kind == "gate":
 		result["id"] = -1
-		result["title"] = "裂隙门"
+		result["title"] = Locale.text("裂隙门")
 		if bool(target.get("ready", false)):
-			result["description"] = "共鸣已稳定。全队进入下一关并恢复生命。" if int(state["stage"]) < 3 else "最终共鸣已稳定，完成远征。"
-			result["prompt"] = "E · 前往下一关" if int(state["stage"]) < 3 else "E · 完成远征"
+			result["description"] = Locale.text("共鸣已稳定。全队进入下一关并恢复生命。" if int(state["stage"]) < 3 else "最终共鸣已稳定，完成远征。")
+			result["prompt"] = Locale.text("E · 前往下一关" if int(state["stage"]) < 3 else "E · 完成远征")
 		elif bool(target.get("active", false)):
-			result["description"] = "留在640范围内完成充能，并击败裂隙守卫。"
-			result["prompt"] = "充能 %d%% · %s" % [int(float(target["charge"]) * 100.0), "守卫仍在" if bool(state["boss_alive"]) else "守卫已击败"]
+			result["description"] = Locale.text("留在640范围内完成充能，并击败裂隙守卫。")
+			result["prompt"] = Locale.format("充能 %d%% · %s", [int(float(target["charge"]) * 100.0), Locale.text("守卫仍在" if bool(state["boss_alive"]) else "守卫已击败")])
 			result["affordable"] = false
 		else:
-			result["description"] = "召唤守卫并开始22秒共鸣充能。准备妥当后启动。"
-			result["prompt"] = "E · 激活裂隙门"
+			result["description"] = Locale.text("召唤守卫并开始22秒共鸣充能。准备妥当后启动。")
+			result["prompt"] = Locale.text("E · 激活裂隙门")
 		return result
 	var item: String = str(target.get("item", ""))
 	var definition: Dictionary = loot_definition(item)
 	result["item"] = item
 	result["category"] = str(definition.get("category", "passive"))
-	result["title"] = str(definition.get("name", item))
-	result["description"] = str(definition.get("description", ""))
-	result["warning"] = str(definition.get("warning", ""))
+	# This transient inspection record is built independently on each peer.
+	# IDs, prices and the authoritative catalog/state remain language-neutral.
+	result["title"] = Locale.text(str(definition.get("name", item)))
+	result["description"] = Locale.text(str(definition.get("description", "")))
+	result["warning"] = Locale.text(str(definition.get("warning", "")))
 	if kind == "pickup":
-		result["prompt"] = "E · 拾取遗物"
+		result["prompt"] = Locale.text("E · 拾取遗物")
 		if str(result["category"]) in ["weapon", "equipment"]:
 			var slot: String = str(result["category"])
 			var old: Dictionary = loot_definition(str(player.get(slot, "")))
-			result["prompt"] = "E · 替换主武器" if slot == "weapon" else "E · 替换主动装备"
-			result["warning"] = "将替换「%s」，旧装备会落地；换装保留未结束的冷却。" % str(old.get("name", "当前装备"))
+			result["prompt"] = Locale.text("E · 替换主武器" if slot == "weapon" else "E · 替换主动装备")
+			result["warning"] = Locale.format("将替换「%s」，旧装备会落地；换装保留未结束的冷却。", [Locale.text(str(old.get("name", "当前装备")))])
 		return result
 	var facility: String = str(target.get("type", "cache"))
 	result["facility_type"] = facility
 	var price: int = int(target.get("cost", 0))
 	match facility:
 		"blood":
-			result["title"] = "生命献祭 · " + str(result["title"])
-			result["description"] = "消耗%d当前生命（不会致死），奖励落地后再按E选择。\n" % price + str(result["description"])
-			result["warning"] = "代价：立即扣除%d当前生命；当前生命必须高于%d。" % [price, price] + ("\n" + str(result["warning"]) if not str(result["warning"]).is_empty() else "")
-			result["prompt"] = "E · 献祭 %d 生命" % price
+			result["title"] = Locale.text("生命献祭 · ") + str(result["title"])
+			result["description"] = Locale.format("消耗%d当前生命（不会致死），奖励落地后再按E选择。\n", [price]) + str(result["description"])
+			result["warning"] = Locale.format("代价：立即扣除%d当前生命；当前生命必须高于%d。", [price, price]) + ("\n" + str(result["warning"]) if not str(result["warning"]).is_empty() else "")
+			result["prompt"] = Locale.format("E · 献祭 %d 生命", [price])
 			result["affordable"] = float(player["hp"]) > price
 		"combat":
-			result["title"] = "试炼信标 · " + str(result["title"])
+			result["title"] = Locale.text("试炼信标 · ") + str(result["title"])
 			var status: String = str(target.get("status", "idle"))
-			result["description"] = "召唤4名专属试炼敌人；全部击败后奖励落地。无金币费用。\n" + str(result["description"])
-			result["warning"] = "风险：立即进入战斗；周围普通敌人不会计入试炼进度。"
-			result["prompt"] = "E · 开始战斗试炼" if status == "idle" else "试炼进行中 · 剩余 %d" % int(target.get("remaining", 0))
+			result["description"] = Locale.text("召唤4名专属试炼敌人；全部击败后奖励落地。无金币费用。\n") + str(result["description"])
+			result["warning"] = Locale.text("风险：立即进入战斗；周围普通敌人不会计入试炼进度。")
+			result["prompt"] = Locale.text("E · 开始战斗试炼") if status == "idle" else Locale.format("试炼进行中 · 剩余 %d", [int(target.get("remaining", 0))])
 			result["affordable"] = status == "idle"
 		_:
 			var label: String = "三选一商店" if facility == "choice" else ("装备仓" if facility == "equipment" else "补给箱")
-			result["title"] = label + " · " + str(result["title"])
-			result["description"] = "支付%d金币；奖励落地后再按E选择。\n" % price + str(result["description"])
+			result["title"] = Locale.text(label) + " · " + str(result["title"])
+			result["description"] = Locale.format("支付%d金币；奖励落地后再按E选择。\n", [price]) + str(result["description"])
 			if facility == "choice":
-				result["description"] = "同组三个终端仅可购买一个。\n" + str(result["description"])
-			result["prompt"] = "E · 支付 %d 金币" % price
+				result["description"] = Locale.text("同组三个终端仅可购买一个。\n") + str(result["description"])
+			result["prompt"] = Locale.format("E · 支付 %d 金币", [price])
 			result["affordable"] = int(player["coins"]) >= price
 	return result
 
@@ -1376,7 +1379,7 @@ func _interact(player: Dictionary, target: Dictionary = {}) -> void:
 		player["hurt_timer"] = 6.0
 	else:
 		if int(player["coins"]) < cost:
-			_notice(player, "金币不足：需要%d金币。" % cost)
+			_notice(player, "金币不足：需要%d金币。", [cost])
 			return
 		player["coins"] = int(player["coins"]) - cost
 	selected["opened"] = true
@@ -1494,8 +1497,9 @@ func _spawn_pickup(position: Vector2, kind: String, item: String, amount: int, c
 	return pickup
 
 
-func _notice(player: Dictionary, message: String) -> void:
-	_emit("notice", player["pos"], {"player": player["id"], "message": message})
+func _notice(player: Dictionary, message: String, arguments: Array = []) -> void:
+	# Send untranslated templates and values: every client chooses its own UI language.
+	_emit("notice", player["pos"], {"player": player["id"], "message": message if arguments.is_empty() else message % arguments, "message_key": message, "message_args": arguments.duplicate()})
 
 func _step_pickups(dt: float) -> void:
 	var kept: Array = []

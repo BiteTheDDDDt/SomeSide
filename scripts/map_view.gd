@@ -2,6 +2,7 @@ class_name SideMapView
 extends Control
 
 const Icons = preload("res://scripts/item_icons.gd")
+const Locale = preload("res://scripts/localization.gd")
 var map_font: Font
 var _frame: Dictionary = {}
 var _local_id: int = 1
@@ -47,7 +48,7 @@ func _draw() -> void:
 		draw_circle(p, 3, Color(accent, 0.65), true, -1, true)
 		if map_font == null:
 			continue
-		var title: String = str(landmark.get("name", ""))
+		var title: String = Locale.text(str(landmark.get("name", "")))
 		var width: float = map_font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 		for offset: float in [-17.0, 19.0, -32.0, 34.0, -49.0, 51.0]:
 			var anchor := Vector2(clampf(p.x - width * 0.5, 8, size.x - width - 8), clampf(p.y + offset, 16, size.y - 5))
@@ -75,7 +76,7 @@ func _draw() -> void:
 		draw_arc(p, 8, 0, TAU, 24, Color("f2b368"), 2, true)
 		draw_circle(p, 3, Color("f2b368"))
 		if map_font != null:
-			draw_string(map_font, p + Vector2(-18, -15), "裂隙门", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("f2b368"))
+			draw_string(map_font, p + Vector2(-18, -15), Locale.text("裂隙门"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("f2b368"))
 	var spawn: Vector2 = _point(_frame.get("spawn", Vector2(200, dimensions.y - 101)))
 	draw_circle(spawn, 4, Color("789c9e"), false, 1.5, true)
 	for id in _frame.get("players", {}):
@@ -89,4 +90,4 @@ func _draw() -> void:
 		if id == _local_id:
 			draw_arc(p, 7, 0, TAU, 20, color, 1.5, true)
 			if map_font != null:
-				draw_string(map_font, p + Vector2(10, 4), "你", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
+				draw_string(map_font, p + Vector2(10, 4), Locale.text("你"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)

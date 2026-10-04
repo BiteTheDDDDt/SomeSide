@@ -6,6 +6,7 @@ param(
     [switch]$Impaired,
     [switch]$Advanced,
     [switch]$Biomes,
+    [switch]$MixedLanguages,
     [ValidateRange(0, 12)][int]$FinishAfter = 0
 )
 
@@ -14,7 +15,7 @@ if ($Biomes -and ($Advanced -or $FinishAfter -gt 0)) { throw 'Use -Biomes separa
 $projectDirectory = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $enginePath = Join-Path $PSScriptRoot 'runtime\Godot_v4.7.2-stable_win64_console.exe'
 if ($Exported) {
-    $enginePath = Join-Path $projectDirectory 'dist\v0.7.0\SomeSide.exe'
+    $enginePath = Join-Path $projectDirectory 'dist\v0.8.0\SomeSide.exe'
     if (-not (Test-Path -LiteralPath $enginePath)) { throw 'Export the game before running with -Exported.' }
 } elseif (-not (Test-Path -LiteralPath $enginePath)) {
     & (Join-Path $PSScriptRoot 'install.ps1')
@@ -22,6 +23,7 @@ if ($Exported) {
 $resultPrefix = if ($Exported) { 'network-export-' } else { 'network-' }
 if ($Impaired) { $resultPrefix += 'impaired-' }
 if ($Biomes) { $resultPrefix += 'biomes-' }
+if ($MixedLanguages) { $resultPrefix += 'bilingual-' }
 $resultDirectory = Join-Path $PSScriptRoot ('results\' + $resultPrefix + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Path $resultDirectory -Force | Out-Null
 $startedProcesses = @()
@@ -45,6 +47,7 @@ function Start-SmokePeer([string]$Name, [string]$Role, [int]$Duration, [int]$Pee
     if ($Role -eq 'host' -and $FinishAfter -gt 0) { $argumentList += "--finish-after=$FinishAfter" }
     if ($Advanced) { $argumentList += '--smoke-advanced' }
     if ($Biomes) { $argumentList += '--smoke-biomes' }
+    if ($MixedLanguages) { $argumentList += $(if ($Role -eq 'host') { '--language=en' } else { '--language=zh' }) }
     $process = Start-Process -FilePath $enginePath -ArgumentList $argumentList -WorkingDirectory $projectDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     # Keep a handle open so Windows PowerShell can still read ExitCode after exit.
     $null = $process.Handle
@@ -117,6 +120,10 @@ try {
             foreach ($shape in @('line', 'circle')) { $passed = $passed -and $shape -in $report.biome_observed.hazard_shapes }
             $passed = $passed -and @($report.biome_observed.attack_kinds).Count -ge 6
         }
+        if ($passed -and $MixedLanguages) {
+            $expectedLanguage = if ($case.Role -eq 'host') { 'en' } else { 'zh' }
+            $passed = $report.language -eq $expectedLanguage
+        }
         $runtimeErrors = @()
         if (Test-Path -LiteralPath $case.Stderr) {
             $runtimeErrors = @(Select-String -LiteralPath $case.Stderr -Pattern '^(SCRIPT ERROR|ERROR):')
@@ -138,7 +145,7 @@ try {
         $allPassed = $allPassed -and $proxyPassed
         Write-Host ("UDP proxy: passed={0}, clients={1}" -f $proxyPassed, $proxyReport.clients)
     }
-    $summary = [pscustomobject]@{ passed = $allPassed; exported = [bool]$Exported; impaired = [bool]$Impaired; advanced = [bool]$Advanced; biomes = [bool]$Biomes; finish_after = $FinishAfter; clients = $Clients; port = $Port; proxy = $proxyReport; cases = $summaries }
+    $summary = [pscustomobject]@{ passed = $allPassed; exported = [bool]$Exported; impaired = [bool]$Impaired; advanced = [bool]$Advanced; biomes = [bool]$Biomes; mixed_languages = [bool]$MixedLanguages; finish_after = $FinishAfter; clients = $Clients; port = $Port; proxy = $proxyReport; cases = $summaries }
     $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $resultDirectory 'summary.json') -Encoding UTF8
     Write-Host "Reports: $resultDirectory"
     if (-not $allPassed) { exit 1 }

@@ -2,6 +2,7 @@ extends SceneTree
 
 const Icons = preload("res://scripts/item_icons.gd")
 const Content = preload("res://scripts/content.gd")
+const Locale = preload("res://scripts/localization.gd")
 
 var game: Node
 var passed: int = 0
@@ -27,7 +28,8 @@ func _run() -> void:
 	# Ambient playback may already have started in its child _ready. Drain it
 	# before the test exits so the headless audio server releases playback.
 	game.get("sound").call("shutdown")
-	game.set("profile", {"name": "UI Traveller", "character": "ranger", "volume": 0.0, "effects": 1.0, "shake": true, "fullscreen": false, "runs": 0, "best_stage": 0, "wins": 0})
+	Locale.set_language("zh")
+	game.set("profile", {"name": "UI Traveller", "language": "zh", "character": "ranger", "volume": 0.0, "effects": 1.0, "shake": true, "fullscreen": false, "runs": 0, "best_stage": 0, "wins": 0})
 	game.call("_show_menu")
 	await _layout()
 	_check(str(game.get("screen")) == "menu", "Main scene opens the title menu")

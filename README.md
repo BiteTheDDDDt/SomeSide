@@ -1,4 +1,4 @@
-# SomeSide 0.7.0
+# SomeSide 0.8.0
 
 一个可以直接运行的 2D 横版动作 Roguelike 原型：鼠标自由瞄准、两种战斗风格、局内道具叠加、三段关卡，以及玩家主机驱动的 2–4 人合作。
 
@@ -6,7 +6,9 @@
 
 ## 开始游戏
 
-**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.7 独立版本位于 `dist/v0.7.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.7.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
+**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.8 独立版本位于 `dist/v0.8.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.8.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
+
+0.8 支持简体中文和英文。首次启动按系统语言选择：中文系统使用简体中文，其余系统默认英文；设置中的语言选项可随时修改，后续启动优先使用已保存的选择。菜单、指南、道具效果与风险、交互提示、地图地标和首领名称都随之切换，合作玩家可各自选择语言。右上角以独立金色图标和较大的数字显示完整金币余额，阶段、计时与威胁另行显示。
 
 双击 `Editor.cmd` 可打开工程。便携引擎和编辑器数据位于 `tools/runtime`，不会修改系统 PATH。如果拿到的是不含 runtime 的源码，启动脚本会下载官方 Godot，并使用官方 SHA512 清单校验下载包；首次运行需要网络。
 
@@ -135,11 +137,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -E
 # 四人跨三关验证九种敌人、三种首领与攻击预警同步
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -Exported -Biomes -Port 27861
 
+# 英文主机与中文客户端共同游玩，验证语言设置彼此独立
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -Exported -MixedLanguages -Port 27871
+
 # 使用真实 UDP 代理注入约 100 ms 往返延迟、抖动与 2% 丢包（需 Python 3）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -Clients 1 -Port 27851 -Impaired -FinishAfter 10
 ```
 
-导出结果是 `dist/v0.7.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 生成只含游戏、快速开始说明和许可的 0.7 ZIP。未下载模板时，第一次导出会下载约 1.28 GB 官方模板归档，仅提取 Windows x86_64 所需模板。
+导出结果是 `dist/v0.8.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 生成只含游戏、快速开始说明和许可的 0.8 ZIP。未下载模板时，第一次导出会下载约 1.28 GB 官方模板归档，仅提取 Windows x86_64 所需模板。
 
 测试覆盖快照深拷贝、随机种子、瞄准预测、单跳与羽翼、手动拾取、多人争抢、装备冷却保留、设施交易和稀有掉落。地图可达性通过真实移动与碰撞验证：两个角色都不带道具、不冲刺，起跳和落点留出余量，并验证起跳位置偏差。压力测试继续检查四人长时间构筑与切关一致性。网络测试启动独立 Godot 进程，要求主机见到完整队伍、收到输入，客户端接收多次快照，并成功退出且没有运行时错误。证据保存在 `tools/results/network-*`。
 
@@ -154,6 +159,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\smoke-network.ps1 -C
 `-Advanced` 为四人网络验收配置四种新增武器与主动装备，逐端检查炮台、延迟陨击、团队时序增益，以及回旋、雷击和光矛投射物确实跨网络到达。自动测试模式的装备配置不影响正常开局。
 
 `-Biomes` 在主机上依次进入三关并运行真实敌人 AI，要求每个客户端都观察到三张地图、九种普通敌人、三种首领、多个蓄力动作及圆形/直线危险区；它与 `-Advanced` 分开运行。敌人测试还验证真实伤害、走位躲避、冷却、治疗预算、眩晕和死亡取消。新渲染集成测试检查真实战斗下的快照只读、有限几何与特效预算。环境截图工具支持 `--sweep` 扫描三关全部平台边缘。
+
+`-MixedLanguages` 为主机指定英文、客户端指定中文，并逐端检查实际显示语言；可与其他网络模式组合。开发时可用 `-- --language=en` 或 `-- --language=zh` 临时覆盖当前会话语言，不改写已保存的偏好。双语测试检查系统语言回退、保存选择、翻译完整性、英文排版、不同语言下相同的价格与玩法状态，以及金币余额显示。
 
 这是玩法与合作架构原型。当前使用固定平台地图、完整状态快照和有限实体数量；没有持久化进行中的联机战局。局内规则、数据接口与扩展边界见 [架构说明](docs/ARCHITECTURE.md) 和 [开发接口](docs/CONTRACT.md)，本次测试、发布包哈希与验证边界见 [构建验收报告](docs/BUILD_REPORT.md)。
 
