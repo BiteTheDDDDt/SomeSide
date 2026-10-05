@@ -1,0 +1,59 @@
+{
+	"captures": [
+		{
+			"blade_angle_deg": 4.44485898036391,
+			"blade_phase": "swing",
+			"events": [
+				"hit"
+			],
+			"file": "cover-v0181-17.png",
+			"ranger_position": "(121.4988, 186.0)",
+			"tick": 17,
+			"vanguard_position": "(179.4988, 265.0)"
+		},
+		{
+			"blade_angle_deg": 29.4970259485326,
+			"blade_phase": "swing",
+			"events": [],
+			"file": "cover-v0181-18.png",
+			"ranger_position": "(125.582, 186.0)",
+			"tick": 18,
+			"vanguard_position": "(183.582, 265.0)"
+		},
+		{
+			"blade_angle_deg": 54.5491929167013,
+			"blade_phase": "swing",
+			"events": [],
+			"file": "cover-v0181-19.png",
+			"ranger_position": "(129.6653, 186.0)",
+			"tick": 19,
+			"vanguard_position": "(187.6653, 265.0)"
+		}
+	],
+	"custom_terrain": true,
+	"game_version": "0.18.1",
+	"hud_names_numbers_markers_accessories_hidden": true,
+	"logical_view": [
+		420,
+		333
+	],
+	"moth_presentation_depth_scale": 0.72,
+	"native_output": [
+		1260,
+		1000
+	],
+	"native_thumbnails": [
+		[
+			630,
+			500
+		],
+		[
+			315,
+			250
+		]
+	],
+	"production_assets_unchanged": true,
+	"purpose": "Cover-only diorama, not a normal gameplay screenshot",
+	"simulation_hz": 60,
+	"title_clear_area": "upper 25 percent"
+}

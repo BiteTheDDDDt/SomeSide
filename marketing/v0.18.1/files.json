@@ -1,0 +1,44 @@
+[
+  {
+    "file": "covers/SomeSide-cover-315x250.png",
+    "width": 315,
+    "height": 250,
+    "bytes": 122398,
+    "sha256": "A72A478D00A22D09DBCD8683DDA9DB473528F9CAF93905EAF89F4ADAFB26F56E"
+  },
+  {
+    "file": "covers/SomeSide-cover-630x500.png",
+    "width": 630,
+    "height": 500,
+    "bytes": 439731,
+    "sha256": "5E5FC03675E234FE31E700E3B68AB23DFDA097A258BEFA50CABC0FB1BA16B814"
+  },
+  {
+    "file": "covers/SomeSide-cover-master.png",
+    "width": 1408,
+    "height": 1117,
+    "bytes": 1239855,
+    "sha256": "4EB2BB3DD46365C2AF815918DE38E072D31BE3866BAB83858E9D2EF9DB8359ED"
+  },
+  {
+    "file": "screenshots/01-forest-coop.png",
+    "width": 1920,
+    "height": 1080,
+    "bytes": 322887,
+    "sha256": "76A8D368D6AE25D63511125BF6A15D6D3ACF46DBCE38BA2058ADDC1F06FBB870"
+  },
+  {
+    "file": "screenshots/02-canyon-action.png",
+    "width": 1920,
+    "height": 1080,
+    "bytes": 216017,
+    "sha256": "F089CCAC250F8B985D104E59BCBFE53AEE01E98E1BD2132FB443E708EEAE0968"
+  },
+  {
+    "file": "screenshots/03-ruins-boss.png",
+    "width": 1920,
+    "height": 1080,
+    "bytes": 451084,
+    "sha256": "C20429A9873FC032E32C9B10E59BAFC61D63B5953B59E00F7208A1E72A985905"
+  }
+]

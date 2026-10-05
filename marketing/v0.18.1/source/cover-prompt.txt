@@ -1,0 +1,15 @@
+Tool: built-in image_gen.imagegen, edit mode, opaque background.
+Input: cover-scene-base.png (native Godot v0.18.1 cover diorama).
+Generated output: covers/SomeSide-cover-master.png, 1408x1117.
+Final upload exports: 630x500 and 315x250, technical resizing only.
+
+Use case: compositing / restrained screenshot typography.
+Asset: the final itch.io cover for SomeSide, landscape 1260 x 1000 pixels, exact 63:50 aspect ratio. Must remain readable at 630 x 500 and 315 x 250.
+
+Image 1 is the EDIT TARGET, a deliberately staged cover scene rendered by SomeSide v0.18.1 itself. Treat it as a LOCKED photographic plate, not reference for a new illustration. Preserve the exact orthographic game artwork, all sprite silhouettes, body poses, weapon shapes, platforms, tree, ringed moon, palette and subject positions. The ranger with a rifle is on the upper-left ledge; the orange-armoured vanguard swings a clearly horizontal sword on the lower ledge; enemies occupy the right. Keep the sword connected to the hand and well away from the head.
+
+Make only two restrained graphic-design edits:
+1. Add the exact title "SomeSide" on ONE line in the upper quarter, approximately x=75..1185 and y=100..280. Preserve the capital S in Some and Side. Heavy compact geometric sans lettering with a few clean angular cuts, flat solid ink: "Some" warm ivory, "Side" muted warm amber matching the existing armour. Crisp confident indie-game title, readable at thumbnail size. A small hard dark offset shadow is enough for separation. No subtitle, tagline, badge, border, watermark, extra symbol or decorative UI.
+2. Very gently deepen the dark backdrop behind the title and improve separation around the two EXISTING characters, without outlining them with neon, changing their colours or painting details. Keep the moon visible behind the title. Keep existing muzzle flash and sword slash exactly where they are; only their existing contrast may be very slightly strengthened.
+
+CRITICAL INVARIANTS: Do not redraw, enlarge, replace, restyle or reposition any character, helmet, limb, enemy or weapon. Do not change platform geometry. Preserve the jagged pixel-sprite character edges and the smooth angular weapon edges as supplied. Do not make painted fantasy art. No new attacks, electricity, particles, smoke, fog, fire, lens flare, glow halos, rim lighting, gradients inside letters, bevelled or metallic text. Never add anything above the vanguard's helmet that could resemble a lamp or sword. No AI illustration finish or cinematic makeover. The result must look immediately like this exact game scene with excellent typography. Opaque full-bleed background.

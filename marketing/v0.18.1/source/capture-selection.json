@@ -1,0 +1,41 @@
+{
+  "version": "0.18.1",
+  "game_commit": "59ef575",
+  "cover": {
+    "source": "source/cover-scene-base.png",
+    "frame": 17,
+    "staged_diorama": true,
+    "postprocess": "Built-in imagegen title typography and light contrast",
+    "prompt": "source/cover-prompt.txt",
+    "final": "covers/SomeSide-cover-630x500.png"
+  },
+  "screenshots": [
+    {
+      "file": "screenshots/01-forest-coop.png",
+      "capture_source": "tools/results/promo-v0181/01-forest-cooperation.png",
+      "frame": 29,
+      "theme": "Rainforest cooperation",
+      "native": true,
+      "ai_edited": false,
+      "sha256": "76A8D368D6AE25D63511125BF6A15D6D3ACF46DBCE38BA2058ADDC1F06FBB870"
+    },
+    {
+      "file": "screenshots/02-canyon-action.png",
+      "capture_source": "tools/results/promo-v0181/02-canyon-ascent.png",
+      "frame": 43,
+      "theme": "Canyon aerial combat",
+      "native": true,
+      "ai_edited": false,
+      "sha256": "F089CCAC250F8B985D104E59BCBFE53AEE01E98E1BD2132FB443E708EEAE0968"
+    },
+    {
+      "file": "screenshots/03-ruins-boss.png",
+      "capture_source": "tools/results/promo-v0181/03-ruins-archon.png",
+      "frame": 67,
+      "theme": "Ruins guardian encounter",
+      "native": true,
+      "ai_edited": false,
+      "sha256": "C20429A9873FC032E32C9B10E59BAFC61D63B5953B59E00F7208A1E72A985905"
+    }
+  ]
+}

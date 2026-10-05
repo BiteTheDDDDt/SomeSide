@@ -1,0 +1,1431 @@
+{
+  "close_up_camera_only": true,
+  "dimensions": [
+    1920,
+    1080
+  ],
+  "generated_fx": false,
+  "hud_language": "en",
+  "profile_unchanged": true,
+  "scenes": [
+    {
+      "camera": [
+        1535.0,
+        990.0
+      ],
+      "captures": [
+        {
+          "active_fx": 12,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "grenade",
+              "grounded": true,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "capacitor": 1,
+                "feather": 1,
+                "magnet": 1,
+                "overclock": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1230.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "pulse_rifle"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 170.0,
+              "id": 2,
+              "items": {
+                "momentum": 1,
+                "plating": 1,
+                "vitality": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": -0.717078189300412,
+                "arm_alpha": 1.0,
+                "body_angle": -0.0633267217670308,
+                "duration": 0.36,
+                "elapsed": 0.116666666666667,
+                "extension": 10.6724942012446,
+                "facing": 1.0,
+                "id": 1,
+                "impact": false,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.324074074074074,
+                "trail": true,
+                "weapon_scale": 1.21277916810925
+              },
+              "pos": [
+                1400.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.959514, -0.281661)",
+              "fire": true,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 72.25184,
+              "id": 141,
+              "kind": "crawler",
+              "pos": [
+                1465.89135742188,
+                1083.0
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 142,
+              "kind": "spitter",
+              "pos": [
+                1689.79162597656,
+                1083.0
+              ]
+            },
+            {
+              "hp": 60.2098666666667,
+              "id": 143,
+              "kind": "spore_moth",
+              "pos": [
+                1712.00463867188,
+                932.034057617188
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 144,
+              "kind": "spitter",
+              "pos": [
+                1847.02392578125,
+                1083.0
+              ]
+            }
+          ],
+          "file": "candidates/forest-coop-027.png",
+          "pending_effects": 0,
+          "projectiles": 2,
+          "tick": 27
+        },
+        {
+          "active_fx": 12,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "grenade",
+              "grounded": true,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "capacitor": 1,
+                "feather": 1,
+                "magnet": 1,
+                "overclock": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1230.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "pulse_rifle"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 170.0,
+              "id": 2,
+              "items": {
+                "momentum": 1,
+                "plating": 1,
+                "vitality": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": -0.279835390946503,
+                "arm_alpha": 1.0,
+                "body_angle": -0.0142556823317623,
+                "duration": 0.36,
+                "elapsed": 0.133333333333333,
+                "extension": 12.6343303700333,
+                "facing": 1.0,
+                "id": 1,
+                "impact": false,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.37037037037037,
+                "trail": true,
+                "weapon_scale": 1.22955402672007
+              },
+              "pos": [
+                1400.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.959258, -0.282532)",
+              "fire": true,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 72.25184,
+              "id": 141,
+              "kind": "crawler",
+              "pos": [
+                1463.9580078125,
+                1083.0
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 142,
+              "kind": "spitter",
+              "pos": [
+                1689.79162597656,
+                1083.0
+              ]
+            },
+            {
+              "hp": 60.2098666666667,
+              "id": 143,
+              "kind": "spore_moth",
+              "pos": [
+                1710.00769042969,
+                932.145080566406
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 144,
+              "kind": "spitter",
+              "pos": [
+                1845.72387695313,
+                1083.0
+              ]
+            }
+          ],
+          "file": "candidates/forest-coop-028.png",
+          "pending_effects": 0,
+          "projectiles": 2,
+          "tick": 28
+        },
+        {
+          "active_fx": 20,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "grenade",
+              "grounded": true,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "capacitor": 1,
+                "feather": 1,
+                "magnet": 1,
+                "overclock": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1230.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "pulse_rifle"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 170.0,
+              "id": 2,
+              "items": {
+                "momentum": 1,
+                "plating": 1,
+                "vitality": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": 0.157407407407407,
+                "arm_alpha": 1.0,
+                "body_angle": 0.0393888761875729,
+                "duration": 0.36,
+                "elapsed": 0.15,
+                "extension": 12.8838580243904,
+                "facing": 1.0,
+                "id": 1,
+                "impact": true,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.416666666666667,
+                "trail": true,
+                "weapon_scale": 1.24148145657227
+              },
+              "pos": [
+                1400.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.958999, -0.283409)",
+              "fire": true,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 48.25184,
+              "id": 141,
+              "kind": "crawler",
+              "pos": [
+                1464.64965820313,
+                1083.0
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 142,
+              "kind": "spitter",
+              "pos": [
+                1689.79162597656,
+                1083.0
+              ]
+            },
+            {
+              "hp": 60.2098666666667,
+              "id": 143,
+              "kind": "spore_moth",
+              "pos": [
+                1708.0107421875,
+                932.256530761719
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 144,
+              "kind": "spitter",
+              "pos": [
+                1844.423828125,
+                1083.0
+              ]
+            }
+          ],
+          "file": "candidates/forest-coop-029.png",
+          "pending_effects": 0,
+          "projectiles": 2,
+          "tick": 29
+        },
+        {
+          "active_fx": 30,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "grenade",
+              "grounded": true,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "capacitor": 1,
+                "feather": 1,
+                "magnet": 1,
+                "overclock": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1230.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "pulse_rifle"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 170.0,
+              "id": 2,
+              "items": {
+                "momentum": 1,
+                "plating": 1,
+                "vitality": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": 0.594650205761316,
+                "arm_alpha": 1.0,
+                "body_angle": 0.0904608302221206,
+                "duration": 0.36,
+                "elapsed": 0.166666666666667,
+                "extension": 11.3808989572945,
+                "facing": 1.0,
+                "id": 1,
+                "impact": true,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.462962962962963,
+                "trail": true,
+                "weapon_scale": 1.24830958943549
+              },
+              "pos": [
+                1400.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.958738, -0.284292)",
+              "fire": true,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 48.25184,
+              "id": 141,
+              "kind": "crawler",
+              "pos": [
+                1465.13293457031,
+                1083.0
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 142,
+              "kind": "spitter",
+              "pos": [
+                1689.79162597656,
+                1083.0
+              ]
+            },
+            {
+              "hp": 60.2098666666667,
+              "id": 143,
+              "kind": "spore_moth",
+              "pos": [
+                1706.01391601563,
+                932.368408203125
+              ]
+            },
+            {
+              "hp": 96.3357866666667,
+              "id": 144,
+              "kind": "spitter",
+              "pos": [
+                1843.12377929688,
+                1083.0
+              ]
+            }
+          ],
+          "file": "candidates/forest-coop-030.png",
+          "pending_effects": 0,
+          "projectiles": 3,
+          "tick": 30
+        }
+      ],
+      "event_samples": [
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "bullet",
+          "player": 1,
+          "tick": 8,
+          "type": "shoot",
+          "weapon": "pulse_rifle"
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "bullet",
+          "player": 1,
+          "tick": 19,
+          "type": "shoot",
+          "weapon": "pulse_rifle"
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "",
+          "player": 2,
+          "tick": 20,
+          "type": "slash",
+          "weapon": "arc_blade"
+        },
+        {
+          "amount": 24.0,
+          "equipment": "",
+          "kind": "",
+          "player": 2,
+          "tick": 29,
+          "type": "hit",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "bullet",
+          "player": 1,
+          "tick": 30,
+          "type": "shoot",
+          "weapon": "pulse_rifle"
+        }
+      ],
+      "events_seen": {
+        "hit:": 1,
+        "shoot:bullet": 3,
+        "slash:arc_blade": 1
+      },
+      "final_file": "01-forest-cooperation.png",
+      "selected_tick": 29,
+      "stage": 1,
+      "theme": "forest-coop",
+      "time": 154.0,
+      "zoom": 1.25
+    },
+    {
+      "camera": [
+        1890.0,
+        1020.0
+      ],
+      "captures": [
+        {
+          "active_fx": 9,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "aegis",
+              "grounded": false,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "feather": 1,
+                "overclock": 1,
+                "piercer": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1745.5849609375,
+                1049.90283203125
+              ],
+              "vel": [
+                245.0,
+                64.1666946411133
+              ],
+              "weapon": "railgun"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 145.0,
+              "id": 2,
+              "items": {
+                "battery": 1,
+                "momentum": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": -0.279835390946503,
+                "arm_alpha": 1.0,
+                "body_angle": -0.0142556823317623,
+                "duration": 0.36,
+                "elapsed": 0.133333333333333,
+                "extension": 12.6343303700333,
+                "facing": 1.0,
+                "id": 1,
+                "impact": false,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.37037037037037,
+                "trail": true,
+                "weapon_scale": 1.22955402672007
+              },
+              "pos": [
+                1950.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.952858, -0.303417)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 1.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 155.596609777778,
+              "id": 141,
+              "kind": "drone",
+              "pos": [
+                2030.67736816406,
+                953.015747070313
+              ]
+            },
+            {
+              "hp": 84.1062755555556,
+              "id": 142,
+              "kind": "drone",
+              "pos": [
+                2242.861328125,
+                880.068176269531
+              ]
+            },
+            {
+              "hp": 192.242915555556,
+              "id": 143,
+              "kind": "charger",
+              "pos": [
+                1992.19250488281,
+                1083.0
+              ]
+            },
+            {
+              "hp": 138.174595555556,
+              "id": 144,
+              "kind": "burrower",
+              "pos": [
+                2256.96728515625,
+                993.0
+              ]
+            }
+          ],
+          "file": "candidates/canyon-ascent-042.png",
+          "pending_effects": 0,
+          "projectiles": 1,
+          "tick": 42
+        },
+        {
+          "active_fx": 17,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "aegis",
+              "grounded": false,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "feather": 1,
+                "overclock": 1,
+                "piercer": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1749.66833496094,
+                1051.45837402344
+              ],
+              "vel": [
+                245.0,
+                93.3333587646484
+              ],
+              "weapon": "railgun"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 145.0,
+              "id": 2,
+              "items": {
+                "battery": 1,
+                "momentum": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": 0.157407407407405,
+                "arm_alpha": 1.0,
+                "body_angle": 0.0393888761875728,
+                "duration": 0.36,
+                "elapsed": 0.15,
+                "extension": 12.8838580243904,
+                "facing": 1.0,
+                "id": 1,
+                "impact": true,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.416666666666666,
+                "trail": true,
+                "weapon_scale": 1.24148145657227
+              },
+              "pos": [
+                1950.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.951785, -0.306766)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 1.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 155.596609777778,
+              "id": 141,
+              "kind": "drone",
+              "pos": [
+                2029.1904296875,
+                954.696533203125
+              ]
+            },
+            {
+              "hp": 84.1062755555556,
+              "id": 142,
+              "kind": "drone",
+              "pos": [
+                2241.09912109375,
+                880.863525390625
+              ]
+            },
+            {
+              "hp": 168.242915555556,
+              "id": 143,
+              "kind": "charger",
+              "pos": [
+                1993.63415527344,
+                1083.0
+              ]
+            },
+            {
+              "hp": 138.174595555556,
+              "id": 144,
+              "kind": "burrower",
+              "pos": [
+                2256.52563476563,
+                993.0
+              ]
+            }
+          ],
+          "file": "candidates/canyon-ascent-043.png",
+          "pending_effects": 0,
+          "projectiles": 1,
+          "tick": 43
+        },
+        {
+          "active_fx": 26,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "aegis",
+              "grounded": false,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "feather": 1,
+                "overclock": 1,
+                "piercer": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1753.75170898438,
+                1053.5
+              ],
+              "vel": [
+                245.0,
+                122.500022888184
+              ],
+              "weapon": "railgun"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 145.0,
+              "id": 2,
+              "items": {
+                "battery": 1,
+                "momentum": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": 0.594650205761319,
+                "arm_alpha": 1.0,
+                "body_angle": 0.090460830222121,
+                "duration": 0.36,
+                "elapsed": 0.166666666666667,
+                "extension": 11.3808989572945,
+                "facing": 1.0,
+                "id": 1,
+                "impact": true,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.462962962962963,
+                "trail": true,
+                "weapon_scale": 1.24830958943549
+              },
+              "pos": [
+                1950.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.950113, -0.311904)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 1.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 85.5966097777778,
+              "id": 141,
+              "kind": "drone",
+              "pos": [
+                2027.7734375,
+                956.298217773438
+              ]
+            },
+            {
+              "hp": 84.1062755555556,
+              "id": 142,
+              "kind": "drone",
+              "pos": [
+                2239.43310546875,
+                881.615478515625
+              ]
+            },
+            {
+              "hp": 168.242915555556,
+              "id": 143,
+              "kind": "charger",
+              "pos": [
+                1994.86743164063,
+                1083.0
+              ]
+            },
+            {
+              "hp": 138.174595555556,
+              "id": 144,
+              "kind": "burrower",
+              "pos": [
+                2256.29223632813,
+                993.0
+              ]
+            }
+          ],
+          "file": "candidates/canyon-ascent-044.png",
+          "pending_effects": 0,
+          "projectiles": 1,
+          "tick": 44
+        },
+        {
+          "active_fx": 26,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "aegis",
+              "grounded": false,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "feather": 1,
+                "overclock": 1,
+                "piercer": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                1761.91845703125,
+                1059.04174804688
+              ],
+              "vel": [
+                245.0,
+                180.833358764648
+              ],
+              "weapon": "railgun"
+            },
+            {
+              "character": "vanguard",
+              "equipment": "shockwave",
+              "grounded": true,
+              "hp": 145.0,
+              "id": 2,
+              "items": {
+                "battery": 1,
+                "momentum": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": true,
+                "aim": "(1.0, 0.0)",
+                "angle": 1.46913580246914,
+                "arm_alpha": 1.0,
+                "body_angle": 0.156302430561436,
+                "duration": 0.36,
+                "elapsed": 0.2,
+                "extension": 4.32874259452352,
+                "facing": 1.0,
+                "id": 1,
+                "impact": true,
+                "phase": "swing",
+                "predicted": false,
+                "progress": 0.555555555555555,
+                "trail": true,
+                "weapon_scale": 1.24620193825305
+              },
+              "pos": [
+                1950.0,
+                1079.0
+              ],
+              "vel": [
+                0.0,
+                0.0
+              ],
+              "weapon": "arc_blade"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(0.944732, -0.327843)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 1.0,
+              "skill": false
+            },
+            "2": {
+              "aim": "(1.0, 0.0)",
+              "fire": false,
+              "interact": false,
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 85.5966097777778,
+              "id": 141,
+              "kind": "drone",
+              "pos": [
+                2025.14929199219,
+                959.264465332031
+              ]
+            },
+            {
+              "hp": 84.1062755555556,
+              "id": 142,
+              "kind": "drone",
+              "pos": [
+                2236.3896484375,
+                882.989074707031
+              ]
+            },
+            {
+              "hp": 168.242915555556,
+              "id": 143,
+              "kind": "charger",
+              "pos": [
+                1996.70910644531,
+                1083.0
+              ]
+            },
+            {
+              "hp": 138.174595555556,
+              "id": 144,
+              "kind": "burrower",
+              "pos": [
+                2256.26733398438,
+                993.0
+              ]
+            }
+          ],
+          "file": "candidates/canyon-ascent-046.png",
+          "pending_effects": 0,
+          "projectiles": 1,
+          "tick": 46
+        }
+      ],
+      "event_samples": [
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "",
+          "player": 1,
+          "tick": 18,
+          "type": "jump",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "",
+          "player": 2,
+          "tick": 34,
+          "type": "slash",
+          "weapon": "arc_blade"
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "railgun",
+          "player": 1,
+          "tick": 39,
+          "type": "shoot",
+          "weapon": "railgun"
+        },
+        {
+          "amount": 24.0,
+          "equipment": "",
+          "kind": "",
+          "player": 2,
+          "tick": 43,
+          "type": "hit",
+          "weapon": ""
+        },
+        {
+          "amount": 70.0,
+          "equipment": "",
+          "kind": "",
+          "player": 1,
+          "tick": 44,
+          "type": "hit",
+          "weapon": ""
+        }
+      ],
+      "events_seen": {
+        "hit:": 2,
+        "jump:": 1,
+        "shoot:railgun": 1,
+        "slash:arc_blade": 1
+      },
+      "final_file": "02-canyon-ascent.png",
+      "selected_tick": 43,
+      "stage": 2,
+      "theme": "canyon-ascent",
+      "time": 367.0,
+      "zoom": 1.2
+    },
+    {
+      "camera": [
+        4310.0,
+        475.0
+      ],
+      "captures": [
+        {
+          "active_fx": 58,
+          "actors": [
+            {
+              "character": "ranger",
+              "equipment": "meteor",
+              "grounded": false,
+              "hp": 100.0,
+              "id": 1,
+              "items": {
+                "capacitor": 1,
+                "feather": 1,
+                "overclock": 1,
+                "plating": 1
+              },
+              "melee": {
+                "active": false
+              },
+              "pos": [
+                4449.3369140625,
+                459.416625976563
+              ],
+              "vel": [
+                125.0,
+                -81.6666412353516
+              ],
+              "weapon": "storm_staff"
+            }
+          ],
+          "commands": {
+            "1": {
+              "aim": "(-0.993377, -0.1149)",
+              "fire": true,
+              "interact": false,
+              "interact_target": {
+                "id": -1,
+                "kind": "gate"
+              },
+              "jump": false,
+              "jump_held": true,
+              "move": 0.0,
+              "skill": false
+            }
+          },
+          "enemies": [
+            {
+              "hp": 151.517588888889,
+              "id": 141,
+              "kind": "sentinel",
+              "pos": [
+                4664.005859375,
+                583.0
+              ]
+            },
+            {
+              "hp": 135.843355555556,
+              "id": 142,
+              "kind": "conductor",
+              "pos": [
+                4679.87158203125,
+                459.245178222656
+              ]
+            },
+            {
+              "hp": 2958.66155555556,
+              "id": 143,
+              "kind": "boss",
+              "pos": [
+                4127.07763671875,
+                418.744415283203
+              ]
+            },
+            {
+              "hp": 151.560444444444,
+              "id": 145,
+              "kind": "sentinel",
+              "pos": [
+                4791.86767578125,
+                583.0
+              ]
+            }
+          ],
+          "file": "candidates/ruins-archon-067.png",
+          "pending_effects": 2,
+          "projectiles": 1,
+          "tick": 67
+        }
+      ],
+      "event_samples": [
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "",
+          "player": 0,
+          "tick": 0,
+          "type": "gate",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "storm",
+          "player": 1,
+          "tick": 12,
+          "type": "shoot",
+          "weapon": "storm_staff"
+        },
+        {
+          "amount": 35.84,
+          "equipment": "",
+          "kind": "",
+          "player": 1,
+          "tick": 25,
+          "type": "hit",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "meteor",
+          "kind": "",
+          "player": 1,
+          "tick": 30,
+          "type": "equipment",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "storm",
+          "player": 1,
+          "tick": 38,
+          "type": "shoot",
+          "weapon": "storm_staff"
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "",
+          "player": 1,
+          "tick": 48,
+          "type": "jump",
+          "weapon": ""
+        },
+        {
+          "amount": 35.84,
+          "equipment": "",
+          "kind": "",
+          "player": 1,
+          "tick": 51,
+          "type": "hit",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "meteor",
+          "player": 1,
+          "tick": 60,
+          "type": "explosion",
+          "weapon": ""
+        },
+        {
+          "amount": 156.8,
+          "equipment": "",
+          "kind": "",
+          "player": 1,
+          "tick": 60,
+          "type": "hit",
+          "weapon": ""
+        },
+        {
+          "amount": 0,
+          "equipment": "",
+          "kind": "storm",
+          "player": 1,
+          "tick": 64,
+          "type": "shoot",
+          "weapon": "storm_staff"
+        }
+      ],
+      "events_seen": {
+        "equipment:": 1,
+        "explosion:meteor": 1,
+        "gate:": 1,
+        "hit:": 3,
+        "jump:": 1,
+        "shoot:storm": 3
+      },
+      "final_file": "03-ruins-archon.png",
+      "selected_tick": 67,
+      "stage": 3,
+      "theme": "ruins-archon",
+      "time": 628.0,
+      "zoom": 1.15
+    }
+  ],
+  "version": "0.18.1",
+  "final_files": [
+    {
+      "file": "01-forest-cooperation.png",
+      "size": [
+        1920,
+        1080
+      ],
+      "selected_tick": 29,
+      "bytes": 322887,
+      "sha256": "76a8d368d6ae25d63511125bf6a15d6d3acf46dbce38ba2058addc1f06fbb870"
+    },
+    {
+      "file": "02-canyon-ascent.png",
+      "size": [
+        1920,
+        1080
+      ],
+      "selected_tick": 43,
+      "bytes": 216017,
+      "sha256": "f089ccac250f8b985d104e59bcbfe53aee01e98e1bd2132fb443e708eeae0968"
+    },
+    {
+      "file": "03-ruins-archon.png",
+      "size": [
+        1920,
+        1080
+      ],
+      "selected_tick": 67,
+      "bytes": 451084,
+      "sha256": "c20429a9873fc032e32c9b10e59bafc61d63b5953b59e00f7208a1e72a985905"
+    }
+  ],
+  "native_logs": [
+    "../promo-v0181-native.log",
+    "../promo-v0181-ruins-final.log"
+  ]
+}

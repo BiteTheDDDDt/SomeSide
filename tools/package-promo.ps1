@@ -1,11 +1,19 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$CoverSource,
-    [string]$OutputDirectory = 'marketing/v0.17.0'
+    [string]$OutputDirectory = '',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '',
+    [ValidatePattern('^[A-Za-z0-9_-]+$')][string]$CoverStem = 'SomeSide-cover'
 )
 
 $ErrorActionPreference = 'Stop'
 $projectDirectory = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+if (-not $Version) {
+    $projectText = Get-Content -LiteralPath (Join-Path $projectDirectory 'project.godot') -Raw
+    $Version = [regex]::Match($projectText, '(?m)^config/version="(\d+\.\d+\.\d+)"').Groups[1].Value
+    if (-not $Version) { throw 'project.godot must declare a valid version.' }
+}
+if (-not $OutputDirectory) { $OutputDirectory = "marketing/v$Version" }
 $sourcePath = (Resolve-Path -LiteralPath $CoverSource).Path
 $outputPath = [IO.Path]::GetFullPath((Join-Path $projectDirectory $OutputDirectory))
 if (-not $outputPath.StartsWith($projectDirectory + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
@@ -30,7 +38,7 @@ try {
             $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
             $graphics.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
             $graphics.DrawImage($sourceImage, 0, 0, $size[0], $size[1])
-            $bitmap.Save((Join-Path $coverDirectory "SomeSide-cover-$($size[0])x$($size[1]).png"), [Drawing.Imaging.ImageFormat]::Png)
+            $bitmap.Save((Join-Path $coverDirectory "$CoverStem-$($size[0])x$($size[1]).png"), [Drawing.Imaging.ImageFormat]::Png)
         } finally {
             $graphics.Dispose()
             $bitmap.Dispose()
@@ -40,7 +48,11 @@ try {
     $sourceImage.Dispose()
 }
 
-$manifest = @(Get-ChildItem -LiteralPath $coverDirectory, (Join-Path $outputPath 'screenshots') -File -Filter '*.png' | Sort-Object FullName | ForEach-Object {
+$masterPath = Join-Path $coverDirectory "$CoverStem-master.png"
+if ($sourcePath -ne $masterPath) { Copy-Item -LiteralPath $sourcePath -Destination $masterPath -Force }
+$coverFiles = @('315x250', '630x500', 'master') | ForEach-Object { Join-Path $coverDirectory "$CoverStem-$_.png" }
+$imageFiles = @($coverFiles) + @(Get-ChildItem -LiteralPath (Join-Path $outputPath 'screenshots') -File -Filter '*.png' | ForEach-Object FullName)
+$manifest = @(Get-Item -LiteralPath $imageFiles | Sort-Object FullName | ForEach-Object {
     $picture = [Drawing.Image]::FromFile($_.FullName)
     try {
         [ordered]@{
@@ -53,8 +65,8 @@ $manifest = @(Get-ChildItem -LiteralPath $coverDirectory, (Join-Path $outputPath
     } finally { $picture.Dispose() }
 })
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $outputPath 'files.json') -Encoding UTF8
-$packagePath = Join-Path $projectDirectory 'dist/SomeSide-v0.17.0-press-images.zip'
-$packageFiles = @($coverDirectory, (Join-Path $outputPath 'screenshots'), (Join-Path $outputPath 'README.txt'), (Join-Path $outputPath 'files.json'), (Join-Path $outputPath 'index.html'))
+$packagePath = Join-Path $projectDirectory "dist/SomeSide-v$Version-press-images.zip"
+$packageFiles = @($coverFiles) + @((Join-Path $outputPath 'screenshots'), (Join-Path $outputPath 'README.txt'), (Join-Path $outputPath 'files.json'), (Join-Path $outputPath 'index.html'))
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $pendingPath = Join-Path (Split-Path -Parent $packagePath) ([IO.Path]::GetRandomFileName() + '.zip')
