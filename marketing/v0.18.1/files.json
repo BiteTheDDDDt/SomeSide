@@ -1,5 +1,12 @@
 [
   {
+    "file": "backgrounds/SomeSide-forest-background.png",
+    "width": 1408,
+    "height": 1117,
+    "bytes": 1153436,
+    "sha256": "5619C6C7452B39C882C7EAE4696B4B00F0EB54CCF03F502A941F95FAD8BA36D7"
+  },
+  {
     "file": "covers/SomeSide-cover-315x250.png",
     "width": 315,
     "height": 250,

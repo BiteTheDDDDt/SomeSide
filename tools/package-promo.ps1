@@ -51,7 +51,9 @@ try {
 $masterPath = Join-Path $coverDirectory "$CoverStem-master.png"
 if ($sourcePath -ne $masterPath) { Copy-Item -LiteralPath $sourcePath -Destination $masterPath -Force }
 $coverFiles = @('315x250', '630x500', 'master') | ForEach-Object { Join-Path $coverDirectory "$CoverStem-$_.png" }
-$imageFiles = @($coverFiles) + @(Get-ChildItem -LiteralPath (Join-Path $outputPath 'screenshots') -File -Filter '*.png' | ForEach-Object FullName)
+$backgroundDirectory = Join-Path $outputPath 'backgrounds'
+$backgroundFiles = @(if (Test-Path -LiteralPath $backgroundDirectory -PathType Container) { Get-ChildItem -LiteralPath $backgroundDirectory -File -Filter '*.png' | ForEach-Object FullName })
+$imageFiles = @($coverFiles) + @(Get-ChildItem -LiteralPath (Join-Path $outputPath 'screenshots') -File -Filter '*.png' | ForEach-Object FullName) + $backgroundFiles
 $manifest = @(Get-Item -LiteralPath $imageFiles | Sort-Object FullName | ForEach-Object {
     $picture = [Drawing.Image]::FromFile($_.FullName)
     try {
@@ -67,6 +69,7 @@ $manifest = @(Get-Item -LiteralPath $imageFiles | Sort-Object FullName | ForEach
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $outputPath 'files.json') -Encoding UTF8
 $packagePath = Join-Path $projectDirectory "dist/SomeSide-v$Version-press-images.zip"
 $packageFiles = @($coverFiles) + @((Join-Path $outputPath 'screenshots'), (Join-Path $outputPath 'README.txt'), (Join-Path $outputPath 'files.json'), (Join-Path $outputPath 'index.html'))
+if ($backgroundFiles.Count -gt 0) { $packageFiles += $backgroundDirectory }
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $pendingPath = Join-Path (Split-Path -Parent $packagePath) ([IO.Path]::GetRandomFileName() + '.zip')

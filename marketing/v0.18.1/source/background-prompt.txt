@@ -1,0 +1,9 @@
+Tool: built-in image_gen.imagegen, edit mode, opaque background.
+Input: covers/SomeSide-cover-master.png.
+Output: backgrounds/SomeSide-forest-background.png, 1408x1117.
+
+Use case: precise-object-edit / clean background plate.
+Image 1 is the exact edit target, the SomeSide cover. Create its clean background-only version at the same 63:50 landscape aspect ratio.
+Remove the entire SomeSide title and its shadow. Remove BOTH humanoid characters completely, all weapons, muzzle flash, projectile streak, sword slash trail, ALL THREE insect monsters (flying moth, spiked crawler, glowing orange-backed creature), and every combat glint. Reconstruct those small occluded areas from the surrounding existing forest and platform background.
+Preserve exactly the remaining environment: full teal forest tree silhouettes, giant central trunk, distant layered hills, the ringed moon in the upper right, sparse diagonal rain, foreground branches, and the three staggered moss-edged platforms with their hanging vines and angular stone undersides. Keep platform edges continuous and straight where figures stood. Maintain the exact positions, proportions, palette, orthographic flat 2D game style, graphic angular details, and subtle contrast of the supplied image. Keep the moon's complete circular surface/ring behind the removed wordmark natural and consistent.
+This is an empty atmospheric environmental background, with NO text of any kind, logos, people, animals, enemies, weapons, projectiles, combat particles, interface, watermark or new objects. Do not redesign, repaint in a painterly style, add fog/bloom, add architecture, change composition or crop. Opaque full bleed. Same landscape ratio as the input.

@@ -14,6 +14,11 @@ covers/SomeSide-cover-master.png：高清封面。
 二次加工使用内置 imagegen 加入标题和轻微明暗整理。
 原生底图、完整提示词和捕获记录保存在 source/，便于复核。
 
+纯背景
+backgrounds/SomeSide-forest-background.png：1408×1117 PNG。
+以封面为基础，用内置imagegen去掉标题、角色、怪物、武器及战斗
+特效，保留雨林、环形月亮和平台。提示词：source/background-prompt.txt。
+
 三张宣传截图（1920×1080 PNG）
 screenshots/01-forest-coop.png：雨林中的双人合作。
 screenshots/02-canyon-action.png：折光断崖的平台动作。
@@ -32,6 +37,6 @@ tools/package-promo.ps1：封面技术尺寸导出和最终发布包。
 files.json：每个最终图片的尺寸、大小和SHA-256。
 source/capture-selection.json：截图选择及原图对应关系。
 
-发布ZIP只包含封面、三张截图、预览页和说明。source/为制作留档，
+发布ZIP包含封面、纯背景、三张截图、预览页和说明。source/为制作留档，
 不需要上传itch。根目录原有cover.png与旧版宣传素材保留。
 本次没有改变游戏玩法、玩家存档或已发布的itch文件。
