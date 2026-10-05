@@ -14,7 +14,7 @@ const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.17.0"
+const VERSION: String = "0.18.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
 const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "coin_drop", "equipment", "drop"]
@@ -1553,7 +1553,8 @@ func _show_guide() -> void:
 
 func _icon(parent: Node, id: String, size: int = 48) -> TextureRect:
 	var image := TextureRect.new()
-	image.texture = Icons.texture(id, size * 2)
+	image.texture = Icons.texture(id, size)
+	image.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	image.custom_minimum_size = Vector2(size, size)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1886,7 +1887,7 @@ func _update_slot(key: String, id: String, cooldown: float, maximum: float, defi
 	var slot: Dictionary = _slot_ui[key]
 	var definition: Dictionary = definition_override if not definition_override.is_empty() else Simulation.loot_definition(id)
 	if str(slot.id) != id:
-		slot.icon.texture = Icons.texture(id, 72)
+		slot.icon.texture = Icons.texture(id, 34)
 		slot.id = id
 		var frame: StyleBoxFlat = slot.panel.get_theme_stylebox("panel").duplicate()
 		frame.border_color = Content.rarity_color(str(definition.get("rarity", "common"))) if key != "dash" else Icons.color(id).darkened(0.45)
@@ -2017,7 +2018,7 @@ func _update_interaction_panel(player: Dictionary) -> void:
 		icon_id = str(target.get("facility_type", "cache"))
 		if icon_id == "equipment":
 			icon_id = "equipment_cache"
-	_loot_ui.icon.texture = Icons.texture(icon_id, 100)
+	_loot_ui.icon.texture = Icons.texture(icon_id, 30)
 	var rarity: String = str(definition.get("rarity", "common"))
 	var rarity_tint: Color = Content.rarity_color(rarity) if not definition.is_empty() else AMBER
 	_loot_ui.category.text = (Locale.text(Content.rarity_name(rarity)) + "  ·  " if not definition.is_empty() else "") + Locale.text(category_text)
@@ -2090,7 +2091,7 @@ func _inventory_card(parent: Node, definition: Dictionary, count: int, equipped:
 	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
 	var image: TextureRect = _icon(row, str(definition.id), 42)
-	image.modulate.a = 1.0 if count > 0 else 0.35
+	image.modulate.a = 1.0 if count > 0 else 0.78
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 4)

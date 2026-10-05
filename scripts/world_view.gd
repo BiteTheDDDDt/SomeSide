@@ -22,6 +22,7 @@ var web_background_cache_enabled: bool = OS.has_feature("web")
 const ItemIcons = preload("res://scripts/item_icons.gd")
 const Biomes = preload("res://scripts/biome_renderer.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const WeaponArt = preload("res://scripts/weapon_art.gd")
 const MeleeMotion = preload("res://scripts/melee_motion.gd")
 const WeaponAction = preload("res://scripts/weapon_action_motion.gd")
 const Appearance = preload("res://scripts/player_appearance.gd")
@@ -1307,12 +1308,16 @@ func _draw_pickups() -> void:
 			continue
 		var kind: String = pickup.get("kind", "coin")
 		var id_value: int = pickup.get("id", 0)
+		# Pickup physics settles a 7 px half-height above the platform.
+		var ground_anchor: Vector2 = Pixels.snap_position(self, p + Vector2(0, 7))
+		if kind == "item":
+			p.y -= 16.0
 		p.y += sin(_clock * 3.0 + float(id_value)) * 3.0
 		if kind == "item":
 			p = Pixels.snap_position(self, p)
 		var item_id: String = str(pickup.get("item", ""))
 		var color_value: Color = GOLD if kind == "coin" else (Color("a7e9a8") if kind == "heal" else ItemIcons.color(item_id))
-		_glow(p, 15.0 if kind == "coin" else 25.0, Color(color_value, 0.045), 3)
+		_glow(p, 18.0 if kind == "item" else (15.0 if kind == "coin" else 25.0), Color(color_value, 0.022 if kind == "item" else 0.045), 3)
 		if kind == "coin":
 			var width: float = 2.0 + absf(sin(_clock * 2.3 + float(id_value))) * 2.0
 			draw_colored_polygon(PackedVector2Array([p + Vector2(0.0, -5.0), p + Vector2(width, -2.0), p + Vector2(width, 3.0), p + Vector2(0.0, 6.0), p + Vector2(-width, 2.0), p + Vector2(-width, -3.0)]), GOLD)
@@ -1326,24 +1331,27 @@ func _draw_pickups() -> void:
 			var beam_color: Color = ItemIcons.rarity_color(rarity)
 			var rank: int = ItemIcons.rarity_rank(rarity)
 			var focused: bool = _is_focused("pickup", id_value)
-			var icon_size: float = 28.0 if focused else 24.0
+			var is_weapon: bool = str(pickup.get("category", "")) == "weapon"
+			var icon_size: float = (36.0 if focused else 32.0) if is_weapon else (32.0 if focused else 28.0)
 			var beam_height: float = 36.0 + float(rank) * 12.0
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-2.0, 12.0), p + Vector2(-3.0 - rank, -beam_height), p + Vector2(3.0 + rank, -beam_height), p + Vector2(2.0, 12.0)]), Color(beam_color, 0.055 + float(rank) * 0.015))
-			draw_line(p + Vector2(0.0, -beam_height), p + Vector2(0.0, 12.0), Color(beam_color, 0.29 if focused else 0.16 + float(rank) * 0.035), 1.0, true)
-			draw_arc(p + Vector2(0,13),12.0 + float(rank) * 1.5,0.0,PI,18,Color(beam_color,0.46),1.2,true)
-			draw_texture_rect(ItemIcons.texture(item_id, int(icon_size)), Rect2(Pixels.snap_position(self, p - Vector2.ONE * icon_size * 0.5), Vector2.ONE * icon_size), false)
-			draw_rect(Rect2(p - Vector2.ONE * (icon_size * 0.5 + 1.0), Vector2.ONE * (icon_size + 2.0)), Color(beam_color,0.85), false,1.2,true)
-			# Small rank pips supplement colour; theme colours remain inside icons.
+			# The object floats independently of its ground marker. Reuse the
+			# inventory illustration without a square card hiding its silhouette.
+			draw_colored_polygon(PackedVector2Array([ground_anchor + Vector2(-14, 0), ground_anchor + Vector2(-8, -3), ground_anchor + Vector2(8, -3), ground_anchor + Vector2(14, 0), ground_anchor + Vector2(8, 3), ground_anchor + Vector2(-8, 3)]), Color(INK, 0.7))
+			draw_colored_polygon(PackedVector2Array([ground_anchor + Vector2(-2, -2), p + Vector2(-3.0 - rank, -beam_height), p + Vector2(3.0 + rank, -beam_height), ground_anchor + Vector2(2, -2)]), Color(beam_color, 0.04 + float(rank) * 0.012))
+			draw_line(p + Vector2(0, -beam_height), ground_anchor, Color(beam_color, 0.24 if focused else 0.10 + float(rank) * 0.035), 1.0, false)
+			draw_line(ground_anchor + Vector2(-10, 0), ground_anchor + Vector2(10, 0), Color(beam_color, 0.6), 1.0, false)
+			draw_texture_rect(ItemIcons.pickup_texture(item_id, int(icon_size)), Rect2(Pixels.snap_position(self, p - Vector2.ONE * icon_size * 0.5), Vector2.ONE * icon_size), false)
+			# Small rank pips supplement colour, below the transparent object.
 			for pip: int in range(rank + 1):
 				var pip_x: float = (float(pip) - float(rank) * 0.5) * 4.0
-				draw_circle(p + Vector2(pip_x,icon_size * 0.5 + 5.0),1.0,beam_color,true,-1.0,true)
+				draw_rect(Rect2(ground_anchor + Vector2(pip_x - 1, 4), Vector2(2, 2)), beam_color)
 			if rank == 3:
 				draw_arc(p,21.0,_clock * 0.35,_clock * 0.35 + PI * 0.65,16,Color(beam_color,0.33),1.0,true)
 			if not str(pickup.get("warning", "")).is_empty() or item_id == "glass":
 				draw_colored_polygon(PackedVector2Array([p + Vector2(13.0, -20.0), p + Vector2(19.0, -9.0), p + Vector2(7.0, -9.0)]), ORANGE)
 				draw_line(p + Vector2(13.0, -16.0), p + Vector2(13.0, -13.0), INK, 1.5, true)
 			if focused:
-				_focus_marker(p, Vector2(19.0, 19.0), beam_color)
+				_focus_marker(p, Vector2.ONE * (icon_size * 0.5 + 3.0), beam_color)
 				_key_hint(p + Vector2(0.0, -37.0), beam_color)
 
 
@@ -1384,78 +1392,8 @@ func _draw_deployables() -> void:
 			draw_line(p+dir*9.0,p+dir*16.0,Color(tint,0.75),1.5,true)
 
 
-func _draw_weapon(weapon: String) -> void:
-	# Local +X is the authoritative aim. Every tip ends at WeaponPose's muzzle.
-	var end: float = WeaponPose.muzzle_length(weapon)
-	draw_line(Vector2.ZERO, Vector2(12,3), INK, 8.0, true)
-	draw_line(Vector2.ZERO, Vector2(12,3), Color("91a89a"), 4.0, true)
-	match weapon:
-		"pulse_rifle":
-			draw_colored_polygon(PackedVector2Array([Vector2(5,-5),Vector2(23,-5),Vector2(27,-2),Vector2(end,-2),Vector2(end,2),Vector2(22,2),Vector2(16,6),Vector2(7,6)]),INK)
-			draw_rect(Rect2(8,-4,17,6),Color("8da89c"))
-			draw_rect(Rect2(13,2,6,7),Color("405a54"))
-			draw_line(Vector2(11,-3),Vector2(22,-3),TEAL,2.0,true)
-			draw_line(Vector2(26,0),Vector2(end,0),Color("e0ead2"),2.0,true)
-			draw_rect(Rect2(7,-7,4,3),Color("b8cbbb"))
-		"scattergun":
-			draw_colored_polygon(PackedVector2Array([Vector2(5,-8),Vector2(26,-8),Vector2(29,-6),Vector2(end,-6),Vector2(end,6),Vector2(24,6),Vector2(19,10),Vector2(7,8)]),INK)
-			draw_rect(Rect2(7,-6,18,11),Color("a76842"))
-			draw_circle(Vector2(18,6),7.0,INK,true,-1.0,true)
-			draw_circle(Vector2(18,6),4.8,Color("c99d67"),true,-1.0,true)
-			draw_circle(Vector2(18,6),1.8,Color("614a38"),true,-1.0,true)
-			for y: float in [-3.0,3.0]:
-				draw_line(Vector2(23,y),Vector2(end-1,y),Color("e8c99a"),3.0,true)
-			draw_line(Vector2(end, -5),Vector2(end,5),GOLD,1.4,true)
-			for x: float in [10.0,15.0,20.0]: draw_line(Vector2(x,-6),Vector2(x,-2),GOLD,1.0,true)
-		"railgun":
-			draw_colored_polygon(PackedVector2Array([Vector2(6,-6),Vector2(26,-6),Vector2(31,-10),Vector2(37,-10),Vector2(33,-4),Vector2(end,-4),Vector2(end,4),Vector2(28,4),Vector2(20,9),Vector2(8,7)]),INK)
-			draw_rect(Rect2(8,-4,18,8),Color("57758d"))
-			for y: float in [-3.0,3.0]: draw_line(Vector2(26,y),Vector2(end,y),Color("a8dbfa"),1.8,true)
-			draw_line(Vector2(26,0),Vector2(end,0),Color("516d93"),1.0,true)
-			draw_rect(Rect2(14,-11,14,4),INK)
-			draw_line(Vector2(16,-9),Vector2(27,-9),Color("a8dbfa"),2.0,true)
-			for x: float in [12.0,17.0,22.0]: draw_line(Vector2(x,-4),Vector2(x,4),Color("b99fff"),2.0,true)
-			draw_line(Vector2(29,7),Vector2(38,7),Color("6f9fbc"),2.0,true)
-		"flamethrower":
-			draw_rect(Rect2(6,-7,24,15),INK)
-			draw_rect(Rect2(8,-5,20,10),Color("985b45"))
-			draw_rect(Rect2(11,5,14,12),INK)
-			draw_rect(Rect2(13,6,10,9),Color("e28b55"))
-			draw_line(Vector2(15,8),Vector2(21,8),GOLD,1.5,true)
-			draw_colored_polygon(PackedVector2Array([Vector2(29,-3),Vector2(end,-6),Vector2(end,6),Vector2(29,3)]),INK)
-			draw_line(Vector2(30,-2),Vector2(end,-4),Color("c5a586"),2.0,true)
-			draw_line(Vector2(30,2),Vector2(end,4),Color("c5a586"),2.0,true)
-			draw_line(Vector2(end, -4),Vector2(end,4),ORANGE,1.4,true)
-			draw_arc(Vector2(19,-4),9.0,PI,TAU,16,Color("d99858"),2.0,true)
-			draw_circle(Vector2(end-1,0),1.4,Color("ffe6b5"),true,-1.0,true)
-		"boomerang":
-			draw_colored_polygon(PackedVector2Array([Vector2(17,-23),Vector2(end-1,-5),Vector2(end,0),Vector2(end-1,5),Vector2(17,23),Vector2(20,6),Vector2(26,0),Vector2(20,-6)]),INK)
-			draw_polyline(PackedVector2Array([Vector2(19,-19),Vector2(end-3,0),Vector2(19,19)]),Color("89dec9"),4.5,true)
-			draw_polyline(PackedVector2Array([Vector2(22,-12),Vector2(end-2,0),Vector2(22,12)]),CREAM,1.3,true)
-			draw_line(Vector2(end-3,0),Vector2(end,0),CREAM,1.0,true)
-		"storm_staff":
-			draw_line(Vector2(2,0),Vector2(end-10,0),INK,7.0,true)
-			draw_line(Vector2(2,0),Vector2(end-10,0),Color("8994b1"),3.0,true)
-			for x: float in [9.0,17.0,25.0]: draw_line(Vector2(x,-3),Vector2(x,3),Color("c4accd"),1.5,true)
-			draw_polyline(PackedVector2Array([Vector2(end-1,-14),Vector2(end-16,-10),Vector2(end-21,0),Vector2(end-16,10),Vector2(end-1,14)]),INK,6.0,true)
-			draw_polyline(PackedVector2Array([Vector2(end-2,-12),Vector2(end-15,-8),Vector2(end-18,0),Vector2(end-15,8),Vector2(end-2,12)]),Color("bca4df"),2.5,true)
-			draw_colored_polygon(PackedVector2Array([Vector2(end-14,0),Vector2(end-7,-7),Vector2(end,0),Vector2(end-7,7)]),Color("a4edf3"))
-			draw_line(Vector2(end-10,0),Vector2(end,0),CREAM,1.2,true)
-		"sun_lance":
-			draw_line(Vector2(-3,0),Vector2(end,0),INK,6.0,true)
-			draw_line(Vector2(-3,0),Vector2(end-9,0),Color("ad8556"),2.5,true)
-			draw_colored_polygon(PackedVector2Array([Vector2(end-27,-10),Vector2(end,0),Vector2(end-27,10),Vector2(end-21,0)]),INK)
-			draw_colored_polygon(PackedVector2Array([Vector2(end-24,-7),Vector2(end,0),Vector2(end-24,7),Vector2(end-18,0)]),Color("f9d184"))
-			draw_line(Vector2(end-22,0),Vector2(end,0),CREAM,1.5,true)
-			draw_arc(Vector2(end-28,0),12.0,PI*0.3,PI*1.7,22,Color("dbb969"),2.2,true)
-			draw_line(Vector2(5,-3),Vector2(5,3),GOLD,2.0,true)
-		"arc_blade":
-			draw_line(Vector2(1,0),Vector2(13,0),INK,8.0,true)
-			draw_line(Vector2(1,0),Vector2(13,0),Color("d0ab79"),5.0,true)
-			draw_colored_polygon(PackedVector2Array([Vector2(13,-5),Vector2(end-11,-10),Vector2(end,0),Vector2(end-11,10),Vector2(13,5)]),INK)
-			draw_colored_polygon(PackedVector2Array([Vector2(16,-3),Vector2(end-11,-7),Vector2(end,0),Vector2(end-11,7),Vector2(16,3)]),Color("b6c8b3"))
-			draw_line(Vector2(18,0),Vector2(end,0),GOLD,2.0,true)
-			draw_line(Vector2(13,-10),Vector2(13,10),Color("c5955a"),3.0,true)
+func _draw_weapon(weapon: String, mechanism: float = 0.0, energy: float = 0.0) -> void:
+	WeaponArt.draw(self, weapon, mechanism, energy)
 
 
 func _draw_players() -> void:
@@ -1588,19 +1526,7 @@ func _draw_ranged_actor(player: Dictionary, pose: Dictionary) -> void:
 	_draw_weapon_arm(player, world_to_screen(pose.shoulder), world_to_screen(pose.grip), facing)
 	draw_set_transform(world_to_screen(pose.weapon_origin), float(pose.weapon_angle), Vector2(1,facing))
 	if float(motion.weapon_alpha) > 0.1:
-		_draw_weapon(str(player.weapon))
-		var mechanism: float = float(motion.mechanism)
-		var energy: float = float(motion.energy)
-		if str(player.weapon) == "scattergun":
-			var slide: float = 23.0 - 6.0 * mechanism
-			draw_rect(Rect2(slide,-1,9,6),INK)
-			draw_rect(Rect2(slide+1,0,7,4),Color("c99d67"))
-		elif str(player.weapon) == "railgun":
-			for x: float in [12.0,17.0,22.0]:
-				draw_line(Vector2(x,-4.0-mechanism*3.0),Vector2(x,4.0+mechanism*3.0),Color("b99fff"),2.0,true)
-		if energy > 0.0:
-			var end: float = WeaponPose.muzzle_length(str(player.weapon))
-			draw_arc(Vector2(end-7,0),7.0+energy*3.0,0,TAU,20,Color("bcebe0",energy*0.6),1.0,true)
+		_draw_weapon(str(player.weapon), float(motion.mechanism), float(motion.energy))
 	draw_set_transform(Vector2.ZERO)
 
 

@@ -45,7 +45,7 @@ func _run() -> void:
 			game._update_hud()
 			var slot: Dictionary = game._slot_ui.dash
 			_check(str(slot.id) == str(ability.id) and slot.name.text == Locale.text(str(ability.name)), "%s %s HUD names its own innate ability" % [language,character])
-			_check(slot.icon.texture == Icons.texture(str(ability.id),72), "The role's Shift icon comes from its actual ability")
+			_check(slot.icon.texture == Icons.texture(str(ability.id), int(slot.icon.custom_minimum_size.x)) and slot.icon.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "The role's Shift icon uses its actual ability at the displayed pixel size")
 			player.items.thruster = 3
 			ability = Simulation.movement_ability(player)
 			player.dash_cd = float(ability.cooldown) * 0.5
