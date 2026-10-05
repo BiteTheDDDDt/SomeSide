@@ -120,11 +120,11 @@ def main() -> None:
                 check(frame.locator('#status').is_hidden(), 'Loading screen dismisses after startup')
                 report['renderer'] = frame.evaluate("""() => {const gl=document.querySelector('canvas').getContext('webgl2'); const ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)}""")
                 shot('menu-en')
-                page.mouse.click(420, 460)
+                page.mouse.click(427, 462)
                 page.wait_for_timeout(400)
-                page.mouse.click(300, 195)  # Chinese language; the setting must survive reload.
+                page.mouse.click(312, 194)  # Chinese language; the setting must survive reload.
                 page.wait_for_timeout(500)
-                page.mouse.click(300, 490)
+                page.mouse.click(339, 483)
                 page.wait_for_timeout(500)
                 check(frame.evaluate('!!document.fullscreenElement'), 'Settings button enters fullscreen from a real click')
                 shot('settings-fullscreen')

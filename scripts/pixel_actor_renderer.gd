@@ -430,7 +430,22 @@ static func _sample_frame(id: String, actor: Dictionary, state: Dictionary, anim
 	return {"actor": id, "animation": animation, "index": chosen, "texture": frame.texture, "source": frame.source, "target": frame.target, "draw_target": frame.draw_target, "tint": tint, "elapsed": elapsed, "duration": duration, "loop": loop, "shoulder": frame.shoulder}
 
 static func draw_player(canvas: Node2D, player: Dictionary, clock: float) -> bool:
-	return _draw(canvas, tracked_frame_for(canvas, str(player.get("character", "ranger")), player, clock, true))
+	var frame: Dictionary = tracked_frame_for(canvas, str(player.get("character", "ranger")), player, clock, true)
+	var motion: Dictionary = player.get("_melee_pose", {})
+	if frame.is_empty() or not bool(motion.get("active", false)) or not motion.has("draw_origin"):
+		return _draw(canvas, frame)
+	# Keep the original running/jumping legs. Rotate only the upper-body crop
+	# around the waist, with no resampling, source edits, or shifted foot anchor.
+	var target: Rect2 = frame.draw_target
+	var waist: float = clampf(5.0, target.position.y + 1.0, target.end.y - 1.0)
+	var top_height: float = waist - target.position.y
+	var lower := Rect2(Vector2(target.position.x, waist), Vector2(target.size.x, target.end.y - waist))
+	canvas.draw_texture_rect_region(frame.texture, lower, Rect2(Vector2(0, top_height), lower.size), frame.tint)
+	var facing: float = float(motion.facing)
+	canvas.draw_set_transform(Vector2(motion.draw_origin) + Vector2(0, waist), float(motion.body_angle) * facing, Vector2(facing, 1))
+	canvas.draw_texture_rect_region(frame.texture, Rect2(target.position - Vector2(0, waist), Vector2(target.size.x, top_height)), Rect2(Vector2.ZERO, Vector2(target.size.x, top_height)), frame.tint)
+	canvas.draw_set_transform(motion.draw_origin, 0.0, Vector2(facing, 1))
+	return true
 
 static func draw_enemy(canvas: Node2D, enemy: Dictionary, clock: float) -> bool:
 	return _draw(canvas, tracked_frame_for(canvas, enemy_id(enemy), enemy, clock))

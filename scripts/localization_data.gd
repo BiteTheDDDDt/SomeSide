@@ -73,7 +73,7 @@ const TEXTS: Dictionary = {
 	"每层每关可抵挡1次致命伤（最多2次），恢复35%生命并获得2秒无敌。": "Prevent 1 lethal hit per stack per stage, up to 2 times. Restore 35% health and gain 2 seconds of invulnerability.",
 	"直接暴击释放130范围新星，每层16伤害（最多8层）；0.75秒内置冷却，不递归触发。": "Direct critical hits release a nova in a 130 radius: 16 damage per stack, up to 8 stacks. Has a 0.75-second internal cooldown and cannot trigger itself.",
 	"精准持续射击：每发8伤害，基础间隔0.19秒；中远距离稳定火力。": "Accurate sustained fire: 8 damage per shot, one shot every 0.19 seconds. Reliable at medium and long range.",
-	"定向近战扇形斩击：基础24伤害，间隔0.52秒；每命中一敌回复0.35生命。": "An aimed melee sweep dealing 24 base damage every 0.52 seconds. Each enemy hit restores 0.35 health.",
+	"短暂起势后朝出刀方向挥砍：基础24伤害，间隔0.52秒；每命中一敌回复0.35生命。": "After a short windup, slash in the committed direction for 24 base damage every 0.52 seconds. Each enemy hit restores 0.35 health.",
 	"一次发射6枚散射弹，每枚8伤害，间隔0.60秒；射程约350，贴近目标威力更强。": "Fire 6 pellets for 8 damage each every 0.60 seconds. Range is about 350; strongest at close range.",
 	"高能直线穿透弹：基础70伤害，间隔1.05秒；最多穿透3个敌人，射程1500。": "A straight piercing shot dealing 70 base damage every 1.05 seconds. Hits up to 3 enemies at 1500 range.",
 	"170范围火焰锥，每0.12秒造成8伤害，并点燃目标：每秒5伤害，持续2秒。": "A flame cone with 170 range deals 8 damage every 0.12 seconds and burns targets for 5 damage per second for 2 seconds.",

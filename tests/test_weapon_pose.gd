@@ -112,6 +112,9 @@ func _test_point_blank() -> void:
 			var shoulder: Vector2 = WeaponPose.shoulder_position(player.pos)
 			var enemy: Dictionary = _dummy(simulation, shoulder + Vector2(player.aim) * 22.0)
 			simulation._fire_weapon(player)
+			if weapon == "arc_blade":
+				# The blade now has a real anticipation interval before its one strike.
+				simulation._step_melee(player, WeaponPose.melee_impact_time(float(player.melee.duration)))
 			simulation._step_projectiles(DT)
 			all_hit = all_hit and float(enemy.hp) < 100000.0
 		_check(all_hit, weapon + ": an enemy between shoulder and muzzle is still damaged in all eight directions")

@@ -2,6 +2,7 @@ extends SceneTree
 
 const Simulation = preload("res://scripts/simulation.gd")
 const Content = preload("res://scripts/content.gd")
+const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const DT: float = 1.0 / 60.0
 var passed: int = 0
 var failed: int = 0
@@ -265,6 +266,8 @@ func _test_advanced_weapons() -> void:
 		player.weapon = id
 		var enemy: Dictionary = _dummy(simulation, Vector2(70, 0))
 		simulation._fire_weapon(player)
+		if id == "arc_blade":
+			simulation._step_melee(player, WeaponPose.melee_impact_time(float(player.melee.duration)))
 		for tick in range(30): simulation._step_projectiles(DT)
 		_cover(id, enemy.hp < 100000.0 and player.fire_cd > 0.0, "the equipped weapon actually damages its aimed target and starts its own cadence")
 	var common = _fresh()

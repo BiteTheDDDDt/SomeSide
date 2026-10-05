@@ -2,6 +2,7 @@ class_name SideSoundscape
 extends Node
 
 const Content = preload("res://scripts/content.gd")
+const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const SAMPLE_RATE: int = 22050
 const MAX_VOICES: int = 12
 const COMBAT_VOICES: int = 8
@@ -23,6 +24,9 @@ var _ambient: AudioStreamPlayer
 var _played: int = 0
 var _dropped: int = 0
 var _last_sound: String = ""
+var _pending_melee: Array[Dictionary] = []
+var _audio_seed: int = -1
+var _audio_stage: int = -1
 
 func _ready() -> void:
 	_prepare_samples()
@@ -48,7 +52,64 @@ func activate_from_gesture() -> void:
 		_ambient.play()
 
 func play_game_event(event: Dictionary, distance: float = 0.0) -> bool:
+	if str(event.get("weapon", "")) == "arc_blade" and str(event.get("phase", "")) == "start":
+		if not enabled or (wait_for_gesture and not _gesture_received) or not is_finite(distance) or distance > 1600.0:
+			return false
+		var owner: int = int(event.get("player", -1))
+		var attack_id: int = int(event.get("attack_id", 0))
+		var predicted: bool = bool(event.get("predicted", false))
+		for pending: Dictionary in _pending_melee:
+			if pending.player == owner and pending.attack_id == attack_id and pending.predicted == predicted:
+				return false
+		if _pending_melee.size() >= MAX_VOICES:
+			_pending_melee.pop_front()
+		_pending_melee.append({"player":owner, "attack_id":attack_id, "predicted":predicted,
+			"delay":WeaponPose.melee_swing_time(float(event.get("duration", 0.36))), "age":0.0, "distance":distance})
+		return true
 	return _play_sound(event_sound(event), distance, Time.get_ticks_msec())
+
+## The blade is audible as the fast sweep begins, after the visible windup.
+## Advance from the game's presentation tick so solo pause also pauses the cue.
+func reset_game_audio() -> void:
+	_pending_melee.clear()
+	_audio_seed = -1
+	_audio_stage = -1
+
+func sync_game_audio(state: Dictionary) -> void:
+	var seed: int = int(state.get("seed", -1))
+	var stage: int = int(state.get("stage", -1))
+	if seed != _audio_seed or stage != _audio_stage:
+		_pending_melee.clear()
+		_audio_seed = seed
+		_audio_stage = stage
+
+func update_game_audio(delta: float, state: Dictionary, paused: bool = false, active: bool = true) -> void:
+	sync_game_audio(state)
+	if not active or not enabled or str(state.get("phase", "playing")) != "playing":
+		_pending_melee.clear()
+		return
+	var players: Dictionary = state.get("players", {})
+	for index: int in range(_pending_melee.size() - 1, -1, -1):
+		var cue: Dictionary = _pending_melee[index]
+		var owner: Dictionary = players.get(int(cue.player), {})
+		if owner.is_empty() or bool(owner.get("dead", false)) or str(owner.get("weapon", "")) != "arc_blade":
+			_pending_melee.remove_at(index)
+			continue
+		if paused:
+			continue
+		cue.age += maxf(0.0, delta)
+		# Remote start events can arrive alongside an already-progressed snapshot.
+		# Predicted local serials are independent and must not consume server time.
+		if not bool(cue.predicted):
+			var swing: Dictionary = owner.get("melee", {})
+			if int(swing.get("id", -1)) == int(cue.attack_id):
+				cue.age = maxf(float(cue.age), float(swing.get("elapsed", 0.0)))
+			elif int(owner.get("attack_count", 0)) >= int(cue.attack_id):
+				_pending_melee.remove_at(index)
+				continue
+		if float(cue.age) + 0.000001 >= float(cue.delay):
+			_pending_melee.remove_at(index)
+			_play_sound("weapon_arc_blade", float(cue.distance), Time.get_ticks_msec())
 
 func play_event(kind: String, distance: float = 0.0) -> bool:
 	return play_game_event({"type": kind}, distance)
@@ -306,6 +367,7 @@ func _exit_tree() -> void:
 
 func shutdown() -> void:
 	enabled = false
+	_pending_melee.clear()
 	if is_instance_valid(_ambient):
 		_ambient.stop()
 		_ambient.stream = null

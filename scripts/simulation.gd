@@ -4,6 +4,7 @@ extends RefCounted
 const Content = preload("res://scripts/content.gd")
 const StageLayouts = preload("res://scripts/stage_layouts.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const WeaponAction = preload("res://scripts/weapon_action_motion.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 
@@ -184,6 +185,8 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		if float(player["shield_timer"]) <= 0.0:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
+		player.erase("melee")
+		player.erase("attack_pose")
 		player["jump_rising"] = false
 		player["land_ready"] = false
 		player["chrono_timer"] = maxf(0.0, float(player.get("chrono_timer", 0.0)) - dt)
@@ -208,6 +211,11 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		return
 	var was_dash: float = float(player.get("dash_timer", 0.0))
 	_move_player(player, command, dt, true)
+	_step_melee(player, dt)
+	if player.has("attack_pose"):
+		player.attack_pose.elapsed = float(player.attack_pose.elapsed) + dt
+		if str(player.attack_pose.weapon) != str(player.get("weapon", "")) or float(player.attack_pose.elapsed) >= float(player.attack_pose.duration):
+			player.erase("attack_pose")
 	if float(player.get("dash_timer", 0.0)) > was_dash:
 		player["momentum_timer"] = 1.2
 		player["invuln"] = maxf(float(player["invuln"]), 0.23)
@@ -354,18 +362,17 @@ func _fire_weapon(player: Dictionary) -> void:
 	var weapon: String = str(player.get("weapon", "pulse_rifle"))
 	player["fire_cd"] = attack_interval(player)
 	player["attack_count"] = int(player.get("attack_count", 0)) + 1
+	if weapon != "arc_blade":
+		player["attack_pose"] = {"id":int(player.attack_count), "weapon":weapon, "elapsed":0.0,
+			"duration":WeaponAction.duration(weapon, float(player.fire_cd)), "aim":aim, "interval":float(player.fire_cd)}
 	match weapon:
 		"arc_blade":
-			_emit("slash", muzzle, {"aim": aim, "radius": 105.0, "player": player["id"], "weapon": weapon})
-			var enemies: Array = state["enemies"]
-			for enemy_value in enemies.duplicate():
-				var enemy: Dictionary = enemy_value
-				var offset: Vector2 = Vector2(enemy["pos"]) - position
-				if float(enemy["hp"]) > 0.0 and offset.length() <= 110.0 + _enemy_radius(enemy) and (offset.length() < 34.0 or offset.normalized().dot(aim) > -0.12):
-					_damage_enemy(enemy, 24.0 * _damage_scale(player), int(player["id"]), true, 0)
-					if str(enemy["kind"]) != "boss":
-						enemy["vel"] = Vector2(enemy["vel"]) + aim * 170.0
-					player["hp"] = minf(float(player["max_hp"]), float(player["hp"]) + 0.35)
+			var duration: float = WeaponPose.melee_duration(float(player.fire_cd))
+			player["melee"] = {"id": int(player.attack_count), "elapsed": 0.0, "duration": duration,
+				"aim": aim, "struck": false, "damage": 24.0 * _damage_scale(player),
+				"echo": _stacks(player, "echo") > 0 and int(player.attack_count) % 6 == 0}
+			_emit("slash", muzzle, {"aim": aim, "radius": 105.0, "player": player["id"], "weapon": weapon,
+				"phase": "start", "duration": duration, "attack_id": int(player.attack_count)})
 		"scattergun":
 			for pellet in range(6):
 				var spread: float = (float(pellet) - 2.5) * 0.075 + _rng.randf_range(-0.012, 0.012)
@@ -397,11 +404,41 @@ func _fire_weapon(player: Dictionary) -> void:
 			var spread: float = _rng.randf_range(-0.018, 0.018)
 			_spawn_projectile(muzzle, aim.rotated(spread) * 1100.0, "player", "bullet", 8.0 * _damage_scale(player), int(player["id"]), 1.3, 3.0, shoulder)
 			_emit("shoot", muzzle, {"aim": aim, "player": player["id"], "kind": "bullet", "weapon": weapon})
-	if _stacks(player, "echo") > 0 and int(player["attack_count"]) % 6 == 0:
-		var target: Dictionary = _nearest_enemy(position, 650.0)
-		if not target.is_empty():
-			_damage_enemy(target, 12.0 * mini(8, _stacks(player, "echo")) * _damage_scale(player), int(player["id"]), false, 1)
-			_emit("explosion", target["pos"], {"radius": 55.0, "owner": player["id"], "kind": "echo", "team": "player"})
+	if weapon != "arc_blade" and _stacks(player, "echo") > 0 and int(player["attack_count"]) % 6 == 0:
+		_fire_echo(player)
+
+
+func _fire_echo(player: Dictionary) -> void:
+	var target: Dictionary = _nearest_enemy(Vector2(player.pos), 650.0)
+	if not target.is_empty():
+		_damage_enemy(target, 12.0 * mini(8, _stacks(player, "echo")) * _damage_scale(player), int(player["id"]), false, 1)
+		_emit("explosion", target["pos"], {"radius": 55.0, "owner": player["id"], "kind": "echo", "team": "player"})
+
+
+func _step_melee(player: Dictionary, dt: float) -> void:
+	if not player.has("melee"):
+		return
+	if bool(player.get("dead", false)) or str(player.get("weapon", "")) != "arc_blade":
+		player.erase("melee")
+		return
+	var melee: Dictionary = player.melee
+	melee.elapsed = float(melee.elapsed) + maxf(0.0, dt)
+	if not bool(melee.struck) and float(melee.elapsed) + 0.000001 >= WeaponPose.melee_impact_time(float(melee.duration)):
+		# Mark before procs: recursive relic damage cannot resolve this swing twice.
+		melee.struck = true
+		var aim: Vector2 = melee.aim
+		for enemy_value: Variant in Array(state["enemies"]).duplicate():
+			var enemy: Dictionary = enemy_value
+			var offset: Vector2 = Vector2(enemy["pos"]) - Vector2(player.pos)
+			if float(enemy["hp"]) > 0.0 and offset.length() <= 110.0 + _enemy_radius(enemy) and (offset.length() < 34.0 or offset.normalized().dot(aim) > -0.12):
+				_damage_enemy(enemy, float(melee.damage), int(player["id"]), true, 0)
+				if str(enemy["kind"]) != "boss":
+					enemy["vel"] = Vector2(enemy["vel"]) + aim * 170.0
+				player["hp"] = minf(float(player["max_hp"]), float(player["hp"]) + 0.35)
+		if bool(melee.get("echo", false)):
+			_fire_echo(player)
+	if float(melee.elapsed) >= float(melee.duration):
+		player.erase("melee")
 
 
 func _use_skill(player: Dictionary) -> void:
@@ -1488,6 +1525,9 @@ func _take_loot(player: Dictionary, pickup: Dictionary) -> void:
 		if not old.is_empty():
 			_spawn_pickup(Vector2(pickup["pos"]) + Vector2(26.0, -6.0), "item", old, 1, remaining)
 		player[category] = item
+		if category == "weapon":
+			player.erase("melee")
+			player.erase("attack_pose")
 		player[cooldown_key] = maxf(maxf(remaining, float(pickup.get("cooldown", 0.0))), 0.18 if category == "weapon" else 0.5)
 	else:
 		_grant_item(player, item)
@@ -1733,6 +1773,8 @@ func _build_stage(stage: int) -> void:
 		player["momentum_timer"] = 0.0
 		player["nova_cd"] = 0.0
 		player["attack_count"] = 0
+		player.erase("melee")
+		player.erase("attack_pose")
 		_reset_exploration(player, true)
 		slot += 1
 	_update_difficulty()
@@ -2045,8 +2087,13 @@ func _emit(type: String, position: Vector2, extra: Dictionary = {}) -> void:
 				break
 		if not replaced:
 			return
-	var event: Dictionary = {"type": type, "pos": position}
+	var event: Dictionary = {"type": type, "pos": position, "stage": int(state.get("stage", 1))}
 	event.merge(extra, true)
+	if event.has("weapon") and type in ["shoot", "slash"]:
+		var wielder: Dictionary = Dictionary(state.get("players", {})).get(int(event.get("player", -1)), {})
+		var action: Dictionary = wielder.get("attack_pose", {})
+		if not action.is_empty() and str(action.weapon) == str(event.weapon):
+			event.merge({"attack_id":int(action.id), "duration":float(action.duration), "interval":float(action.interval)}, false)
 	if type in ["shoot", "hit", "explosion", "slash", "dash"]:
 		var actor: int = int(extra.get("owner", extra.get("player", -1)))
 		if bool(extra.get("friendly", false)):

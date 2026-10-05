@@ -4,6 +4,16 @@ extends RefCounted
 ## Shared by authority, local prediction and rendering. Cosmetic body motion
 ## must never shift the aim pivot or the ballistic muzzle.
 const AIM_DEADZONE: float = 4.0
+const MeleeMotion = preload("res://scripts/melee_motion.gd")
+
+static func melee_duration(interval: float) -> float:
+	return MeleeMotion.duration(interval)
+
+static func melee_impact_time(duration: float) -> float:
+	return MeleeMotion.impact_time(duration)
+
+static func melee_swing_time(duration: float) -> float:
+	return duration * MeleeMotion.WINDUP_END
 
 static func normalized_aim(aim: Vector2) -> Vector2:
 	if not aim.is_finite():

@@ -34,7 +34,7 @@ static func passives() -> Array:
 static func weapons() -> Array:
 	var result: Array = [
 		_record("pulse_rifle", "脉冲步枪", "精准持续射击：每发8伤害，基础间隔0.19秒；中远距离稳定火力。", "65e2d6", "weapon"),
-		_record("arc_blade", "共鸣弧刃", "定向近战扇形斩击：基础24伤害，间隔0.52秒；每命中一敌回复0.35生命。", "ffa66a", "weapon"),
+		_record("arc_blade", "共鸣弧刃", "短暂起势后朝出刀方向挥砍：基础24伤害，间隔0.52秒；每命中一敌回复0.35生命。", "ffa66a", "weapon"),
 		_record("scattergun", "裂片霰弹枪", "一次发射6枚散射弹，每枚8伤害，间隔0.60秒；射程约350，贴近目标威力更强。", "ffc975", "weapon", "rare"),
 		_record("railgun", "穿星磁轨枪", "高能直线穿透弹：基础70伤害，间隔1.05秒；最多穿透3个敌人，射程1500。", "b69fff", "weapon", "rare"),
 		_record("flamethrower", "熔火喷流", "170范围火焰锥，每0.12秒造成8伤害，并点燃目标：每秒5伤害，持续2秒。", "7fd4a0", "weapon", "uncommon"),

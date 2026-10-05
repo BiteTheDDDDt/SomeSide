@@ -257,6 +257,7 @@ func _test_weapon_behaviors() -> void:
 	front.hp = 1000.0
 	behind.hp = 1000.0
 	blade_sim._fire_weapon(wielder)
+	blade_sim._step_melee(wielder, float(wielder.melee.duration) * preload("res://scripts/melee_motion.gd").IMPACT)
 	_check(front.hp < 1000.0 and behind.hp == 1000.0 and wielder.hp > 50.0, "An equipped blade damages the aimed arc and heals its wielder while sparing enemies behind")
 	var rail_sim = _fresh()
 	var shooter: Dictionary = rail_sim.state.players[1]

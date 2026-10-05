@@ -7,12 +7,17 @@ const Icons = preload("res://scripts/item_icons.gd")
 const MapView = preload("res://scripts/map_view.gd")
 const Content = preload("res://scripts/content.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const WeaponActionMotion = preload("res://scripts/weapon_action_motion.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
-const VERSION: String = "0.14.0"
+const UIArt = preload("res://scripts/ui_art.gd")
+const UITheme = preload("res://scripts/ui_theme.gd")
+const VERSION: String = "0.15.0"
 const DEFAULT_PORT: int = 27841
+const MAX_PENDING_STAGE_EVENTS: int = 192
+const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "equipment", "drop"]
 const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
 const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
 const INK := Color("0b1e27")
@@ -54,6 +59,7 @@ var _command_times: Dictionary = {}
 var _snapshot_chunks: Dictionary = {}
 var _pending_inputs: Array = []
 var _event_buffer: Array = []
+var _pending_stage_events: Array = []
 var _visual_error: Vector2 = Vector2.ZERO
 var _last_snapshot_tick: int = -1
 var _last_event_tick: int = -1
@@ -74,6 +80,7 @@ var _captured: bool = false
 var _smoke_finished: bool = false
 var _quitting: bool = false
 var _local_fire_timer: float = 0.0
+var _predicted_attack_count: int = 0
 var _slot_ui: Dictionary = {}
 var _relic_strip: GridContainer
 var _relic_signature: String = ""
@@ -182,7 +189,10 @@ func _process(delta: float) -> void:
 		world.interaction_target = _focus_target
 	else:
 		world.interaction_target = {}
+	world.combat_paused = paused and not online
 	world.set_frame(render_state, local_id, delta)
+	_flush_stage_events()
+	sound.update_game_audio(delta, sim.state, paused and not online, screen == "playing")
 	if is_instance_valid(_map_view):
 		_map_view.set_frame(sim.state, local_id)
 		_map_title.text = "%02d  /  %s" % [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "远征地图")))]
@@ -333,11 +343,15 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 		return
 	var weapon: String = str(player.get("weapon", "pulse_rifle"))
 	_local_fire_timer = Simulation.attack_interval(player)
+	_predicted_attack_count = maxi(_predicted_attack_count, int(player.get("attack_count", 0))) + 1
 	var aim: Vector2 = WeaponPose.normalized_aim(command.get("aim", player.get("aim", Vector2.RIGHT)))
 	var event: Dictionary = {"type": "slash" if weapon == "arc_blade" else "shoot", "kind": "bullet" if weapon == "pulse_rifle" else weapon, "weapon": weapon, "pos": WeaponPose.muzzle_position(player, aim), "aim": aim, "player": local_id}
+	event.merge({"attack_id": _predicted_attack_count, "predicted": true, "interval": _local_fire_timer,
+		"duration": WeaponActionMotion.duration(weapon, _local_fire_timer)})
 	match weapon:
 		"arc_blade":
 			event.radius = 105.0
+			event.merge({"phase": "start", "duration": WeaponPose.melee_duration(_local_fire_timer), "attack_id": _predicted_attack_count, "predicted": true}, true)
 		"flamethrower":
 			event.type = "slash"
 			event.kind = "flame"
@@ -348,6 +362,7 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 			event.kind = "lance"
 	event.merge(sim._visual_data(local_id), false)
 	world.push_events([event])
+	sound.sync_game_audio(sim.state)
 	sound.play_game_event(event)
 
 func _is_web() -> bool:
@@ -616,6 +631,7 @@ func _begin_run(members: Array, seed_value: int) -> void:
 
 func _begin_local(members: Array, seed_value: int) -> void:
 	sim.start_run(members, seed_value)
+	sound.reset_game_audio()
 	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "projectile_kinds": []}
 	_biome_observed = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 	_biome_smoke_stage = 0
@@ -637,8 +653,11 @@ func _begin_local(members: Array, seed_value: int) -> void:
 	_received.clear()
 	_pending_inputs.clear()
 	_event_buffer.clear()
+	_pending_stage_events.clear()
 	_tick = 0
 	_sequence = 0
+	_local_fire_timer = 0.0
+	_predicted_attack_count = 0
 	_last_snapshot_tick = -1
 	_last_event_tick = -1
 	_visual_error = Vector2.ZERO
@@ -723,7 +742,51 @@ func _receive_events(events: Array, tick: int, run_seed: int) -> void:
 	if screen not in ["playing", "results"] or tick <= _last_event_tick or run_seed != int(sim.state.get("seed", -1)):
 		return
 	_last_event_tick = tick
-	_consume_events(events)
+	var current_stage: int = int(sim.state.get("stage", 1))
+	for value: Variant in events:
+		if not value is Dictionary:
+			continue
+		var event: Dictionary = value
+		var event_stage: int = int(event.get("stage", current_stage))
+		if event_stage < current_stage or event_stage > 3:
+			continue
+		if _pending_stage_events.size() >= MAX_PENDING_STAGE_EVENTS:
+			# Under a long snapshot gap, keep progress/interaction notices ahead
+			# of expendable shot and hit effects. Currency already lives in state.
+			var disposable: int = -1
+			for index in range(_pending_stage_events.size()):
+				if str(_pending_stage_events[index].get("type", "")) in TRANSIENT_EVENT_TYPES:
+					disposable = index
+					break
+			if disposable < 0 and str(event.get("type", "")) in TRANSIENT_EVENT_TYPES:
+				continue
+			_pending_stage_events.remove_at(maxi(0, disposable))
+		var queued: Dictionary = event.duplicate(true)
+		# Legacy fixtures without a stage belong to the stage at reception,
+		# never to whichever stage happens to be current when later presented.
+		queued["stage"] = event_stage
+		_pending_stage_events.append(queued)
+
+func _flush_stage_events() -> void:
+	if _pending_stage_events.is_empty():
+		return
+	if screen not in ["playing", "results"]:
+		_pending_stage_events.clear()
+		return
+	var current_stage: int = int(sim.state.get("stage", 1))
+	var ready: Array = []
+	var future: Array = []
+	for event: Dictionary in _pending_stage_events:
+		var event_stage: int = int(event.stage)
+		if event_stage == current_stage:
+			ready.append(event)
+		elif event_stage > current_stage:
+			future.append(event)
+	_pending_stage_events = future
+	# Called after world.set_frame: a newly arrived stage's effects must not
+	# be built against the old map and then erased by its visual reset.
+	if not ready.is_empty():
+		_consume_events(ready)
 
 @rpc("authority", "call_remote", "reliable", 0)
 func _end_run(snapshot: Dictionary) -> void:
@@ -744,15 +807,23 @@ func _pong(stamp: int) -> void:
 	_ping_ms = float(Time.get_ticks_msec() - stamp)
 
 func _consume_events(events: Array) -> void:
+	sound.sync_game_audio(sim.state)
 	var presented: Array = []
+	var accepted_count: int = 0
+	var current_stage: int = int(sim.state.get("stage", 1))
 	for event in events:
+		# Also protect solo/host delivery when a transition and an accumulated
+		# action share the same local consume boundary.
+		if int(event.get("stage", current_stage)) != current_stage:
+			continue
+		accepted_count += 1
 		# The owning client already presents primary attacks immediately.
 		# Keep authoritative damage/skill events and every other player's shots.
 		if online and not hosting and int(event.get("player", -1)) == local_id and event.has("weapon") and str(event.get("type", "")) in ["shoot", "slash"]:
 			continue
 		presented.append(event)
 	world.push_events(presented)
-	_events_seen += events.size()
+	_events_seen += accepted_count
 	var local_position: Vector2 = sim.state.get("players", {}).get(local_id, {}).get("pos", Vector2.ZERO)
 	for event in presented:
 		var kind: String = str(event.get("type", ""))
@@ -800,6 +871,7 @@ func _disconnect() -> void:
 	_command_times.clear()
 	_snapshot_chunks.clear()
 	_pending_inputs.clear()
+	_pending_stage_events.clear()
 
 func _load_profile() -> void:
 	var file := ConfigFile.new()
@@ -971,16 +1043,7 @@ func _finish_automation() -> void:
 	_quit_game(0 if passed else 1)
 
 func _style(color: Color, border: Color = Color.TRANSPARENT, radius: int = 6) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = border
-	style.set_border_width_all(1 if border.a > 0.0 else 0)
-	style.set_corner_radius_all(radius)
-	style.content_margin_left = 18.0
-	style.content_margin_right = 18.0
-	style.content_margin_top = 11.0
-	style.content_margin_bottom = 11.0
-	return style
+	return UITheme.panel(color, border, radius)
 
 func _label(parent: Node, text: String, size: int = 18, color: Color = PAPER) -> Label:
 	var label := Label.new()
@@ -1003,27 +1066,34 @@ func _button(parent: Node, text: String, action: Callable, primary: bool = false
 	_skin_button(button, primary)
 	button.pressed.connect(func(): sound.play_event("ui"); action.call())
 	parent.add_child(button)
+	var machining := UIArt.new()
+	machining.name = "ButtonMachining"
+	machining.mode = "button"
+	machining.button = button
+	machining.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	button.add_child(machining)
 	return button
 
 func _skin_button(button: Button, primary: bool = false) -> void:
+	button.set_meta("art_primary", primary)
 	button.add_theme_color_override("font_color", INK if primary else PAPER)
+	button.add_theme_color_override("font_focus_color", INK if primary else PAPER)
 	button.add_theme_color_override("font_hover_color", INK if primary else PAPER)
 	button.add_theme_color_override("font_pressed_color", INK)
 	button.add_theme_color_override("font_disabled_color", Color("667879"))
-	button.add_theme_stylebox_override("normal", _style(AMBER if primary else SURFACE, AMBER if primary else EDGE, 4))
-	button.add_theme_stylebox_override("hover", _style(AMBER.lightened(0.12) if primary else Color("1b363d"), AMBER if primary else Color("66827f"), 4))
-	button.add_theme_stylebox_override("pressed", _style(AMBER.darkened(0.12), AMBER, 4))
-	button.add_theme_stylebox_override("disabled", _style(Color("112127"), Color("24383d"), 4))
-	var focus: StyleBoxFlat = _style(Color.TRANSPARENT, PAPER, 4)
+	button.add_theme_stylebox_override("normal", UITheme.button(AMBER if primary else Color("153039"), Color("ffd394") if primary else Color("3c6268"), primary))
+	button.add_theme_stylebox_override("hover", UITheme.button(AMBER.lightened(0.12) if primary else Color("20494e"), PAPER if primary else TEAL, primary))
+	button.add_theme_stylebox_override("pressed", UITheme.button(AMBER.darkened(0.12), AMBER, primary))
+	button.add_theme_stylebox_override("disabled", UITheme.button(Color("11252d"), Color("29444b"), primary))
+	var focus: StyleBoxFlat = UITheme.button(Color.TRANSPARENT, PAPER, primary)
 	focus.set_border_width_all(2)
+	focus.shadow_size = 0
 	button.add_theme_stylebox_override("focus", focus)
+	if button.has_node("ButtonMachining"): button.get_node("ButtonMachining").queue_redraw()
 
 func _divider(parent: Node) -> void:
-	var line := HSeparator.new()
-	var style := StyleBoxLine.new()
-	style.color = EDGE
-	style.thickness = 1
-	line.add_theme_stylebox_override("separator", style)
+	var line := UIArt.new()
+	line.mode = "divider"
 	line.custom_minimum_size.y = 9
 	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(line)
@@ -1039,9 +1109,13 @@ func _overlay_surface(bounds: Rect2, shade_alpha: float = 0.88) -> void:
 	var surface := Panel.new()
 	surface.position = bounds.position
 	surface.size = bounds.size
-	surface.add_theme_stylebox_override("panel", _style(Color("0b1e25"), EDGE, 8))
+	surface.add_theme_stylebox_override("panel", _style(Color("0b2028"), Color("365960"), 18))
 	surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.add_child(surface)
+	var frame := UIArt.new()
+	frame.mode = "frame"
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	surface.add_child(frame)
 
 func _gap(parent: Node, height: float = 12.0) -> void:
 	var gap := Control.new()
@@ -1088,6 +1162,15 @@ func _page(title: String, subtitle: String, width: float = 480.0, preserve_game:
 	else:
 		_clear_ui()
 	_overlay_surface(Rect2(40, 28, width + 48, 644), 0.5 if not preserve_game else 0.85)
+	if not preserve_game and width <= 640:
+		var display := UIArt.new()
+		display.name = "CharacterDisplay"
+		display.mode = "scene"
+		display.character = str(profile.character)
+		display.stage = int(sim.state.get("stage", 1))
+		display.position = Vector2(width + 120, 42)
+		display.size = Vector2(1130 - width, 610)
+		overlay.add_child(display)
 	var margin := MarginContainer.new()
 	margin.position = Vector2(64, 46)
 	margin.size = Vector2(width, 600)
@@ -1097,7 +1180,14 @@ func _page(title: String, subtitle: String, width: float = 480.0, preserve_game:
 	margin.add_child(column)
 	if title != "SomeSide":
 		_label(column, "SomeSide", 13, TEAL)
-	_label(column, title, 52 if title == "SomeSide" else 32)
+	if title == "SomeSide":
+		var wordmark := UIArt.new()
+		wordmark.name = "SomeSideWordmark"
+		wordmark.mode = "wordmark"
+		wordmark.custom_minimum_size = Vector2(width, 82)
+		column.add_child(wordmark)
+	else:
+		_label(column, title, 32)
 	var description: Label = _label(column, subtitle, 14, MUTED)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	description.custom_minimum_size.x = width
@@ -1147,6 +1237,19 @@ func _show_menu(message: String = "") -> void:
 	if not message.is_empty():
 		var error_label: Label = _label(column, message, 14, AMBER)
 		error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	else:
+		var regions := UIArt.new()
+		regions.name = "RegionRoute"
+		regions.mode = "regions"
+		regions.position = Vector2(64, 548)
+		regions.size = Vector2(480, 65)
+		overlay.add_child(regions)
+		var names: Array = ["巨木雨林", "折光断崖", "双环遗迹"]
+		for index in range(3):
+			var region: Label = _label(overlay, str(names[index]), 12, MUTED)
+			region.position = Vector2(64 + index * 166, 619)
+			region.size = Vector2(148, 22)
+			region.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var badge: Label = _label(overlay, "%02d  /  %s" % [int(sim.state.get("stage", 1)), Locale.text(str(sim.state.get("stage_name", "巨木雨林")))], 14, MUTED)
 	badge.position = Vector2(950, 650)
 
@@ -1158,7 +1261,9 @@ func _show_characters() -> void:
 	for definition in Simulation.character_catalog():
 		var selected: bool = str(profile.character) == str(definition.id)
 		var panel := PanelContainer.new()
-		panel.add_theme_stylebox_override("panel", _style(SURFACE, AMBER if selected else EDGE, 4))
+		var character_style: StyleBoxFlat = _style(SURFACE, AMBER if selected else EDGE, 7)
+		character_style.border_width_left = 3 if selected else 1
+		panel.add_theme_stylebox_override("panel", character_style)
 		column.add_child(panel)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 18)
@@ -1172,6 +1277,12 @@ func _show_characters() -> void:
 		if not appearance.is_empty(): portrait.texture = appearance.texture
 		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(portrait)
+		var portrait_frame := UIArt.new()
+		portrait_frame.mode = "portrait"
+		portrait_frame.tint = TEAL if str(definition.id) == "ranger" else AMBER
+		portrait_frame.show_behind_parent = true
+		portrait_frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		portrait.add_child(portrait_frame)
 		var content := VBoxContainer.new()
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		content.add_theme_constant_override("separation", 6)
@@ -1198,8 +1309,10 @@ func _text_field(parent: Node, value: String, placeholder: String = "") -> LineE
 	field.add_theme_color_override("font_placeholder_color", MUTED)
 	field.add_theme_color_override("caret_color", AMBER)
 	field.add_theme_color_override("selection_color", Color("375751"))
-	field.add_theme_stylebox_override("normal", _style(Color("0a1a21"), EDGE, 4))
-	field.add_theme_stylebox_override("focus", _style(Color("0f252c"), TEAL, 4))
+	var normal: StyleBoxFlat = _style(Color("071a22"), Color("355760"), 5)
+	normal.border_width_bottom = 2
+	field.add_theme_stylebox_override("normal", normal)
+	field.add_theme_stylebox_override("focus", _style(Color("102d35"), TEAL, 5))
 	parent.add_child(field)
 	return field
 
@@ -1239,7 +1352,11 @@ func _show_lobby() -> void:
 	var me: Dictionary = {}
 	for index in range(4):
 		var row := PanelContainer.new()
-		row.add_theme_stylebox_override("panel", _style(SURFACE, EDGE, 4))
+		var row_style: StyleBoxFlat = _style(SURFACE, EDGE, 5)
+		if index < roster.size() and bool(roster[index].get("ready", false)):
+			row_style.border_color = Color("3a6c65")
+			row_style.border_width_left = 3
+		row.add_theme_stylebox_override("panel", row_style)
 		column.add_child(row)
 		var cells := HBoxContainer.new()
 		cells.add_theme_constant_override("separation", 14)
@@ -1385,6 +1502,9 @@ func _settings_slider(parent: Node, title: String, value: float, minimum: float,
 	slider.add_theme_stylebox_override("slider", track)
 	slider.add_theme_stylebox_override("grabber_area", fill)
 	slider.add_theme_stylebox_override("grabber_area_highlight", fill)
+	slider.add_theme_icon_override("grabber", UITheme.slider_grip(PAPER))
+	slider.add_theme_icon_override("grabber_highlight", UITheme.slider_grip(AMBER))
+	slider.add_theme_icon_override("grabber_disabled", UITheme.slider_grip(MUTED))
 	row.add_child(slider)
 	var amount: Label = _label(row, "%d%%" % roundi(value * 100), 14, MUTED)
 	amount.custom_minimum_size.x = 50
@@ -1448,10 +1568,10 @@ func _meter(parent: Node, tint: Color, dimensions: Vector2) -> ProgressBar:
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var background := StyleBoxFlat.new()
 	background.bg_color = Color("213a43")
-	background.set_corner_radius_all(2)
+	background.set_corner_radius_all(1)
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = tint
-	fill.set_corner_radius_all(2)
+	fill.set_corner_radius_all(1)
 	bar.add_theme_stylebox_override("background", background)
 	bar.add_theme_stylebox_override("fill", fill)
 	parent.add_child(bar)
@@ -1462,7 +1582,7 @@ func _hud_panel(position: Vector2, dimensions: Vector2) -> VBoxContainer:
 	panel.position = position
 	panel.size = dimensions
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var backdrop: StyleBoxFlat = _style(Color(0.025, 0.065, 0.085, 0.78))
+	var backdrop: StyleBoxFlat = _style(Color(0.025, 0.065, 0.085, 0.78), Color(0.28, 0.43, 0.44, 0.48), 5)
 	backdrop.content_margin_left = 10
 	backdrop.content_margin_right = 10
 	backdrop.content_margin_top = 7
@@ -2153,6 +2273,11 @@ func _show_results() -> void:
 		card.add_child(words)
 		_label(words, metric[0], 12, MUTED)
 		_label(words, metric[1], 24, AMBER)
+	var route := UIArt.new()
+	route.mode = "route"
+	route.stage = int(sim.state.get("stage", 1))
+	route.custom_minimum_size.y = 26
+	column.add_child(route)
 	_divider(column)
 	for player in sim.state.get("players", {}).values():
 		_label(column, Locale.format("%s   ·   %d 件遗物   ·   %d 击破", [str(player.name), _item_total(player.get("items", {})), int(player.get("kills", 0))]), 16, PAPER)

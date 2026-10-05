@@ -10,6 +10,7 @@ var reduced_motion: bool = false
 var fx_scale: float = 1.0
 var shake_enabled: bool = true
 var interpolate_remote_entities: bool = false
+var combat_paused: bool = false
 var interaction_target: Dictionary = {}
 ## Native scenery textures remove repeated triangulation/material draws.
 ## This switch exists for fidelity/performance regression captures.
@@ -21,6 +22,8 @@ var web_background_cache_enabled: bool = OS.has_feature("web")
 const ItemIcons = preload("res://scripts/item_icons.gd")
 const Biomes = preload("res://scripts/biome_renderer.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
+const MeleeMotion = preload("res://scripts/melee_motion.gd")
+const WeaponAction = preload("res://scripts/weapon_action_motion.gd")
 const Appearance = preload("res://scripts/player_appearance.gd")
 const Entities = preload("res://scripts/entity_renderer.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
@@ -41,6 +44,11 @@ const CREAM: Color = Color("e9f3da")
 var _frame: Dictionary = {}
 var _local_id: int = 1
 var _clock: float = 0.0
+var _combat_clock: float = 0.0
+var _melee_tracks: Dictionary = {}
+var _melee_predictions: Dictionary = {}
+var _weapon_tracks: Dictionary = {}
+var _weapon_predictions: Dictionary = {}
 var _camera_ready: bool = false
 var _effects: Array[Dictionary] = []
 var _numbers: Array[Dictionary] = []
@@ -393,6 +401,10 @@ func _update_render_positions(delta: float) -> void:
 	var snapshot_time: float = float(_frame.get("time", 0.0))
 	if stage != _render_stage or snapshot_time < _last_snapshot_time:
 		Pixels.reset_tracks(self)
+		_melee_tracks.clear()
+		_melee_predictions.clear()
+		_weapon_tracks.clear()
+		_weapon_predictions.clear()
 		_render_positions.clear()
 		_fixed_samples.clear()
 		_render_stage = stage
@@ -403,6 +415,14 @@ func _update_render_positions(delta: float) -> void:
 		_snapshot_age = minf(0.05, _snapshot_age + delta)
 	var alive: Dictionary = {}
 	var players: Dictionary = _frame.get("players", {})
+	for owner: Variant in _melee_tracks.keys():
+		if not players.has(owner):
+			_melee_tracks.erase(owner)
+			_melee_predictions.erase(owner)
+	for owner: Variant in _weapon_tracks.keys():
+		if not players.has(owner):
+			_weapon_tracks.erase(owner)
+			_weapon_predictions.erase(owner)
 	for player_id: Variant in players:
 		var player: Dictionary = players[player_id]
 		var key: String = "p" + str(player_id)
@@ -505,20 +525,133 @@ func _entity_draw_position(key: String, position_value: Vector2) -> Vector2:
 	return _render_positions.get(key, position_value)
 
 
+func _start_melee(event: Dictionary) -> void:
+	var owner: int = int(event.get("player", -1))
+	if owner < 0:
+		return
+	var predicted: bool = bool(event.get("predicted", false))
+	var id: int = int(event.get("attack_id", 0))
+	var existing: Dictionary = _melee_tracks.get(owner, {})
+	if not existing.is_empty() and bool(existing.predicted) == predicted and int(existing.id) >= id and id > 0:
+		return
+	if not predicted and int(_melee_predictions.get(owner, -1)) >= id:
+		return
+	if predicted:
+		_melee_predictions[owner] = maxi(id, int(_melee_predictions.get(owner, -1)))
+	_melee_tracks[owner] = {"id": id, "predicted": predicted, "start": _combat_clock,
+		"duration": clampf(float(event.get("duration", 0.36)), 0.04, 0.36),
+		"aim": WeaponPose.normalized_aim(event.get("aim", Vector2.RIGHT)), "sample_elapsed": -1.0}
+
+
+func melee_pose(player: Dictionary) -> Dictionary:
+	var owner: int = int(player.get("id", -1))
+	if bool(player.get("dead", false)) or str(player.get("weapon", "")) != "arc_blade":
+		_melee_tracks.erase(owner)
+		return {"active": false}
+	var track: Dictionary = _melee_tracks.get(owner, {})
+	var replicated: Dictionary = player.get("melee", {})
+	var authority_id: int = int(replicated.get("id", -1))
+	if not replicated.is_empty() and authority_id > int(_melee_predictions.get(owner, -1)) and authority_id >= int(track.get("id", -1)):
+		var elapsed: float = float(replicated.get("elapsed", 0.0))
+		if track.is_empty() or int(track.id) != authority_id or bool(track.predicted) or not is_equal_approx(float(track.sample_elapsed), elapsed):
+			track = {"id": authority_id, "predicted": false,
+				"start": _combat_clock - elapsed - (0.0 if combat_paused else _snapshot_age),
+				"duration": float(replicated.duration), "aim": replicated.aim, "sample_elapsed": elapsed}
+			_melee_tracks[owner] = track
+	if track.is_empty():
+		return {"active": false}
+	var pose: Dictionary = MeleeMotion.sample(_combat_clock - float(track.start), float(track.duration), track.aim)
+	pose["id"] = int(track.id)
+	pose["predicted"] = bool(track.predicted)
+	return pose
+
+
+func _start_weapon_action(event: Dictionary) -> void:
+	var owner: int = int(event.get("player", -1))
+	var weapon: String = str(event.get("weapon", ""))
+	if owner < 0 or weapon not in WeaponAction.WEAPONS:
+		return
+	var predicted: bool = bool(event.get("predicted", false))
+	var id: int = int(event.get("attack_id", 0))
+	var existing: Dictionary = _weapon_tracks.get(owner, {})
+	if not existing.is_empty() and str(existing.weapon) == weapon and bool(existing.predicted) == predicted and int(existing.id) >= id and id > 0:
+		return
+	if not predicted and int(_weapon_predictions.get(owner, -1)) >= id:
+		return
+	if predicted:
+		_weapon_predictions[owner] = maxi(id, int(_weapon_predictions.get(owner, -1)))
+	_weapon_tracks[owner] = {"id":id, "weapon":weapon, "predicted":predicted, "start":_combat_clock,
+		"duration":float(event.get("duration", WeaponAction.duration(weapon,float(event.get("interval",0.19))))), "sample_elapsed":-1.0}
+
+
+func weapon_action_pose(player: Dictionary) -> Dictionary:
+	var owner: int = int(player.get("id", -1))
+	var weapon: String = str(player.get("weapon", ""))
+	if bool(player.get("dead", false)) or weapon not in WeaponAction.WEAPONS:
+		_weapon_tracks.erase(owner)
+		return WeaponAction.rest()
+	var track: Dictionary = _weapon_tracks.get(owner, {})
+	if not track.is_empty() and str(track.weapon) != weapon:
+		_weapon_tracks.erase(owner)
+		track = {}
+	var replicated: Dictionary = player.get("attack_pose", {})
+	var authority_id: int = int(replicated.get("id", -1))
+	if not replicated.is_empty() and str(replicated.get("weapon", "")) == weapon and authority_id > int(_weapon_predictions.get(owner, -1)) and authority_id >= int(track.get("id", -1)):
+		var elapsed: float = float(replicated.get("elapsed", 0.0))
+		if track.is_empty() or int(track.id) != authority_id or bool(track.predicted) or not is_equal_approx(float(track.sample_elapsed), elapsed):
+			track = {"id":authority_id, "weapon":weapon, "predicted":false,
+				"start":_combat_clock-elapsed-(0.0 if combat_paused else _snapshot_age), "duration":float(replicated.duration), "sample_elapsed":elapsed}
+			_weapon_tracks[owner] = track
+	if track.is_empty():
+		return WeaponAction.rest()
+	var pose: Dictionary = WeaponAction.sample(weapon, _combat_clock-float(track.start), float(track.duration))
+	pose.merge({"id":int(track.id), "predicted":bool(track.predicted), "elapsed":_combat_clock-float(track.start), "duration":float(track.duration)})
+	return pose
+
+
 func weapon_draw_pose(player: Dictionary) -> Dictionary:
 	var position_value: Vector2 = _entity_draw_position("p" + str(player.get("id", -1)), player.get("pos", Vector2.ZERO))
 	var aim: Vector2 = WeaponPose.normalized_aim(player.get("aim", Vector2.RIGHT))
+	var melee: Dictionary = melee_pose(player)
+	var ranged: Dictionary = weapon_action_pose(player)
+	if bool(melee.active):
+		aim = melee.aim
 	# A deep landing pose moves the visible shoulder with the torso. Sampling
 	# the same tracked frame again during body drawing is idempotent. Simulation
 	# and input continue to use WeaponPose's unchanged physical shoulder/muzzle.
 	var displayed: Dictionary = player.duplicate(false)
 	displayed.pos = position_value
+	displayed.aim = aim
 	var frame: Dictionary = Pixels.tracked_frame_for(self, str(player.get("character", "ranger")), displayed, _clock, true)
 	var offset: Vector2 = frame.get("shoulder", Vector2(0.0, -5.0))
+	var body_motion: Dictionary = melee if bool(melee.active) else ranged
+	if bool(body_motion.active):
+		var pivot := Vector2(0.0, 5.0)
+		offset = pivot + (offset - pivot).rotated(float(body_motion.body_angle))
 	offset.x *= 1.0 if aim.x >= 0.0 else -1.0
 	var shoulder: Vector2 = position_value + offset
-	return {"position":position_value, "shoulder":shoulder,
-		"muzzle":shoulder + aim * WeaponPose.muzzle_length(str(player.get("weapon", "pulse_rifle"))), "aim":aim}
+	var result: Dictionary = {"position":position_value, "shoulder":shoulder,
+		"muzzle":shoulder + aim * WeaponPose.muzzle_length(str(player.get("weapon", "pulse_rifle"))), "aim":aim, "melee":melee, "ranged":ranged,
+		"weapon_origin":shoulder, "weapon_angle":aim.angle(), "weapon_scale":1.0,
+		"grip":shoulder+aim*7.5, "tip":shoulder+aim*WeaponPose.muzzle_length(str(player.get("weapon","pulse_rifle")))}
+	if bool(melee.active):
+		var blade_direction := Vector2.from_angle(float(melee.angle))
+		var blade_scale: float = float(melee.weapon_scale)
+		var origin: Vector2 = shoulder + aim * float(melee.extension)
+		var grip: Vector2 = origin + blade_direction * (7.5 * blade_scale)
+		var tip: Vector2 = origin + blade_direction * (WeaponPose.muzzle_length("arc_blade") * blade_scale)
+		result.merge({"weapon_angle": float(melee.angle), "grip": grip, "weapon_scale":blade_scale,
+			"weapon_origin":origin, "tip":tip, "muzzle":tip}, true)
+	elif bool(ranged.active):
+		var facing: float = 1.0 if aim.x >= 0.0 else -1.0
+		var local_offset: Vector2 = ranged.offset
+		local_offset.y *= facing
+		var origin: Vector2 = shoulder + local_offset.rotated(aim.angle())
+		var angle: float = aim.angle() + float(ranged.angle_offset) * facing
+		var axis := Vector2.from_angle(angle)
+		var tip: Vector2 = origin + axis * WeaponPose.muzzle_length(str(player.weapon))
+		result.merge({"weapon_origin":origin, "weapon_angle":angle, "grip":origin+axis*float(ranged.grip_distance), "muzzle":tip, "tip":tip}, true)
+	return result
 
 
 func muzzle_effect_pose(effect: Dictionary) -> Dictionary:
@@ -531,7 +664,7 @@ func muzzle_effect_pose(effect: Dictionary) -> Dictionary:
 		fallback.visible = false
 		return fallback
 	var pose: Dictionary = weapon_draw_pose(player)
-	return {"visible":true, "pos":pose.muzzle, "aim":pose.aim}
+	return {"visible":true, "pos":pose.muzzle, "aim":Vector2.from_angle(float(pose.get("weapon_angle", Vector2(pose.aim).angle())))}
 
 
 static func projectile_trail_length(projectile: Dictionary, draw_position: Vector2, maximum: float) -> float:
@@ -590,6 +723,8 @@ func _add_effect(effect: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	if not combat_paused:
+		_combat_clock += delta
 	_shake = maxf(0.0, _shake - delta * 22.0)
 	_shake_offset = Vector2(sin(_clock * 93.0), cos(_clock * 71.0)) * minf(_shake, 5.0) if shake_enabled and not reduced_motion else Vector2.ZERO
 	for index: int in range(_effects.size() - 1, -1, -1):
@@ -609,6 +744,8 @@ func push_events(events: Array) -> void:
 	for event_value: Variant in events:
 		var event: Dictionary = event_value
 		var kind: String = event.get("type", "")
+		if kind in ["shoot", "slash"] and event.has("weapon"):
+			_start_weapon_action(event)
 		var position_value: Vector2 = event.get("pos", Vector2.ZERO)
 		var strength: float = effect_strength(event)
 		var direction: Vector2 = event.get("aim", event.get("direction", Vector2.RIGHT))
@@ -685,6 +822,14 @@ func push_events(events: Array) -> void:
 				if not healing and not shielding and not temporal:
 					_shake = minf(5.0, maxf(_shake, 1.5 + strength * 0.8))
 			"slash":
+				if str(event.get("weapon", "")) == "arc_blade":
+					_start_melee(event)
+					# Keep attack metadata available to existing feedback consumers;
+					# the live hand/blade motion draws its own short blade trail.
+					_add_effect({"kind":"slash", "melee":true, "pos":position_value, "owner":event.get("player",-1),
+						"weapon":"arc_blade", "angle":direction.angle(), "strength":strength, "age":0.0,
+						"life":float(event.get("duration",0.36)), "radius":105.0, "color":GOLD})
+					continue
 				var flame: bool = str(event.get("kind", "")) == "flame"
 				var swipe: Dictionary = {"kind": "flame" if flame else "slash", "pos": position_value, "angle": direction.angle(), "age": 0.0, "life": 0.19 if flame else 0.27, "color": Color("ffa77a") if flame else GOLD, "strength":strength, "radius":clampf(float(event.get("radius",170.0 if flame else 85.0)),45.0,180.0 if flame else 160.0)}
 				if event.has("weapon"):
@@ -1287,13 +1432,24 @@ func _draw_players() -> void:
 		# Keep the authoritative snapshot untouched while feet follow visible travel.
 		var displayed: Dictionary = player.duplicate(false)
 		displayed.pos = pose.position
+		displayed.aim = aim
+		if bool(pose.melee.active) or bool(pose.ranged.active):
+			var body_motion: Dictionary = (pose.melee if bool(pose.melee.active) else pose.ranged).duplicate(false)
+			body_motion["draw_origin"] = p
+			body_motion["facing"] = facing
+			displayed["_melee_pose"] = body_motion
 		Entities.player_body(self, displayed, _clock)
 		draw_set_transform(Vector2.ZERO)
 		# Accessories mirror with the body; the weapon follows the selected shoulder.
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
 		Appearance.draw_layer(self, appearance, false, _clock)
-		draw_set_transform(world_to_screen(pose.shoulder), aim.angle(), Vector2(1.0, facing))
-		_draw_weapon(weapon)
+		if bool(pose.melee.active):
+			_draw_melee_actor(player, pose)
+		elif bool(pose.ranged.active):
+			_draw_ranged_actor(player, pose)
+		else:
+			draw_set_transform(world_to_screen(pose.shoulder), aim.angle(), Vector2(1.0, facing))
+			_draw_weapon(weapon)
 		draw_set_transform(Vector2.ZERO)
 		if float(player.get("chrono_timer", 0.0)) > 0.0:
 			var phase: float = _clock * 1.7
@@ -1314,6 +1470,63 @@ func _draw_players() -> void:
 			_world_label(p + Vector2(0.0, -42.0), str(player.get("name", "PILOT")), color_value if int(key) == _local_id else CREAM, 11)
 		if int(key) == _local_id:
 			draw_colored_polygon(PackedVector2Array([p + Vector2(-3.0, -37.0), p + Vector2(3.0, -37.0), p + Vector2(0.0, -33.0)]), Color(color_value, 0.75))
+
+
+func _draw_melee_actor(player: Dictionary, pose: Dictionary) -> void:
+	var motion: Dictionary = pose.melee
+	var shoulder: Vector2 = world_to_screen(pose.shoulder)
+	var grip: Vector2 = world_to_screen(pose.grip)
+	var angle: float = float(pose.weapon_angle)
+	var facing: float = float(motion.facing)
+	draw_set_transform(Vector2.ZERO)
+	if bool(motion.trail):
+		# A short ribbon follows the physical sword, and only during the fast cut.
+		var trailing: float = angle - 0.85 * facing
+		draw_arc(shoulder, 68.0, minf(trailing, angle), maxf(trailing, angle), 18, Color(GOLD, 0.22), 7.0, true)
+		draw_arc(shoulder, 72.0, minf(trailing + facing * 0.24, angle), maxf(trailing + facing * 0.24, angle), 14, Color(CREAM, 0.8), 1.8, true)
+	_draw_weapon_arm(player, shoulder, grip, facing, float(motion.arm_alpha))
+	draw_set_transform(world_to_screen(pose.weapon_origin), angle, Vector2(float(pose.weapon_scale), facing))
+	_draw_weapon("arc_blade")
+	draw_set_transform(Vector2.ZERO)
+	draw_circle(grip, 3.0, Color(INK,float(motion.arm_alpha)))
+	draw_circle(grip, 1.8, Color(Color("d6c4a1"),float(motion.arm_alpha)))
+
+
+func _draw_ranged_actor(player: Dictionary, pose: Dictionary) -> void:
+	var facing: float = 1.0 if Vector2(pose.aim).x >= 0.0 else -1.0
+	var motion: Dictionary = pose.ranged
+	draw_set_transform(Vector2.ZERO)
+	_draw_weapon_arm(player, world_to_screen(pose.shoulder), world_to_screen(pose.grip), facing)
+	draw_set_transform(world_to_screen(pose.weapon_origin), float(pose.weapon_angle), Vector2(1,facing))
+	if float(motion.weapon_alpha) > 0.1:
+		_draw_weapon(str(player.weapon))
+		var mechanism: float = float(motion.mechanism)
+		var energy: float = float(motion.energy)
+		if str(player.weapon) == "scattergun":
+			var slide: float = 23.0 - 6.0 * mechanism
+			draw_rect(Rect2(slide,-1,9,6),INK)
+			draw_rect(Rect2(slide+1,0,7,4),Color("c99d67"))
+		elif str(player.weapon) == "railgun":
+			for x: float in [12.0,17.0,22.0]:
+				draw_line(Vector2(x,-4.0-mechanism*3.0),Vector2(x,4.0+mechanism*3.0),Color("b99fff"),2.0,true)
+		if energy > 0.0:
+			var end: float = WeaponPose.muzzle_length(str(player.weapon))
+			draw_arc(Vector2(end-7,0),7.0+energy*3.0,0,TAU,20,Color("bcebe0",energy*0.6),1.0,true)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_weapon_arm(player: Dictionary, shoulder: Vector2, grip: Vector2, facing: float, opacity: float = 1.0) -> void:
+	var direction: Vector2 = (grip - shoulder).normalized()
+	var elbow: Vector2 = shoulder.lerp(grip, 0.5) + direction.orthogonal() * facing * 5.5 + Vector2(0, 2)
+	var armor: Color = Color("be9156") if str(player.get("character", "ranger")) == "vanguard" else Color("a4b4a4")
+	armor.a = opacity
+	var outline: Color = Color(INK,opacity)
+	draw_polyline(PackedVector2Array([shoulder, elbow, grip]), outline, 7.0, false)
+	draw_line(shoulder, elbow, armor, 4.8, false)
+	draw_line(elbow, grip, armor.darkened(0.15), 4.2, false)
+	draw_circle(elbow, 2.6, outline)
+	draw_circle(elbow, 1.6, armor.lightened(0.15))
+	draw_line(shoulder + Vector2(0,-1), elbow + Vector2(0,-1), Color(Color("e5d7b5"),opacity), 1.0, false)
 
 
 func _draw_enemies() -> void:
@@ -1529,6 +1742,7 @@ func _draw_hazard(hazard: Dictionary) -> void:
 func _draw_effects() -> void:
 	_draw_particle_batches()
 	for effect: Dictionary in _effects:
+		if bool(effect.get("melee", false)): continue
 		if str(effect.get("kind","")) in PARTICLE_KINDS: continue
 		var pose: Dictionary = muzzle_effect_pose(effect)
 		if not bool(pose.visible):

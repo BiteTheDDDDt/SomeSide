@@ -152,6 +152,7 @@ func _check_weapon_visual_feedback() -> void:
 	var remote: Dictionary = simulation.state.players[2]
 	var actual_metadata: bool = true
 	var follows: bool = true
+	var aim_control: bool = true
 	var changed_weapon_hides: bool = true
 	var dead_hides: bool = true
 	var immutable: bool = true
@@ -202,7 +203,10 @@ func _check_weapon_visual_feedback() -> void:
 		world.set_frame(moved_snapshot,1,1.0/60.0)
 		var draw_pose: Dictionary = world.weapon_draw_pose(moved_snapshot.players[2])
 		var flash_pose: Dictionary = world.muzzle_effect_pose(flash)
-		follows = follows and bool(flash_pose.visible) and Vector2(flash_pose.pos).distance_to(draw_pose.muzzle)<0.001 and Vector2(flash_pose.aim).distance_to(remote.aim)<0.001 and Vector2(draw_pose.position).distance_to(remote.pos)>0.1 and Vector2(flash_pose.pos).distance_to(WeaponPose.muzzle_position(remote))>0.1
+		var displayed_axis: Vector2 = Vector2.from_angle(float(draw_pose.weapon_angle))
+		follows = follows and bool(flash_pose.visible) and Vector2(flash_pose.pos).distance_to(draw_pose.muzzle)<0.001 and Vector2(flash_pose.aim).distance_to(displayed_axis)<0.001 and Vector2(draw_pose.position).distance_to(remote.pos)>0.1 and Vector2(flash_pose.pos).distance_to(WeaponPose.muzzle_position(remote))>0.1
+		var expected_aim: Vector2 = Vector2.RIGHT if str(entry.id)=="arc_blade" else Vector2(remote.aim)
+		aim_control = aim_control and Vector2(draw_pose.aim).distance_to(expected_aim)<0.001
 		await process_frame
 		immutable = immutable and var_to_bytes(snapshot)==original_snapshot and var_to_bytes(events)==original_events and var_to_bytes(moved_snapshot)==original_moved
 		remote.weapon = "arc_blade" if str(entry.id)!="arc_blade" else "pulse_rifle"
@@ -213,7 +217,8 @@ func _check_weapon_visual_feedback() -> void:
 		world.set_frame(simulation.get_snapshot(),1,1.0/60.0)
 		dead_hides = dead_hides and not bool(world.muzzle_effect_pose(flash).visible)
 	_check(actual_metadata,"All eight real authoritative attacks retain weapon and owner when transformed into rendered muzzle, flame or slash effects")
-	_check(follows,"Actual attack feedback follows the remote character's interpolated muzzle and current aim, instead of stale authority coordinates")
+	_check(follows,"Actual attack feedback follows the remote character's interpolated muzzle and displayed weapon axis, including recoil and swing rotation")
+	_check(aim_control,"Ranged attacks immediately follow current aim while the blade retains its original swing direction")
 	_check(changed_weapon_hides,"Changing each weapon suppresses that weapon's still-alive outgoing muzzle effect")
 	_check(dead_hides,"Death suppresses stale attached attack feedback for every weapon")
 	_check(immutable,"Pushing real attacks and updating their smoothed poses cannot alter event payloads or incoming snapshots")
