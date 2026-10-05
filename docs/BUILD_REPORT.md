@@ -1,32 +1,30 @@
-# SomeSide v0.13.1 本地网页预览修复
+# SomeSide v0.14.0 操作、金币与声音更新
 
-用户在 Chrome 与 Firefox 中直接双击导出的 `index.html`，以 `file://` 运行，导致 WebAssembly / 资源下载被浏览器阻止，显示 `Failed to fetch`。问题与是否支持 WebGL 无关；旧加载页将所有启动失败都提示为浏览器兼容性问题，造成误导。
+## 行为变化
 
-## 修改
-
-- 新增项目根目录 `PlayWeb.cmd`，通过 `tools/serve-web.ps1` 和 Python 标准库预览服务，自动打开默认浏览器中的 `http://127.0.0.1:8765/`。只绑定本机，只提供 Web 导出目录；不开放目录列表或越界路径。游玩时保留控制台，Ctrl+C 停止。
-- 默认读取当前项目版本选择导出目录；可指定 `-Directory`、`-Port`，开发自动化可用 `-NoBrowser`。本地预览需要 Python 3，当前机器已安装；上传 itch 后，玩家无需 Python 或本地服务器。
-- 加载页在 `file://` 下提前停止，不请求 `.wasm` / `.pck`，明确提示使用预览服务器或 itch，并给出 `PlayWeb.cmd`；隐藏无意义的重试按钮，保留 Windows 下载链接。
-- 真实下载失败和缺少浏览器功能分别显示对应提示，不再把 `Failed to fetch` 归为 WebGL 不兼容。
-- 更新中英使用说明；游戏运行逻辑仅更新版本号，玩法、图像和联机没有变化。
+- 普通与精英击杀金币立即给当前全队到账，保留 4/9 基础金额及首领固定 35 奖金；远处和倒地队友照常收到。丰收协议采用存活队员中的最高层数，最多翻倍，固定首领奖金不加成。金币不再占用地面物品预算；治疗吸取和遗物、武器、主动装备的手动选择不变。同步更新磁环/丰收协议的中英说明。
+- Space、W、上方向键各自记录新的物理按下，可在另一键仍按住时发起新跳跃。保留短按低跳、长按高跳、羽翼空跳次数、A/D 后按优先、平台下落和失焦清理，不会因交替按键获得额外空跳。
+- 两个角色的跑步循环由实际显示位移推进，完整步幅由约 127.4px 标定为 60px；相对瞄准方向后退时反转循环，停下时停止积累步幅，高移速不再卡在原先 2 倍动画速度上限。落地移动超过 4px 即回到跑步；身体与武器采样相同的插值位置，权威坐标与命中规则不变。
+- 61 种原创分层 PCM 音效覆盖 8 主武器、8 主动装备、跳跃/空跳/落地/冲刺、命中/受伤/死亡、金币/治疗、4 稀有度拾取、设施、传送门、复活和 UI。主机发成功动作事件；预测主武器不会被权威副本重复播放，客户端移动重放不发音效。
+- 12 声部，其中普通战斗最多使用 8 个，给重要反馈留出空间；按事件和事件族限频，金币连杀提示间隔至少 90ms。音库 1,049,210 bytes，加环境声 352,800 bytes，共约 1.34 MiB；本机单独首次合成约 0.7 秒，之后复用静态缓存，不在每次攻击时生成。
 
 ## 验证
 
-- 真实启动新 Python 预览服务：HTTP/HEAD、WASM/PCK MIME、仅本机地址、越界路径拒绝检查通过。
-- Chrome **154.0.8037.93**、Firefox **148.0.2** 均从该服务加载最终 v0.13.1、点击进入单人并移动/射击，无浏览器或 Godot 运行时错误。合计 **11 项检查通过**。证据：`tools/results/web-preview-v0131/report.json` 及两浏览器菜单/实战截图。
-- 实际运行 `PlayWeb.cmd -NoBrowser -Port 0`，服务器返回 HTTP 200；随后通过 Ctrl+C 关闭测试会话。
-- Chrome 加载回归：中英 `file://`、WASM 404、JS 404、WebGL 缺失，共 **8 场景 / 60 项通过**。本地文件场景不发出 WASM/PCK 请求，显示准确说明。
-- Firefox 中英 `file://` 另测 **16 项通过**，无未捕获异常。证据：`tools/results/web-loader-v0131-chrome/report.json`、`web-loader-v0131-firefox/report.json`。浏览器与预览服务均已关闭。
-- 发布 ZIP 11 个文件，根目录 `index.html`，相对依赖、大小、文件头及 itch 限制检查通过，解压 62,041,758 bytes。证据：`tools/results/web-zip-v0131-audit.json`。
+- 30 套逻辑、输入、布局、渲染缓存和 Web 平台回归，共 **1520 项通过，0 失败**。最终音效 72、主路径音效 14、Web 运行时 33 项再次检查，无错误或警告。汇总：`tools/results/tests-v014-summary.json`。初次 runner 到尚未保存的音效测试时停止，保存后继续余下套件；最终音效测试已修正 headless dummy mixer 的退出警告。
+- 模拟检查覆盖全队金币金额、重复死亡、Boss 奖金、地面物品满预算、连锁击杀、预测/快照幂等；跳跃覆盖两键顺序、落地后保留旧键、无羽翼/有羽翼限制。两角色三关无道具单跳可达性继续通过。
+- 原生渲染录制：150 帧、60fps 的前进/后退对照，两名角色共四列。`tools/results/gait-v014/comparison.webm`，逐帧 PNG 与位移/相位记录同目录。上行为旧时钟相位参考，下行为新 World 显示路径。实际导出 EXE 演示运行 480 tick，截图 `tools/results/native-v014.png`，无运行时错误。
+- Windows 导出成品：主机加 3 客户端，中英混合，高级武器/技能场景四端均通过，退出码均 0、运行时错误均 0。记录：`tools/results/network-export-bilingual-20261005-101323/summary.json`。
+- Chrome 实际 Web 成品 14 项通过：跨域 iframe、手势音频、IndexedDB 偏好、全屏、真实单人输入、不同尺寸、模拟推进与 14 种角色缓存。Firefox 本地 HTTP 预览另测 9 项通过，包括实际单人、声音输出和资源响应。两浏览器都检测到运行中的 AudioContext 和非零输出信号，未报告运行时错误。记录：`tools/results/web-browser-v014/report.json`、`tools/results/web-preview-v014-firefox/report.json`。
+- 最终 Web ZIP 11 个文件、根目录 index.html；相对资源路径、大小、WASM/PCK 文件头和 itch 限制检查通过，解压 62,056,734 bytes。记录：`tools/results/web-zip-v014-audit.json`。临时浏览器、预览服务器与验证进程均已关闭。
 
-本补丁未修改玩法，未重复完整逻辑回归；v0.13.0 的 26 套 / 1325 项检查及 Windows 四人联机基线见 [上版构建报告](BUILD_REPORT_v0.13.0.md)。未修改 itch 页面。
+原有八帧中仍有相似腿部姿态，本次未编辑 PNG，尚不是精确脚掌锁地的骨骼/IK 动画。声音验证包括路由、样本的峰值/RMS/包络差异和实际输出，不代表经过人工听感混音。试听按顺序存于 `tools/results/audio-preview/weapons.wav`、`equipment.wav`、`feedback.wav`，对应时间轴与测量在同目录 report.json。
 
 ## 产物
 
-- Web：`dist/SomeSide-v0.13.1-web.zip`，32,329,360 bytes。
-- Web SHA256：`F6BFB15F7B13B10ECBD6E86C190F25D10D31AB3A4838B8AEC7046D6D103EC628`
-- Windows 同版本包：`dist/SomeSide-v0.13.1-windows-x64.zip`，60,145,712 bytes。
-- Windows ZIP SHA256：`272BCED49AAECE506DC745579D6CBB8BA9CD4688B63E80773BA2BC87158BCB27`
-- EXE SHA256：`4EA2C88B392D3A65940C8941401385F60403E5051BEA54E174853AC08022D71F`
+- Windows：`dist/SomeSide-v0.14.0-windows-x64.zip`，60,160,399 bytes。
+- Windows ZIP SHA256：`902E0A882ECF94471AB0D2C3D759D0ECACA385E3F0295FDC33F0F7211B0F8EDA`
+- EXE：`dist/v0.14.0/SomeSide.exe`；SHA256：`7116580FDCAA261E651A942C9583AFCA499B5758390FB869076D9A07473E2CEE`
+- Web：`dist/SomeSide-v0.14.0-web.zip`，32,344,031 bytes。
+- Web ZIP SHA256：`15BC90BE498BF4DBB1147850018F850EDBD1B1B57ACE35A0FABC2E4EEE4F5F4C`
 
-旧版本保留，用户封面及导入文件未修改。新的本地预览辅助脚本保存在源码工程，HTML5 上传包不包含 Windows 启动脚本。操作见 [网页使用与上传说明](ITCH_WEB.zh-CN.md)。
+本地玩网页版用根目录 PlayWeb.cmd；itch 上传包直接使用上述 Web ZIP。旧版本产物继续保留，用户 cover.png 未纳入此提交。没有自动替换线上 itch 文件。上版记录：[v0.13.1](BUILD_REPORT_v0.13.1.md)。

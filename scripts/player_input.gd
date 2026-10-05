@@ -9,6 +9,7 @@ const JUMP_KEYS: Array[int] = [KEY_SPACE, KEY_W, KEY_UP]
 
 var _pressed: Dictionary = {}
 var _press_order: int = 0
+var _jump_pending: bool = false
 
 func handle_event(event: InputEvent) -> void:
 	if not event is InputEventKey:
@@ -28,10 +29,21 @@ func handle_event(event: InputEvent) -> void:
 		return
 	_press_order += 1
 	_pressed[key] = _press_order
+	if key in JUMP_KEYS:
+		_jump_pending = true
 
 func reset() -> void:
 	_pressed.clear()
 	_press_order = 0
+	_jump_pending = false
+
+## An action-level edge merges Space/W/Up, losing a new key press while another
+## alias is held. Latch physical presses until the next command, including taps
+## between ticks; multiple presses in one tick still request only one jump.
+func consume_jump_pressed() -> bool:
+	var pressed: bool = _jump_pending
+	_jump_pending = false
+	return pressed
 
 func movement_axis() -> float:
 	var newest_order: int = -1

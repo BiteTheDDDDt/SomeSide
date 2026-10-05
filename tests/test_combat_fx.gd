@@ -66,6 +66,12 @@ func _run() -> void:
 		_check(not shatter.is_empty(),"Actual "+kind+" death produces a short material breakup")
 		if not shatter.is_empty(): materials[str(shatter.color)]=true
 	_check(materials.size()==3,"Organic, stone and mechanical deaths have distinct material palettes")
+	world._effects.clear()
+	world.push_events([{"type":"pickup","kind":"coin","automatic":true,"pos":player.pos}])
+	_check(world._effects.size()==5 and world._effects.all(func(effect: Dictionary) -> bool: return effect.color==World.GOLD) and world._effects.back().radius==15.0,"Automatic gold collection uses four gold motes and one compact ring")
+	world._effects.clear()
+	world.push_events([{"type":"pickup","kind":"item","pos":player.pos}])
+	_check(world._effects.size()==12 and world._effects.all(func(effect: Dictionary) -> bool: return effect.color==World.TEAL) and world._effects.back().radius==32.0,"Relic pickup retains its larger teal feedback")
 	var state_bytes: PackedByteArray=var_to_bytes(sim.state)
 	world.set_frame(sim.get_snapshot(),1,0.0)
 	world.fx_scale=1.5

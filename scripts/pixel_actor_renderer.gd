@@ -151,7 +151,12 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 		var movement_speed: float = float(source.get("movement_speed", 245.0 if id in ["ranger", "vanguard"] else 110.0))
 		if not is_finite(movement_speed) or movement_speed <= 0.0:
 			movement_speed = 245.0 if id in ["ranger", "vanguard"] else 110.0
-		_actors[id] = {"path": path, "frames": frames, "animations": animations, "animation_modes": modes, "movement_speed": movement_speed, "bounds": bounds, "scale": scale_value}
+		# World pixels covered by one complete two-step cycle. Optional so older
+		# enemy/fixture sheets retain their authored time-driven wing/leg cycles.
+		var stride_distance: float = float(source.get("stride_distance", 0.0))
+		if not is_finite(stride_distance) or stride_distance < 0.0 or stride_distance > 4096.0:
+			stride_distance = 0.0
+		_actors[id] = {"path": path, "frames": frames, "animations": animations, "animation_modes": modes, "movement_speed": movement_speed, "stride_distance": stride_distance, "bounds": bounds, "scale": scale_value}
 
 static func _bake_frames(image: Image, frames: Array, union: Rect2, scale_value: float) -> bool:
 	if image == null or image.is_empty():
@@ -346,16 +351,20 @@ static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary,
 	var dt: float = safe_clock - float(track.get("clock", safe_clock))
 	var reset: bool = track.is_empty() or dt < 0.0 or dt > 0.5 or position_value.distance_squared_to(track.get("pos", position_value)) > 180.0 * 180.0
 	var restart: bool = false
+	var land_position: Vector2 = track.get("land_position", position_value)
 	if not reset and player:
 		var landing: bool = grounded and not bool(track.grounded) and requested not in ["dash", "dead"] and actor.animations.has("land")
 		var firing: bool = requested == "idle" and attack_count > int(track.attack_count) and actor.animations.has("attack")
 		if landing or firing:
 			animation = "land" if landing else "attack"
 			restart = true
+			if landing:
+				land_position = position_value
 		elif requested in ["idle", "run"] and str(track.animation) in ["land", "attack"] and float(track.elapsed) + dt < _duration(actor, str(track.animation)):
 			# A landing is visual only: walking, aiming and firing remain live.
 			# Running immediately interrupts a standing attack pose.
-			if str(track.animation) == "land" or requested == "idle":
+			var left_contact: bool = str(track.animation) == "land" and requested == "run" and dt > 0.0 and absf(position_value.x - land_position.x) > 4.0
+			if not left_contact and (str(track.animation) == "land" or requested == "idle"):
 				animation = str(track.animation)
 	var velocity: Vector2 = state.get("vel", Vector2.ZERO)
 	var rate: float = 1.0
@@ -366,10 +375,25 @@ static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary,
 		if not player and bool(state.get("flying", false)):
 			rate = maxf(1.0, rate)
 	var elapsed: float = 0.0
+	var tracked_position: Vector2 = position_value
 	if not reset and not restart and animation == str(track.get("animation", "")):
-		# Integrate cadence instead of multiplying the entire world clock by the
-		# current speed. Speed relics and braking cannot rewind the running cycle.
-		elapsed = float(track.elapsed) + dt * float(track.get("rate", rate))
+		elapsed = float(track.elapsed)
+		if player and animation == "run" and float(actor.stride_distance) > 0.0:
+			# A planted foot must sweep opposite actual travel. Aim mirrors the
+			# body independently, so backpedalling reverses the gait. Measure the
+			# rendered position: no skating through stops, clamped haste cadence,
+			# or phase drift while interpolation and simulation use different Hz.
+			if dt > 0.0:
+				var facing: float = 1.0 if Vector2(state.get("aim", Vector2.RIGHT)).x >= 0.0 else -1.0
+				var travel: float = position_value.x - Vector2(track.pos).x
+				elapsed += travel * facing * _duration(actor, animation) / float(actor.stride_distance)
+			else:
+				# A projectile may ask for its muzzle during set_frame, before the
+				# world clock advances. Keep that travel for the next render sample.
+				tracked_position = track.pos
+		else:
+			# Integrate flying/enemy cadence instead of rescaling the world clock.
+			elapsed += dt * float(track.get("rate", rate))
 	elif not player and animation in ["idle", "move", "run"]:
 		elapsed = float(posmod(int(state.get("id", 0)), 37)) * 0.071
 	if not player:
@@ -382,7 +406,7 @@ static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary,
 				oldest_clock = float(tracks[existing_key].clock)
 				oldest = existing_key
 		tracks.erase(oldest)
-	tracks[key] = {"clock": safe_clock, "animation": animation, "elapsed": elapsed, "rate": rate, "grounded": grounded, "attack_count": attack_count, "pos": position_value}
+	tracks[key] = {"clock": safe_clock, "animation": animation, "elapsed": elapsed, "rate": rate, "grounded": grounded, "attack_count": attack_count, "pos": tracked_position, "land_position": land_position}
 	cache.clock = safe_clock
 	canvas.set_meta(TRACK_META, cache)
 	return _sample_frame(id, actor, state, animation, elapsed, player)

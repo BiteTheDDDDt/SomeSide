@@ -159,11 +159,102 @@ func _run() -> void:
 	_check(Pixels.tracked_frame_for(world, "ranger", player, 10.4, true).index == 2, "The real world run-restart path resets animation even when presentation time stays monotonic")
 	world.free()
 	_check_landing_weapon()
+	_check_distance_stride(image)
 	canvas.free()
 	other_canvas.free()
 	Pixels.reload_manifest()
+	for id: String in ["ranger", "vanguard"]:
+		var actor: Dictionary = Pixels._actors[id]
+		_check(float(actor.stride_distance) >= 48.0 and float(actor.stride_distance) <= 72.0, "%s authored two-step gait is calibrated to its foot sweep instead of the former 127px slide" % id)
 	print("ACTOR_ANIMATION_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
+
+func _check_distance_stride(image: Image) -> void:
+	var record: Dictionary = _record()
+	record.stride_distance = 80.0
+	Pixels.install_manifest({"version": 1, "actors": {"ranger": record}}, {"fixture": ImageTexture.create_from_image(image)})
+	var canvas := Node2D.new()
+	var player: Dictionary = _player()
+	player.vel = Vector2(200, 0)
+	player.aim = Vector2.RIGHT
+	Pixels.tracked_frame_for(canvas, "ranger", player, 0.0, true)
+	player.pos.x += 22.0
+	var step: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.11, true)
+	_check(step.index == 3 and is_equal_approx(step.elapsed, 0.11), "A forward quarter-stride follows actual horizontal distance")
+	var frozen: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.3, true)
+	_check(frozen.index == step.index and frozen.elapsed == step.elapsed, "No displacement means no foot movement even if the snapshot still reports velocity")
+	player.vel.x = -200.0
+	player.pos.x -= 12.0
+	var reverse: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.36, true)
+	_check(reverse.index == 2 and is_equal_approx(reverse.elapsed, 0.05), "Backpedalling reverses the foot-contact sequence instead of moonwalking forward")
+	player.aim = Vector2.LEFT
+	var turned: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.36, true)
+	_check(turned.index == reverse.index and turned.elapsed == reverse.elapsed, "Mouse-facing changes alone do not advance or restart the current stride")
+	player.pos.x -= 12.0
+	var left: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.42, true)
+	_check(left.index == 3 and is_equal_approx(left.elapsed, 0.11), "Moving left while aiming left uses the mirrored forward gait")
+	player.pos.x += 24.0
+	player.vel.x = 400.0
+	var right_backward: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.48, true)
+	_check(is_equal_approx(right_backward.elapsed, -0.01) and right_backward.index == 5, "Moving right while aiming left wraps the reverse gait correctly")
+	var before: PackedByteArray = var_to_bytes(player)
+	var repeated: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 0.48, true)
+	_check(repeated.elapsed == right_backward.elapsed and var_to_bytes(player) == before, "Repeated body/weapon sampling is idempotent and leaves physical state untouched")
+	Pixels.reset_tracks(canvas)
+	player.aim = Vector2.RIGHT
+	player.vel.x = 800.0
+	Pixels.tracked_frame_for(canvas, "ranger", player, 1.0, true)
+	player.pos.x += 64.0
+	var haste: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 1.08, true)
+	_check(is_equal_approx(haste.elapsed, 0.32), "High haste follows the complete travelled stride without the previous 2x cadence ceiling")
+	player.pos.x += 10.0
+	var early_muzzle: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 1.08, true)
+	var after_clock: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 1.10, true)
+	_check(early_muzzle.elapsed == haste.elapsed and is_equal_approx(after_clock.elapsed, haste.elapsed + 0.05), "A muzzle query before the world clock advances cannot consume the next frame's foot travel")
+	var phases: Array[float] = []
+	for rate: int in [30, 60, 120, 165]:
+		Pixels.reset_tracks(canvas)
+		player.pos.x = 100.0
+		var frame: Dictionary
+		for tick: int in range(rate + 1):
+			# Accelerating travel uses the same analytical path at every render rate.
+			var t: float = float(tick) / rate
+			player.pos.x = 100.0 + 160.0 * t * t
+			player.vel.x = maxf(16.0, 320.0 * t)
+			frame = Pixels.tracked_frame_for(canvas, "ranger", player, t, true)
+		phases.append(float(frame.elapsed))
+	_check(phases.all(func(value: float) -> bool: return absf(value - 0.8) < 0.00001), "Actual accelerating travel produces the same stride at 30, 60, 120 and 165 FPS")
+	player.vel = Vector2.ZERO
+	_check(Pixels.tracked_frame_for(canvas, "ranger", player, 1.01, true).animation == "idle", "Stopping immediately exits the distance-driven run cycle")
+	var world := World.new()
+	player.vel = Vector2(200, 0)
+	player.pos = Vector2(100, 200)
+	world._render_positions["p1"] = Vector2(90, 200)
+	world._clock = 2.0
+	world.weapon_draw_pose(player)
+	player.pos.x += 20.0
+	world._render_positions["p1"] = Vector2(97, 200)
+	world._clock = 2.1
+	var immutable: PackedByteArray = var_to_bytes(player)
+	var pose: Dictionary = world.weapon_draw_pose(player)
+	var tracked: Dictionary = world.get_meta(Pixels.TRACK_META).tracks["p:1:ranger"]
+	_check(tracked.pos == Vector2(97, 200) and is_equal_approx(tracked.elapsed, 0.035), "The production weapon path advances gait by seven rendered pixels rather than twenty snapshot pixels")
+	var displayed: Dictionary = player.duplicate(false)
+	displayed.pos = pose.position
+	var body: Dictionary = Pixels.tracked_frame_for(world, "ranger", displayed, world._clock, true)
+	_check(is_equal_approx(body.elapsed, tracked.elapsed) and var_to_bytes(player) == immutable, "The body reuses the displayed weapon sample while the authoritative snapshot stays unchanged")
+	world.free()
+	Pixels.reset_tracks(canvas)
+	player.grounded = false
+	player.vel = Vector2(245, 100)
+	Pixels.tracked_frame_for(canvas, "ranger", player, 3.0, true)
+	player.grounded = true
+	player.vel.y = 0.0
+	var land: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 3.01, true)
+	player.pos.x += 5.0
+	var leaving_contact: Dictionary = Pixels.tracked_frame_for(canvas, "ranger", player, 3.03, true)
+	_check(land.animation == "land" and leaving_contact.animation == "run", "Running out of a landing resumes footwork after four pixels instead of sliding through a stationary crouch")
+	canvas.free()
 
 func _check_landing_weapon() -> void:
 	var world := World.new()

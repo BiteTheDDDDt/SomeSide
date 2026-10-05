@@ -11,7 +11,7 @@ const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
-const VERSION: String = "0.13.1"
+const VERSION: String = "0.14.0"
 const DEFAULT_PORT: int = 27841
 const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
 const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
@@ -296,7 +296,7 @@ func _get_command() -> Dictionary:
 		aiming_player.pos = Vector2(player.pos) + _visual_error
 	command.aim = WeaponPose.aim_at(aiming_player, world.screen_to_world(get_viewport().get_mouse_position()))
 	command.move = _player_input.movement_axis()
-	command.jump = Input.is_action_just_pressed("jump")
+	command.jump = _player_input.consume_jump_pressed()
 	command.jump_held = _player_input.jump_held()
 	command.drop = Input.is_action_pressed("down") and command.jump
 	command.fire = Input.is_action_pressed("fire")
@@ -348,7 +348,7 @@ func _predict_attack_feedback(command: Dictionary, delta: float) -> void:
 			event.kind = "lance"
 	event.merge(sim._visual_data(local_id), false)
 	world.push_events([event])
-	sound.play_event(str(event.type))
+	sound.play_game_event(event)
 
 func _is_web() -> bool:
 	return _web_runtime
@@ -391,18 +391,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		if event.keycode == KEY_ESCAPE:
 			if screen == "playing":
+				sound.play_event("ui_back" if paused else "ui")
 				if paused:
 					_resume()
 				else:
 					_show_pause()
 			elif screen in ["join", "settings", "guide", "characters"]:
+				sound.play_event("ui_back")
 				_show_menu()
 		if event.keycode == KEY_TAB and screen == "playing":
+			sound.play_event("ui_back" if paused else "ui")
 			if paused:
 				_resume()
 			else:
 				_show_inventory()
 		if event.keycode == KEY_M and screen == "playing":
+			sound.play_event("ui_back" if paused else "ui")
 			if paused:
 				_resume()
 			else:
@@ -753,12 +757,21 @@ func _consume_events(events: Array) -> void:
 	for event in presented:
 		var kind: String = str(event.get("type", ""))
 		var distance: float = local_position.distance_to(event.get("pos", local_position))
-		sound.play_event(kind, distance)
+		var audio_event: Dictionary = event
+		if kind == "pickup":
+			if bool(event.get("automatic", false)) and str(event.get("kind", "")) == "coin":
+				# Kill gold is shared immediately, even when a teammate fights far away.
+				distance = 0.0
+			elif not str(event.get("item", "")).is_empty():
+				audio_event = event.duplicate(false)
+				audio_event["rarity"] = Simulation.loot_definition(str(event.item)).get("rarity", "common")
+		sound.play_game_event(audio_event, distance)
 		if kind == "pickup" and int(event.get("player", -1)) == local_id and not str(event.get("item", "")).is_empty():
 			var definition: Dictionary = Simulation.loot_definition(str(event.item))
 			var category: String = str(definition.get("category", "passive"))
 			_notify(Locale.format("获得遗物 · %s · %s" if category == "passive" else "已装备 · %s · %s", [Locale.text(Content.rarity_name(str(definition.get("rarity", "common")))), Locale.text(str(definition.get("name", event.item)))]))
 		elif kind == "notice" and int(event.get("player", -1)) == local_id:
+			sound.play_event("ui_error")
 			var message_key: String = str(event.get("message_key", event.get("message", "")))
 			var message_args: Array = event.get("message_args", [])
 			_notify(Locale.text(message_key) if message_args.is_empty() else Locale.format(message_key, message_args), 3.0)

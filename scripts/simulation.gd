@@ -113,7 +113,7 @@ func add_player(id: int, player_name: String, character: String) -> void:
 		"hp": health, "max_hp": health, "shield": 0.0, "coins": 35,
 		"items": {}, "dead": false, "grounded": false, "fire_cd": 0.0,
 		"skill_cd": 0.0, "dash_cd": 0.0, "invuln": 1.5,
-		"kills": 0, "revive": 0.0, "coyote": 0.0, "jumps": 0, "jump_rising": false,
+		"kills": 0, "revive": 0.0, "coyote": 0.0, "jumps": 0, "jump_rising": false, "land_ready": false,
 		"drop_timer": 0.0, "dash_timer": 0.0, "dash_dir": Vector2.RIGHT,
 		"hurt_timer": 0.0, "revive_timer": 0.0, "interact_cd": 0.0, "shield_timer": 0.0,
 		"explore_anchor": position, "explore_sites": [position], "explore_window": 0.0, "explore_budget": 0,
@@ -185,6 +185,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
 		player["jump_rising"] = false
+		player["land_ready"] = false
 		player["chrono_timer"] = maxf(0.0, float(player.get("chrono_timer", 0.0)) - dt)
 		player["momentum_timer"] = maxf(0.0, float(player.get("momentum_timer", 0.0)) - dt)
 		var corpse_velocity: Vector2 = player.get("vel", Vector2.ZERO)
@@ -206,7 +207,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 				_emit("revive", player["pos"], {"player": player["id"]})
 		return
 	var was_dash: float = float(player.get("dash_timer", 0.0))
-	_move_player(player, command, dt)
+	_move_player(player, command, dt, true)
 	if float(player.get("dash_timer", 0.0)) > was_dash:
 		player["momentum_timer"] = 1.2
 		player["invuln"] = maxf(float(player["invuln"]), 0.23)
@@ -228,7 +229,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		_interact(player, command.get("interact_target", {}))
 
 
-func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
+func _move_player(player: Dictionary, command: Dictionary, dt: float, report_events: bool = false) -> void:
 	player["chrono_timer"] = maxf(0.0, float(player.get("chrono_timer", 0.0)) - dt)
 	player["momentum_timer"] = maxf(0.0, float(player.get("momentum_timer", 0.0)) - dt)
 	var direction: Vector2 = command.get("aim", player.get("aim", Vector2.RIGHT))
@@ -238,6 +239,13 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 	var velocity: Vector2 = player.get("vel", Vector2.ZERO)
 	var position: Vector2 = player.get("pos", state.get("spawn", Vector2(210.0, _floor_y() - PLAYER_HALF.y)))
 	var grounded: bool = bool(player.get("grounded", false))
+	var was_grounded: bool = grounded
+	var jumped: bool = false
+	var double_jump: bool = false
+	# New arrivals must establish ground contact before their first landing
+	# sound. Prediction maintains this state too, but never emits feedback.
+	if grounded:
+		player["land_ready"] = true
 	# Only a deliberate jump owns variable-height control. Dash momentum,
 	# knockback and simply walking off a ledge must never be cut by this input.
 	if grounded or velocity.y >= 0.0 or float(player.get("dash_timer", 0.0)) > 0.0:
@@ -263,10 +271,13 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 			player["coyote"] = 0.0
 			player["jump_rising"] = true
 			grounded = false
+			jumped = true
 		elif int(player.get("jumps", 0)) < 1 + _stacks(player, "feather") and _stacks(player, "feather") > 0:
 			velocity.y = -JUMP_SPEED * 0.91
 			player["jumps"] = maxi(1, int(player.get("jumps", 0))) + 1
 			player["jump_rising"] = true
+			jumped = true
+			double_jump = true
 	if bool(command.get("dash", false)) and float(player["dash_cd"]) <= 0.0:
 		var dash_direction: Vector2 = Vector2(move, 0.0)
 		if absf(move) < 0.1:
@@ -286,12 +297,20 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 			player["jump_rising"] = false
 		velocity.x = move_toward(velocity.x, move * speed, (2500.0 if grounded else 1800.0) * dt)
 		velocity.y = minf(1100.0, velocity.y + GRAVITY * dt)
+	if jumped:
+		player["land_ready"] = true
 	var result: Dictionary = _move_body(position, velocity, dt, PLAYER_HALF, float(player["drop_timer"]) > 0.0)
 	player["pos"] = result["pos"]
 	player["vel"] = result["vel"]
 	player["grounded"] = result["grounded"]
+	if report_events:
+		if jumped and float(player["dash_timer"]) <= 0.0:
+			_emit("jump", player["pos"], {"player": player["id"], "double": double_jump})
+		if not was_grounded and bool(result["grounded"]) and bool(player.get("land_ready", false)) and velocity.y >= 120.0:
+			_emit("land", player["pos"], {"player": player["id"], "impact_speed": velocity.y})
 	if bool(result["grounded"]):
 		player["jumps"] = 0
+		player["land_ready"] = true
 	if bool(result["grounded"]) or Vector2(result["vel"]).y >= 0.0:
 		player["jump_rising"] = false
 	if Vector2(player["pos"]).y > _world_size().y + 80.0:
@@ -299,6 +318,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		player["pos"] = Vector2(clampf(position.x, 30.0, _world_size().x - 30.0), _floor_y() - PLAYER_HALF.y - 24.0)
 		player["vel"] = Vector2.ZERO
 		player["jump_rising"] = false
+		player["land_ready"] = false
 
 
 func _move_body(position: Vector2, velocity: Vector2, dt: float, half: Vector2, drop: bool = false) -> Dictionary:
@@ -431,6 +451,7 @@ func _use_skill(player: Dictionary) -> void:
 			_emit("explosion", turret_pos, {"radius": 55.0, "owner": player["id"], "kind": "turret", "team": "player"})
 		"meteor":
 			var effects: Array = state.get("effects", [])
+			var effects_before: int = effects.size()
 			for index in range(3):
 				if effects.size() >= 24:
 					break
@@ -438,6 +459,8 @@ func _use_skill(player: Dictionary) -> void:
 				impact.x = clampf(impact.x, 20.0, _world_size().x - 20.0)
 				effects.append({"id": _id(), "kind": "meteor", "pos": impact, "delay": 0.5 + index * 0.25, "radius": 150.0, "damage": 140.0 * _damage_scale(player), "owner": player["id"]})
 			state["effects"] = effects
+			if effects.size() > effects_before:
+				_emit("equipment", position, {"equipment": "meteor", "player": player["id"]})
 		"time_warp":
 			for teammate_value in Dictionary(state["players"]).values():
 				var teammate: Dictionary = teammate_value
@@ -647,14 +670,16 @@ func _kill_enemy(enemy: Dictionary, player: Dictionary, owner: int, depth: int) 
 	if not player.is_empty():
 		player["kills"] = int(player["kills"]) + 1
 		player["hp"] = minf(float(player["max_hp"]), float(player["hp"]) + _stacks(player, "siphon") * 1.8)
-	_spawn_pickup(position, "coin", "", 4 if not bool(enemy["elite"]) else 9)
+	# Currency is authority-side progress, not a collectible that can expire or
+	# fall behind the team. A squad's best living collector supplies the bonus;
+	# everybody keeps the existing full shared reward, including downed allies.
+	_credit_coins(9 if bool(enemy["elite"]) else 4, position, _coin_bonus_player(), "enemy_kill", owner, 35 if str(enemy["kind"]) == "boss" else 0)
 	if _rng.randf() < 0.12:
 		_spawn_pickup(position + Vector2(12.0, -12.0), "heal", "", 18)
 	if str(enemy["kind"]) == "boss":
 		state["boss_alive"] = false
 		for p_value in Dictionary(state["players"]).values():
 			var p: Dictionary = p_value
-			p["coins"] = int(p["coins"]) + 35
 			if not bool(p["dead"]):
 				p["hp"] = minf(float(p["max_hp"]), float(p["hp"]) + 35.0)
 		_spawn_pickup(position + Vector2(-25.0, -16.0), "item", _random_loot("boss"), 1)
@@ -665,6 +690,37 @@ func _kill_enemy(enemy: Dictionary, player: Dictionary, owner: int, depth: int) 
 	# cannot recurse, bounding the worst-case proc work even at high item stacks.
 	if depth == 0 and not player.is_empty() and _stacks(player, "ember") > 0:
 		_explode(position, 115.0, (12.0 + _stacks(player, "ember") * 9.0) * _damage_scale(player), owner, "player", 1)
+
+
+func _coin_bonus_player() -> Dictionary:
+	var best: Dictionary = {}
+	for value in Dictionary(state.get("players", {})).values():
+		var player: Dictionary = value
+		if bool(player.get("dead", false)):
+			continue
+		if best.is_empty() or _stacks(player, "harvest") > _stacks(best, "harvest") or (_stacks(player, "harvest") == _stacks(best, "harvest") and int(player["id"]) < int(best["id"])):
+			best = player
+	return best
+
+
+func _credit_coins(base_amount: int, position: Vector2, collector: Dictionary, source: String = "pickup", owner: int = -1, fixed_bonus: int = 0) -> int:
+	var players: Dictionary = state.get("players", {})
+	if players.is_empty():
+		return 0
+	var harvest: int = 0 if collector.is_empty() else _stacks(collector, "harvest")
+	var reward: int = int(round(maxi(0, base_amount) * (1.0 + minf(1.0, harvest * 0.15)))) + maxi(0, fixed_bonus)
+	if reward <= 0:
+		return 0
+	var recipients: Array = players.keys()
+	recipients.sort()
+	for id: Variant in recipients:
+		var recipient: Dictionary = players[id]
+		recipient["coins"] = int(recipient["coins"]) + reward
+	var bonus_player: int = -1 if collector.is_empty() else int(collector["id"])
+	_emit("pickup", position, {"kind": "coin", "item": "", "automatic": source == "enemy_kill", "source": source,
+		"player": bonus_player if bonus_player >= 0 else int(recipients[0]), "owner": owner, "bonus_player": bonus_player,
+		"amount": reward, "base_amount": base_amount, "fixed_bonus": fixed_bonus, "recipients": recipients})
+	return reward
 
 
 func _explode(position: Vector2, radius: float, damage: float, owner: int, team: String, depth: int, effect_kind: String = "") -> void:
@@ -1566,13 +1622,12 @@ func _step_pickups(dt: float) -> void:
 				if distance < 30.0:
 					match kind:
 						"coin":
-							var reward: int = int(round(int(pickup["amount"]) * (1.0 + minf(1.0, _stacks(target, "harvest") * 0.15))))
-							for player_value in Dictionary(state["players"]).values():
-								var player: Dictionary = player_value
-								player["coins"] = int(player["coins"]) + reward
+							# Retain support for explicitly authored/legacy coin pickups.
+							_credit_coins(int(pickup["amount"]), position, target)
 						"heal":
 							target["hp"] = minf(float(target["max_hp"]), float(target["hp"]) + int(pickup["amount"]))
-					_emit("pickup", position, {"player": target["id"], "item": pickup["item"], "kind": kind})
+					if kind != "coin":
+						_emit("pickup", position, {"player": target["id"], "item": pickup["item"], "kind": kind})
 					taken = true
 		pickup["pos"] = position
 		if not taken and (str(pickup["kind"]) == "item" or float(pickup["age"]) < 50.0):
@@ -1672,6 +1727,7 @@ func _build_stage(stage: int) -> void:
 		player["shield_timer"] = 0.0
 		player["jumps"] = 0
 		player["jump_rising"] = false
+		player["land_ready"] = false
 		player["phoenix_spent"] = 0
 		player["chrono_timer"] = 0.0
 		player["momentum_timer"] = 0.0

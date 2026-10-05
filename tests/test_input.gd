@@ -26,6 +26,7 @@ func _run() -> void:
 	_test_aliases()
 	_test_repeat_and_reset()
 	_test_jump_hold()
+	_test_jump_edges()
 	_test_physical_keys()
 	await _test_real_event_dispatch()
 	print("INPUT_TEST_RESULT passed=", passed, " failed=", failed)
@@ -140,6 +141,38 @@ func _test_jump_hold() -> void:
 	tracker.handle_event(_key(KEY_Q, true))
 	tracker.handle_event(_key(KEY_S, true))
 	_check(not tracker.jump_held() and tracker.movement_axis() == 1.0, "Skill and drop keys do not masquerade as movement or jump")
+
+func _test_jump_edges() -> void:
+	var tracker = PlayerInput.new()
+	for first: int in PlayerInput.JUMP_KEYS:
+		for second: int in PlayerInput.JUMP_KEYS:
+			if first == second:
+				continue
+			tracker.reset()
+			tracker.handle_event(_key(first, true))
+			var first_edge: bool = tracker.consume_jump_pressed()
+			tracker.handle_event(_key(second, true))
+			_check(first_edge and tracker.consume_jump_pressed() and tracker.jump_held(), "Jump aliases %d then %d each issue a fresh edge while the other remains held" % [first, second])
+			_check(not tracker.consume_jump_pressed(), "An alias press is consumed once rather than repeated on later ticks")
+	tracker.reset()
+	tracker.handle_event(_key(KEY_SPACE, true))
+	tracker.consume_jump_pressed()
+	tracker.handle_event(_key(KEY_SPACE, true, true))
+	tracker.handle_event(_key(KEY_SPACE, true))
+	_check(not tracker.consume_jump_pressed(), "Autorepeat and duplicate physical downs never produce additional jumps")
+	tracker.handle_event(_key(KEY_W, true))
+	tracker.handle_event(_key(KEY_W, false))
+	_check(tracker.consume_jump_pressed() and tracker.jump_held(), "A quick alias tap between ticks survives release while another key maintains hold")
+	tracker.handle_event(_key(KEY_W, true))
+	tracker.handle_event(_key(KEY_UP, true))
+	_check(tracker.consume_jump_pressed() and not tracker.consume_jump_pressed(), "Several presses before one command coalesce without a delayed extra jump")
+	tracker.handle_event(_key(KEY_W, false))
+	tracker.handle_event(_key(KEY_W, true))
+	tracker.reset()
+	_check(not tracker.consume_jump_pressed() and not tracker.jump_held(), "Focus and session reset discard unconsumed presses as well as holds")
+	tracker.handle_event(_key(KEY_SPACE, true))
+	tracker.handle_event(_key(KEY_SPACE, false))
+	_check(tracker.consume_jump_pressed() and not tracker.jump_held(), "A released quick tap delivers the jump edge with released variable-height control")
 
 func _test_physical_keys() -> void:
 	var tracker = PlayerInput.new()

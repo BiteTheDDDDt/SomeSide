@@ -33,6 +33,7 @@ func _run() -> void:
 	await _test_direction_commands()
 	await _test_mouse_independence()
 	await _test_jump_commands()
+	await _test_alternating_jump_physics()
 	await _test_pause_and_focus()
 	_test_network_hold()
 	_release_all()
@@ -137,6 +138,9 @@ func _test_jump_commands() -> void:
 	command = _command()
 	_check(not bool(command.jump) and bool(command.get("jump_held", false)), "Keeping Space down preserves hold without issuing another jump edge")
 	_key(KEY_W, true)
+	command = _command()
+	_check(bool(command.jump) and bool(command.jump_held), "Pressing W while Space remains held sends its own jump edge")
+	_check(not bool(_command().jump), "A pending physical jump is consumed by exactly one command")
 	_key(KEY_SPACE, false)
 	_check(bool(_command().get("jump_held", false)), "A separately held W keeps jump held after Space is released")
 	await process_frame
@@ -154,6 +158,58 @@ func _test_jump_commands() -> void:
 	command = _command()
 	_check(bool(command.jump) and bool(command.drop), "The existing S plus Space platform-drop edge remains available")
 	_release_all()
+	await process_frame
+
+func _test_alternating_jump_physics() -> void:
+	var sim = game.sim
+	var saved_state: Dictionary = sim.state.duplicate(true)
+	sim.state.world_size = Vector2(1800, 1100)
+	sim.state.floor_y = 1000.0
+	sim.state.platforms = [Rect2(0, 1000, 1800, 60)]
+	for aliases: Array in [[KEY_SPACE, KEY_W], [KEY_W, KEY_SPACE]]:
+		for feathers: int in [0, 1]:
+			_release_all()
+			game.call("_reset_controls")
+			var player: Dictionary = sim.state.players[1]
+			player.pos = Vector2(650, 979)
+			player.vel = Vector2.ZERO
+			player.grounded = true
+			player.coyote = 0.0
+			player.jumps = 0
+			player.items = {"feather": feathers}
+			_key(int(aliases[0]), true)
+			sim._move_player(player, _command(), DT)
+			_check(int(player.jumps) == 1 and float(player.vel.y) < -600.0, "First physical alias starts the normal ground jump with %d feather(s)" % feathers)
+			for tick: int in range(10):
+				sim._move_player(player, _command(), DT)
+			var before: float = float(player.vel.y)
+			_key(int(aliases[1]), true)
+			var command: Dictionary = _command()
+			sim._move_player(player, command, DT)
+			_check(bool(command.jump) and bool(command.jump_held), "The second alias creates a real production jump request without releasing the first")
+			if feathers == 0:
+				_check(int(player.jumps) == 1 and float(player.vel.y) > before, "Alternating keys cannot grant an unearned air jump or extend ascent")
+			else:
+				_check(int(player.jumps) == 2 and float(player.vel.y) < -570.0, "The second alias consumes the available feather jump immediately")
+				_key(KEY_UP, true)
+				before = float(player.vel.y)
+				sim._move_player(player, _command(), DT)
+				_check(int(player.jumps) == 2 and float(player.vel.y) > before, "A third alias cannot exceed the one-feather jump budget")
+			_release_all()
+			sim._move_player(player, _command(), DT)
+			_check(float(player.vel.y) >= -260.01 and not bool(player.jump_rising), "Releasing all aliases still cuts the current jump to its short-hop ascent")
+			_key(int(aliases[0]), true)
+			# Consume the unavailable midair edge, then keep this alias held through landing.
+			sim._move_player(player, _command(), DT)
+			for tick: int in range(100):
+				sim._move_player(player, _command(), DT)
+			_check(bool(player.grounded) and int(player.jumps) == 0, "Keeping an alias held through landing never causes automatic bouncing")
+			_key(int(aliases[1]), true)
+			sim._move_player(player, _command(), DT)
+			_check(not bool(player.grounded) and float(player.vel.y) < -600.0, "A different alias immediately jumps after landing while the first remains held")
+	_release_all()
+	game.call("_reset_controls")
+	sim.state = saved_state
 	await process_frame
 
 func _test_pause_and_focus() -> void:

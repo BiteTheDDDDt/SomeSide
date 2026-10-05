@@ -263,7 +263,8 @@
         -35,
         50,
         58
-      ]
+      ],
+      "stride_distance": 60
     },
     "vanguard": {
       "texture": "res://assets/sprites/vanguard-v2.png",
@@ -526,7 +527,8 @@
         -35,
         50,
         58
-      ]
+      ],
+      "stride_distance": 60
     },
     "crawler": {
       "texture": "res://assets/sprites/forest-enemies-v2.png",

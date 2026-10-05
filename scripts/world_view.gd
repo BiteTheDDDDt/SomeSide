@@ -511,7 +511,9 @@ func weapon_draw_pose(player: Dictionary) -> Dictionary:
 	# A deep landing pose moves the visible shoulder with the torso. Sampling
 	# the same tracked frame again during body drawing is idempotent. Simulation
 	# and input continue to use WeaponPose's unchanged physical shoulder/muzzle.
-	var frame: Dictionary = Pixels.tracked_frame_for(self, str(player.get("character", "ranger")), player, _clock, true)
+	var displayed: Dictionary = player.duplicate(false)
+	displayed.pos = position_value
+	var frame: Dictionary = Pixels.tracked_frame_for(self, str(player.get("character", "ranger")), displayed, _clock, true)
 	var offset: Vector2 = frame.get("shoulder", Vector2(0.0, -5.0))
 	offset.x *= 1.0 if aim.x >= 0.0 else -1.0
 	var shoulder: Vector2 = position_value + offset
@@ -695,8 +697,12 @@ func push_events(events: Array) -> void:
 				_spark(position_value, dash_color, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
 				_add_effect({"kind":"dash", "pos":position_value, "angle":direction.angle(), "color":dash_color, "strength":strength, "age":0.0, "life":0.22})
 			"pickup":
-				_spark(position_value, TEAL, 11, 75.0, 0.5)
-				_ring(position_value, TEAL, 32.0, 0.45)
+				if str(event.get("kind", "")) == "coin":
+					_spark(position_value, GOLD, 4, 42.0, 0.26)
+					_ring(position_value, GOLD, 15.0, 0.24)
+				else:
+					_spark(position_value, TEAL, 11, 75.0, 0.5)
+					_ring(position_value, TEAL, 32.0, 0.45)
 			"drop", "interact":
 				_spark(position_value, GOLD, 8, 70.0, 0.45)
 			"gate", "stage", "revive":
@@ -1277,7 +1283,11 @@ func _draw_players() -> void:
 			p.y -= absf(cos(_clock * 16.0)) * running if grounded else 0.0
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
 		Appearance.draw_layer(self, appearance, true, _clock)
-		Entities.player_body(self, player, _clock)
+		# Body and weapon sample exactly the same interpolated world position.
+		# Keep the authoritative snapshot untouched while feet follow visible travel.
+		var displayed: Dictionary = player.duplicate(false)
+		displayed.pos = pose.position
+		Entities.player_body(self, displayed, _clock)
 		draw_set_transform(Vector2.ZERO)
 		# Accessories mirror with the body; the weapon follows the selected shoulder.
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
