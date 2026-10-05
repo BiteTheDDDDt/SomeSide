@@ -2,17 +2,16 @@ extends SceneTree
 
 const Art = preload("res://scripts/weapon_art.gd")
 const Simulation = preload("res://scripts/simulation.gd")
-const DIRECTORY: String = "res://tools/results/weapon-art-v018/"
+const DIRECTORY: String = "res://tools/results/weapon-art-v0181/"
 
 class Catalogue extends Node2D:
 	const WeaponArt = preload("res://scripts/weapon_art.gd")
+	const Icons = preload("res://scripts/item_icons.gd")
 	var icons: Array[Texture2D] = []
 	func _ready() -> void:
-		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		for id: String in WeaponArt.IDS:
-			var bitmap := Image.new()
-			assert(bitmap.load_svg_from_string('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">'+WeaponArt.icon_drawing(id)+'</svg>') == OK)
-			icons.append(ImageTexture.create_from_image(bitmap))
+			icons.append(Icons.pickup_texture(id,64))
 	func _draw() -> void:
 		draw_rect(Rect2(0,0,1600,1230),Color("0b1921"))
 		var font: Font = ThemeDB.fallback_font
@@ -93,5 +92,10 @@ func _run() -> void:
 	for tick: int in range(4): await process_frame
 	await RenderingServer.frame_post_draw
 	assert(viewport.get_texture().get_image().save_png(DIRECTORY+"contact.png") == OK)
+	var materials: Dictionary = {}
+	for id: String in Art.IDS:
+		var texture: CanvasTexture = Art._texture(id,Art._body(id))
+		materials[id] = {"texture":str(texture.diffuse_texture.get_image().get_size()),"filter":texture.texture_filter,"mipmaps":texture.diffuse_texture.get_image().has_mipmaps()}
+	FileAccess.open(DIRECTORY+"report.json",FileAccess.WRITE).store_string(JSON.stringify({"native":true,"cache":Art.cache_stats(),"materials":materials,"screenshots_resized":false},"\t"))
 	print("WEAPON_ART_CAPTURE_RESULT native=true weapons=8 cache=",Art.cache_stats())
 	quit(0)

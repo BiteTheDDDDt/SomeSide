@@ -94,7 +94,7 @@ func _run() -> void:
 	_check(bay_rect==view.facility_icon_rect(Vector2(600,417),bay,"equipment"),"Equipment bay previews remain stationary inside their sockets")
 	for size: int in [24,28]:
 		var texture: Texture2D=Icons.texture("feather",size)
-		_check(texture.get_size()==Vector2(size,size) and texture==Icons.texture("feather",size),"Ground icon size %d uses one cached native raster instead of rescaling a 32 px texture"%size)
+		_check(texture.get_size()==Vector2(size,size) and texture==Icons.texture("feather",size),"Ground icon size %d retains its logical size and cached texture"%size)
 	_check(original==var_to_bytes(simulation.state) and rng_before==simulation._rng.state,"All display probes preserve authoritative shop state and random sequence")
 	var selected: Dictionary=shops[1]
 	var player: Dictionary=simulation.state.players[1]

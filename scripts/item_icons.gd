@@ -2,8 +2,17 @@ class_name SideItemIcons
 extends RefCounted
 
 ## Original equipment miniatures shared by loot, loadout and inventory.
-## Solid silhouettes and restrained material facets survive 24px rasterization.
+## Smooth SVG miniatures retain logical UI dimensions independently of their
+## supersampled backing images. The sampler belongs to each texture so pixel
+## actors can keep nearest filtering on the same canvas.
+const MAX_RASTER_SIZE: int = 256
+const MAX_CACHE_BYTES: int = 32 * 1024 * 1024
 static var _textures: Dictionary = {}
+static var _texture_costs: Dictionary = {}
+static var _last_use: Dictionary = {}
+static var _cache_bytes: int = 0
+static var _use_order: int = 0
+static var _rasterizations: int = 0
 const Content = preload("res://scripts/content.gd")
 const WeaponArt = preload("res://scripts/weapon_art.gd")
 
@@ -28,20 +37,59 @@ static func pickup_texture(id: String, size: int = 32) -> Texture2D:
 static func _texture(id: String, size: int, framed: bool) -> Texture2D:
 	var pixels: int = clampi(size, 16, 256)
 	var key: String = ("tile:" if framed else "object:") + id + ":" + str(pixels)
+	_use_order += 1
 	if _textures.has(key):
+		_last_use[key] = _use_order
 		return _textures[key]
+	var raster_size: int = mini(pixels * 4, MAX_RASTER_SIZE)
 	var accent: String = color(id).to_html(false)
 	var icon: String = _drawing(id)
-	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">' + (_backplate(id) if framed else "") + '<g stroke-linecap="square" stroke-linejoin="miter">' + icon.replace("ACCENT", "#" + accent) + '</g></svg>'
+	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="geometricPrecision">' + (_backplate(id) if framed else "") + '<g stroke-linecap="square" stroke-linejoin="miter">' + icon.replace("ACCENT", "#" + accent) + '</g></svg>'
 	var bitmap: Image = Image.new()
-	var error: Error = bitmap.load_svg_from_string(svg, float(pixels) / 64.0)
+	var error: Error = bitmap.load_svg_from_string(svg, float(raster_size) / 64.0)
 	if error != OK:
 		push_error("SomeSide icon could not rasterize: " + id)
-		bitmap = Image.create(pixels, pixels, false, Image.FORMAT_RGBA8)
+		bitmap = Image.create(raster_size, raster_size, false, Image.FORMAT_RGBA8)
 		bitmap.fill(color(id))
-	var result: ImageTexture = ImageTexture.create_from_image(bitmap)
+	bitmap.fix_alpha_edges()
+	bitmap.generate_mipmaps()
+	var backing: ImageTexture = ImageTexture.create_from_image(bitmap)
+	backing.set_size_override(Vector2i(pixels, pixels))
+	var result := CanvasTexture.new()
+	result.diffuse_texture = backing
+	result.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	result.texture_repeat = CanvasItem.TEXTURE_REPEAT_DISABLED
+	var cost: int = bitmap.get_data_size()
+	_make_cache_room(cost)
 	_textures[key] = result
+	_texture_costs[key] = cost
+	_last_use[key] = _use_order
+	_cache_bytes += cost
+	_rasterizations += 1
 	return result
+
+
+## Eviction only releases our reference; visible controls keep their textures.
+## Normal UI sizes stay hot, while exhaustive catalogues cannot grow without
+## limit. SVG rasterization occurs only when a requested cache entry is absent.
+static func _make_cache_room(cost: int) -> void:
+	while _cache_bytes + cost > MAX_CACHE_BYTES and not _textures.is_empty():
+		var oldest: String = ""
+		var order: int = _use_order + 1
+		for key: String in _last_use:
+			if int(_last_use[key]) < order:
+				oldest = key
+				order = int(_last_use[key])
+		_cache_bytes -= int(_texture_costs[oldest])
+		_textures.erase(oldest)
+		_texture_costs.erase(oldest)
+		_last_use.erase(oldest)
+
+
+static func cache_stats() -> Dictionary:
+	return {"textures": _textures.size(), "bytes": _cache_bytes,
+		"max_bytes": MAX_CACHE_BYTES, "max_raster_size": MAX_RASTER_SIZE,
+		"rasterizations": _rasterizations}
 
 
 static func _backplate(id: String) -> String:

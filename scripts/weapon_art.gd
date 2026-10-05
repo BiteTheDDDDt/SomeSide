@@ -3,10 +3,11 @@ extends RefCounted
 
 ## The same material plates form held weapons and all inventory/loot icons.
 ## Coordinates are gameplay weapon space: grip at x=7.5, fire along local +X.
-## SVG is baked once; animation moves cached parts. Pulse rifle is a smooth
-## rendering trial at 4x resolution, while the remaining weapons use pixel art.
+## SVG is baked once at 4x resolution with filtered mipmaps. Animation moves
+## cached parts at the same logical size; no vector rasterization runs per frame.
 const IDS: Array[String] = ["pulse_rifle","arc_blade","scattergun","railgun","flamethrower","boomerang","storm_staff","sun_lance"]
 const BOUNDS := Rect2(-6,-18,66,36)
+const RASTER_SCALE: float = 4.0
 static var _cache: Dictionary = {}
 static var _cache_bytes: int = 0
 static var _icon_layouts: Dictionary = {}
@@ -56,24 +57,22 @@ static func icon_drawing(id: String) -> String:
 		var center: Vector2 = Vector2(bounds.position) + Vector2(bounds.size)*.5 - Vector2(64,64)
 		_icon_layouts[id] = {"center":center,"zoom":54.0/float(maxi(bounds.size.x,bounds.size.y))}
 	var layout: Dictionary = _icon_layouts[id]
-	return '<g shape-rendering="crispEdges" transform="translate(32 32) scale(%.5f) translate(%.3f %.3f) rotate(-42)">%s</g>'%[float(layout.zoom),-Vector2(layout.center).x,-Vector2(layout.center).y,_assembly(id)]
+	return '<g transform="translate(32 32) scale(%.5f) translate(%.3f %.3f) rotate(-42)">%s</g>'%[float(layout.zoom),-Vector2(layout.center).x,-Vector2(layout.center).y,_assembly(id)]
 
 static func _texture(key: String, drawing: String) -> Texture2D:
 	if _cache.has(key): return _cache[key]
-	var smooth: bool = key == "pulse_rifle"
-	var svg: String='<svg xmlns="http://www.w3.org/2000/svg" width="66" height="36" viewBox="-6 -18 66 36" shape-rendering="'+("geometricPrecision" if smooth else "crispEdges")+'">'+drawing+'</svg>'
+	var svg: String='<svg xmlns="http://www.w3.org/2000/svg" width="66" height="36" viewBox="-6 -18 66 36" shape-rendering="geometricPrecision">'+drawing+'</svg>'
 	var bitmap:=Image.new()
-	if bitmap.load_svg_from_string(svg, 4.0 if smooth else 1.0)!=OK:
+	if bitmap.load_svg_from_string(svg, RASTER_SCALE)!=OK:
 		push_error("Weapon art could not rasterize: "+key)
 		return null
-	if smooth:
-		# Colour transparent edge texels before filtering to avoid dark fringes.
-		# Mipmaps retain area coverage when this larger image is drawn at 1x.
-		bitmap.fix_alpha_edges()
-		bitmap.generate_mipmaps()
+	# Colour transparent edge texels before filtering to avoid dark fringes.
+	# Mipmaps retain area coverage when this larger image is drawn at 1x.
+	bitmap.fix_alpha_edges()
+	bitmap.generate_mipmaps()
 	var sampler:=CanvasTexture.new()
 	sampler.diffuse_texture=ImageTexture.create_from_image(bitmap)
-	sampler.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if smooth else CanvasItem.TEXTURE_FILTER_NEAREST
+	sampler.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_cache[key]=sampler
 	_cache_bytes += bitmap.get_data_size()
 	return sampler

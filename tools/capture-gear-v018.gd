@@ -3,7 +3,7 @@ extends SceneTree
 ## Directed loadouts/loot using the production HUD and WorldView.
 ## No changes to the profile, gameplay resources, or source textures.
 const Locale = preload("res://scripts/localization.gd")
-const DIRECTORY: String = "res://tools/results/gear-v018/"
+const DIRECTORY: String = "res://tools/results/gear-v0181/"
 var viewport: SubViewport
 var game: Node
 
@@ -76,6 +76,20 @@ func _run() -> void:
 		game._populate_inventory("weapon")
 		await _save("weapons-" + language)
 		game._resume()
+		var saved_pickups: Array = game.sim.state.pickups.duplicate(true)
+		game.sim.state.pickups.clear()
+		_stage_shop()
+		player.pos.x = 2375
+		game.world.set_frame(game.sim.get_snapshot(), 1, 1.0)
+		game.world.camera_position = Vector2(2420,950)
+		game._refresh_interaction_focus()
+		game.world.interaction_target = game._focus_target
+		game._update_interaction_panel(player)
+		await _save("choice-shop-" + language)
+		game.sim.state.pickups = saved_pickups
+		game.sim.state.chests.clear()
+		player.pos.x = 2320
+		game.world.set_frame(game.sim.get_snapshot(), 1, 1.0)
 	# Same live world, a 2x closer camera for art review. No HUD enlargement.
 	game.ui.visible = false
 	viewport.size_2d_override = Vector2i(640, 360)
@@ -84,8 +98,21 @@ func _run() -> void:
 	game.world.camera_position = Vector2(2420, 993)
 	game.world.interaction_target = {}
 	await _save("world-detail-2x")
+	game.sim.state.pickups.clear()
+	_stage_shop()
+	game.world.set_frame(game.sim.get_snapshot(), 1, 1.0)
+	game.world.camera_position = Vector2(2420,993)
+	game.world.interaction_target = {}
+	await _save("choice-detail-2x")
 	var current: PackedByteArray = FileAccess.get_file_as_bytes("user://profile.cfg") if FileAccess.file_exists("user://profile.cfg") else PackedByteArray()
 	assert(existed == FileAccess.file_exists("user://profile.cfg") and current == saved, "Capture must preserve player preferences")
 	game.queue_free(); await process_frame
-	print("GEAR_CAPTURE_RESULT captures=7 native=true profile_unchanged=true")
+	print("GEAR_CAPTURE_RESULT captures=10 native=true profile_unchanged=true")
 	quit(0)
+
+func _stage_shop() -> void:
+	game.sim.state.chests.clear()
+	for index: int in range(3):
+		var chest: Dictionary = game.sim._make_chest("choice",Vector2(2420+index*74,1083),45,["scattergun","feather","graviton"][index])
+		chest.group = 1801
+		game.sim.state.chests.append(chest)

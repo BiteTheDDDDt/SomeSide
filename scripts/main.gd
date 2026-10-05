@@ -14,7 +14,7 @@ const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.18.0"
+const VERSION: String = "0.18.1"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
 const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "coin_drop", "equipment", "drop"]
@@ -1554,7 +1554,7 @@ func _show_guide() -> void:
 func _icon(parent: Node, id: String, size: int = 48) -> TextureRect:
 	var image := TextureRect.new()
 	image.texture = Icons.texture(id, size)
-	image.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	image.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	image.custom_minimum_size = Vector2(size, size)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

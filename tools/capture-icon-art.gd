@@ -2,8 +2,8 @@ extends SceneTree
 
 const Icons=preload("res://scripts/item_icons.gd")
 const Content=preload("res://scripts/content.gd")
-const DIRECTORY="res://tools/results/icon-art/"
-var tag: String="after"
+const DIRECTORY="res://tools/results/icon-art-v0181/"
+var tag: String="smooth"
 
 class Catalogue extends Node2D:
 	var entries: Array=[]
@@ -42,9 +42,10 @@ func _run() -> void:
 			if object_texture.get_size()!=Vector2(pixels,pixels) or object_texture!=Icons.pickup_texture(str(entry.id),pixels): failures.append(str(entry.id)+" object dimensions/cache")
 			if object_texture==texture: failures.append(str(entry.id)+" framed cache collision")
 			var image: Image=object_texture.get_image()
-			for corner: Vector2i in [Vector2i.ZERO,Vector2i(pixels-1,0),Vector2i(0,pixels-1),Vector2i(pixels-1,pixels-1)]:
+			var source_size: Vector2i=image.get_size()
+			for corner: Vector2i in [Vector2i.ZERO,Vector2i(source_size.x-1,0),Vector2i(0,source_size.y-1),source_size-Vector2i.ONE]:
 				if image.get_pixelv(corner).a>0: failures.append(str(entry.id)+" object background")
-			if image.get_used_rect().size.x<pixels*.25 or image.get_used_rect().size.y<pixels*.2: failures.append(str(entry.id)+" missing silhouette")
+			if image.get_used_rect().size.x<source_size.x*.25 or image.get_used_rect().size.y<source_size.y*.2: failures.append(str(entry.id)+" missing silhouette")
 			if pixels==64: object_unique[image.get_data().hex_encode().hash()]=true
 	for id: String in ["phase_dash","guard_burst","shoulder_rush","cache","choice","blood","combat","equipment_cache","gate","revive","unknown"]:
 		if Icons.texture(id,24).get_size()!=Vector2(24,24): failures.append(id+" utility")
@@ -60,7 +61,7 @@ func _run() -> void:
 		root.add_child(view)
 		var page=Catalogue.new()
 		page.entries=records; page.title=tag
-		page.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+		page.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		view.add_child(page)
 		for frame: int in range(3): await process_frame
 		await RenderingServer.frame_post_draw
