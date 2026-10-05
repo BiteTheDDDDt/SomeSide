@@ -160,7 +160,10 @@ static func event_sound(event: Dictionary) -> String:
 			return "facility_open"
 		"jump": return "double_jump" if event.get("double", false) else "jump"
 		"double_jump", "land", "heal", "coin", "ui", "ui_back", "ui_error", "stage", "win", "lose", "boss_spawn": return type
-		"dash": return "enemy_shift" if event.get("enemy", false) else "dash"
+		"dash":
+			if event.get("enemy", false): return "enemy_shift"
+			return "ability_shoulder_rush" if event.get("ability", "") == "shoulder_rush" else "dash"
+		"ability_hit": return "ability_shoulder_hit" if event.get("ability", "") == "shoulder_rush" else ""
 		"gate": return "gate_ready" if event.get("ready", false) else "gate_active"
 		"revive": return "phoenix" if event.get("phoenix", false) else ("revive_start" if event.get("started", false) else "revive")
 	return ""
@@ -248,6 +251,10 @@ static func _prepare_samples() -> void:
 	_add("double_jump", [_layer("air", .19, .4, 1700, 5200, 0, 1.1), _layer("bell", .24, .5, 780, 1120), _layer("bell", .17, .3, 1560, 2240, .035)], 1, 100, "movement", 65, .18)
 	_add("land", [_layer("sine", .085, .7, 105, 46), _layer("noise", .065, .6, 1600, 350)], 1, 120, "movement", 65, .13)
 	_add("dash", [_layer("air", .18, .75, 6500, 1100, 0, .65), _layer("fm", .13, .35, 130, 760, 0, 1.3, 2)], 1, 120, "movement", 65, .18)
+	# Generic jump/hit events precede these in the same authoritative tick.
+	# Own-key rate limits preserve their identity without bypassing voice caps.
+	_add("ability_shoulder_rush", [_layer("metal", .065, .65, 390, 125), _layer("air", .21, .55, 1750, 420), _layer("fm", .18, .55, 125, 48, .02, 1.2, 2)], 2, 160, "", 0, .20)
+	_add("ability_shoulder_hit", [_layer("sine", .14, .7, 105, 36), _layer("metal", .11, .6, 430, 100), _layer("noise", .09, .45, 1800, 270)], 2, 95, "", 0, .21)
 	_add("hit", [_layer("noise", .04, .6, 2400, 800), _layer("sine", .06, .45, 225, 110)], 0, 75, "impacts", 45, .12)
 	_add("critical", [_layer("metal", .12, .65, 1450, 660), _layer("noise", .035, .45, 3800, 1200)], 1, 100, "impacts", 45, .17)
 	_add("arc_hit", [_layer("crackle", .095, .5, 5500, 1800, 0, 2, 68), _layer("fm", .08, .45, 860, 420, 0, 2, 7)], 0, 100, "impacts", 45, .12)

@@ -38,9 +38,16 @@ var _spawn_clock: float = 1.8
 
 static func character_catalog() -> Array:
 	return [
-		{"id": "ranger", "name": "游侠", "description": "初始：脉冲步枪 + 震荡手雷\n100生命；所有武器与主动装备都可在局内替换。", "color": Color("65e2d6")},
-		{"id": "vanguard", "name": "先锋", "description": "初始：共鸣弧刃 + 裂地冲击\n145生命；所有武器与主动装备都可在局内替换。", "color": Color("ffa66a")},
+		{"id": "ranger", "name": "游侠", "description": "初始：脉冲步枪 + 震荡手雷\n100生命；Shift专属相位闪身。武器与主动装备可替换，角色技能保持不变。", "color": Color("65e2d6")},
+		{"id": "vanguard", "name": "先锋", "description": "初始：共鸣弧刃 + 裂地冲击\n145生命；Shift专属破阵突进，撞击并短暂压制敌人。武器与主动装备可替换，角色技能保持不变。", "color": Color("ffa66a")},
 	]
+
+static func movement_ability(player: Dictionary) -> Dictionary:
+	var definition: Dictionary = Content.movement_ability(str(player.get("character", "ranger")))
+	var stacks: int = maxi(0, int(Dictionary(player.get("items", {})).get("thruster", 0)))
+	definition["base_cooldown"] = definition.cooldown
+	definition["cooldown"] = maxf(float(definition.minimum_cooldown), float(definition.cooldown) / (1.0 + stacks * 0.1))
+	return definition
 
 
 static func item_catalog() -> Array:
@@ -116,6 +123,7 @@ func add_player(id: int, player_name: String, character: String) -> void:
 		"skill_cd": 0.0, "dash_cd": 0.0, "invuln": 1.5,
 		"kills": 0, "revive": 0.0, "coyote": 0.0, "jumps": 0, "jump_rising": false, "land_ready": false,
 		"drop_timer": 0.0, "dash_timer": 0.0, "dash_dir": Vector2.RIGHT,
+		"dash_kind": "", "dash_speed": DASH_SPEED, "dash_id": 0, "dash_hits": [], "dash_damage": 0.0, "stun_timer": 0.0,
 		"hurt_timer": 0.0, "revive_timer": 0.0, "interact_cd": 0.0, "shield_timer": 0.0,
 		"explore_anchor": position, "explore_sites": [position], "explore_window": 0.0, "explore_budget": 0,
 		"chrono_timer": 0.0, "momentum_timer": 0.0, "nova_cd": 0.0, "attack_count": 0, "phoenix_spent": 0,
@@ -185,6 +193,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		if float(player["shield_timer"]) <= 0.0:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
+		_cancel_movement_ability(player)
 		player.erase("melee")
 		player.erase("attack_pose")
 		player["jump_rising"] = false
@@ -209,17 +218,21 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 				_reset_exploration(player, false)
 				_emit("revive", player["pos"], {"player": player["id"]})
 		return
-	var was_dash: float = float(player.get("dash_timer", 0.0))
+	var previous_position: Vector2 = player["pos"]
+	var previous_dash_id: int = int(player.get("dash_id", 0))
+	var controlled: bool = float(player.get("stun_timer", 0.0)) > 0.0
 	_move_player(player, command, dt, true)
+	if int(player.get("dash_id", 0)) > previous_dash_id:
+		var ability: Dictionary = movement_ability(player)
+		player["invuln"] = maxf(float(player["invuln"]), float(ability.invuln))
+		_emit("dash", player["pos"], {"aim": player["dash_dir"], "player": player["id"],
+			"ability": ability.id, "duration": ability.duration, "ability_id": player["dash_id"]})
+	_step_shoulder_rush(player, previous_position)
 	_step_melee(player, dt)
 	if player.has("attack_pose"):
 		player.attack_pose.elapsed = float(player.attack_pose.elapsed) + dt
 		if str(player.attack_pose.weapon) != str(player.get("weapon", "")) or float(player.attack_pose.elapsed) >= float(player.attack_pose.duration):
 			player.erase("attack_pose")
-	if float(player.get("dash_timer", 0.0)) > was_dash:
-		player["momentum_timer"] = 1.2
-		player["invuln"] = maxf(float(player["invuln"]), 0.23)
-		_emit("dash", player["pos"], {"aim": player["dash_dir"], "player": player["id"]})
 	var moss: int = _stacks(player, "moss")
 	if _stacks(player, "battery") > 0 and float(player["hurt_timer"]) <= 0.0:
 		var shield_cap: float = minf(float(player["max_hp"]) * 0.6, _stacks(player, "battery") * 8.0)
@@ -228,9 +241,9 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 	if moss > 0:
 		var regen: float = moss * 0.65 * dt * (2.0 if float(player["hurt_timer"]) <= 1.0 else 1.0)
 		player["hp"] = minf(float(player["max_hp"]), float(player["hp"]) + regen)
-	if bool(command.get("fire", false)) and float(player["fire_cd"]) <= 0.0:
+	if not controlled and bool(command.get("fire", false)) and float(player["fire_cd"]) <= 0.0:
 		_fire_weapon(player)
-	if bool(command.get("skill", false)) and float(player["skill_cd"]) <= 0.0:
+	if not controlled and bool(command.get("skill", false)) and float(player["skill_cd"]) <= 0.0:
 		_use_skill(player)
 	if bool(command.get("interact", false)) and float(player["interact_cd"]) <= 0.0:
 		player["interact_cd"] = 0.2
@@ -238,12 +251,19 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 
 
 func _move_player(player: Dictionary, command: Dictionary, dt: float, report_events: bool = false) -> void:
+	var controlled: bool = float(player.get("stun_timer", 0.0)) > 0.0
+	player["stun_timer"] = maxf(0.0, float(player.get("stun_timer", 0.0)) - dt)
+	if controlled:
+		_cancel_movement_ability(player)
+		player.erase("melee")
+		player.erase("attack_pose")
 	player["chrono_timer"] = maxf(0.0, float(player.get("chrono_timer", 0.0)) - dt)
 	player["momentum_timer"] = maxf(0.0, float(player.get("momentum_timer", 0.0)) - dt)
 	var direction: Vector2 = command.get("aim", player.get("aim", Vector2.RIGHT))
 	if direction.is_finite() and direction.length_squared() > 0.0001:
 		player["aim"] = direction.normalized()
 	var move: float = clampf(float(command.get("move", 0.0)), -1.0, 1.0)
+	if controlled: move = 0.0
 	var velocity: Vector2 = player.get("vel", Vector2.ZERO)
 	var position: Vector2 = player.get("pos", state.get("spawn", Vector2(210.0, _floor_y() - PLAYER_HALF.y)))
 	var grounded: bool = bool(player.get("grounded", false))
@@ -256,12 +276,14 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 		player["land_ready"] = true
 	# Only a deliberate jump owns variable-height control. Dash momentum,
 	# knockback and simply walking off a ledge must never be cut by this input.
-	if grounded or velocity.y >= 0.0 or float(player.get("dash_timer", 0.0)) > 0.0:
+	if grounded or velocity.y >= 0.0 or (float(player.get("dash_timer", 0.0)) > 0.0 and str(player.get("dash_kind", "")) != "shoulder_rush"):
 		player["jump_rising"] = false
 	player["coyote"] = 0.105 if grounded else maxf(0.0, float(player.get("coyote", 0.0)) - dt)
 	player["drop_timer"] = maxf(0.0, float(player.get("drop_timer", 0.0)) - dt)
 	player["dash_cd"] = maxf(0.0, float(player.get("dash_cd", 0.0)) - dt)
 	player["dash_timer"] = maxf(0.0, float(player.get("dash_timer", 0.0)) - dt)
+	if float(player["dash_timer"]) <= 0.0:
+		_cancel_movement_ability(player)
 	var speed: float = MOVE_SPEED * (1.0 + minf(1.1, _stacks(player, "thruster") * 0.09)) * (1.3 if float(player["chrono_timer"]) > 0.0 else 1.0)
 	if bool(command.get("drop", false)):
 		# Down+jump is only a drop request, even on the bottom floor.
@@ -272,7 +294,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 			grounded = false
 			player["coyote"] = 0.0
 			player["jump_rising"] = false
-	elif bool(command.get("jump", false)):
+	elif not controlled and bool(command.get("jump", false)):
 		if grounded or float(player["coyote"]) > 0.0:
 			velocity.y = -JUMP_SPEED
 			player["jumps"] = 1
@@ -286,16 +308,26 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 			player["jump_rising"] = true
 			jumped = true
 			double_jump = true
-	if bool(command.get("dash", false)) and float(player["dash_cd"]) <= 0.0:
+	if not controlled and bool(command.get("dash", false)) and float(player["dash_cd"]) <= 0.0:
+		var ability: Dictionary = movement_ability(player)
 		var dash_direction: Vector2 = Vector2(move, 0.0)
 		if absf(move) < 0.1:
 			dash_direction = player.get("aim", Vector2.RIGHT)
+		if bool(ability.horizontal):
+			dash_direction = Vector2(-1.0 if dash_direction.x < 0.0 else 1.0, 0.0)
 		player["dash_dir"] = dash_direction.normalized()
-		player["dash_timer"] = 0.16
-		player["dash_cd"] = maxf(0.8, DASH_COOLDOWN / (1.0 + _stacks(player, "thruster") * 0.1))
-	if float(player["dash_timer"]) > 0.0:
+		player["dash_timer"] = ability.duration
+		player["dash_cd"] = ability.cooldown
+		player["dash_kind"] = ability.id
+		player["dash_speed"] = ability.speed
+		player["dash_id"] = int(player.get("dash_id", 0)) + 1
+		player["dash_hits"] = []
+		player["momentum_timer"] = 1.2
+		player["dash_damage"] = float(ability.damage) * _damage_scale(player)
+	var rushing: bool = float(player["dash_timer"]) > 0.0 and str(player.get("dash_kind", "")) == "shoulder_rush"
+	if float(player["dash_timer"]) > 0.0 and not rushing:
 		player["jump_rising"] = false
-		velocity = Vector2(player["dash_dir"]) * DASH_SPEED
+		velocity = Vector2(player["dash_dir"]) * float(player.get("dash_speed", DASH_SPEED))
 	else:
 		# Missing held state preserves the original full arc for old commands.
 		# A release consumes this jump's control once; pressing again cannot
@@ -305,6 +337,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 			player["jump_rising"] = false
 		velocity.x = move_toward(velocity.x, move * speed, (2500.0 if grounded else 1800.0) * dt)
 		velocity.y = minf(1100.0, velocity.y + GRAVITY * dt)
+		if rushing: velocity.x = Vector2(player["dash_dir"]).x * float(player["dash_speed"])
 	if jumped:
 		player["land_ready"] = true
 	var result: Dictionary = _move_body(position, velocity, dt, PLAYER_HALF, float(player["drop_timer"]) > 0.0)
@@ -312,7 +345,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 	player["vel"] = result["vel"]
 	player["grounded"] = result["grounded"]
 	if report_events:
-		if jumped and float(player["dash_timer"]) <= 0.0:
+		if jumped and (float(player["dash_timer"]) <= 0.0 or rushing):
 			_emit("jump", player["pos"], {"player": player["id"], "double": double_jump})
 		if not was_grounded and bool(result["grounded"]) and bool(player.get("land_ready", false)) and velocity.y >= 120.0:
 			_emit("land", player["pos"], {"player": player["id"], "impact_speed": velocity.y})
@@ -327,6 +360,36 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 		player["vel"] = Vector2.ZERO
 		player["jump_rising"] = false
 		player["land_ready"] = false
+		_cancel_movement_ability(player)
+
+
+func _cancel_movement_ability(player: Dictionary) -> void:
+	player["dash_timer"] = 0.0
+	player["dash_kind"] = ""
+	player["dash_hits"] = []
+	player["dash_damage"] = 0.0
+	player["dash_speed"] = DASH_SPEED
+
+
+## Authority only: sweep the actual collision-resolved movement, never the
+## intended displacement or a client replay. One bounded victim set per action.
+func _step_shoulder_rush(player: Dictionary, from: Vector2) -> void:
+	if str(player.get("dash_kind", "")) != "shoulder_rush" or float(player.get("dash_timer", 0.0)) <= 0.0 or bool(player.get("dead", false)):
+		return
+	var hits: Array = player.get("dash_hits", [])
+	var ability: Dictionary = Content.movement_ability("vanguard")
+	for enemy: Dictionary in Array(state["enemies"]):
+		if hits.size() >= MAX_ENEMIES: break
+		if float(enemy.get("hp", 0.0)) <= 0.0 or hits.has(int(enemy.id)): continue
+		if _segment_circle(from, player["pos"], enemy["pos"], _enemy_radius(enemy) + PLAYER_HALF.x) < 0.0: continue
+		hits.append(int(enemy.id))
+		var damage: float = float(player.get("dash_damage", ability.damage))
+		var stun: float = float(ability.boss_stun) if str(enemy.kind) == "boss" else float(ability.stun)
+		enemy["stun_timer"] = maxf(float(enemy.get("stun_timer", 0.0)), stun)
+		_damage_enemy(enemy, damage, int(player.id), true, 0)
+		_emit("ability_hit", enemy["pos"], {"ability": "shoulder_rush", "player": player.id, "enemy": enemy.id,
+			"ability_id": player["dash_id"], "aim": player["dash_dir"], "damage": damage, "stun": stun})
+	player["dash_hits"] = hits
 
 
 func _move_body(position: Vector2, velocity: Vector2, dt: float, half: Vector2, drop: bool = false) -> Dictionary:
@@ -450,10 +513,13 @@ func _use_skill(player: Dictionary) -> void:
 	player["skill_cd"] = float(definition.get("cooldown", 5.0)) * cooldown_scale
 	match equipment:
 		"shockwave":
+			_cancel_movement_ability(player)
 			player["jump_rising"] = false
 			player["invuln"] = maxf(float(player["invuln"]), 0.45)
 			player["dash_timer"] = 0.2
 			player["dash_dir"] = aim
+			player["dash_kind"] = "shockwave"
+			player["dash_speed"] = DASH_SPEED
 			var center: Vector2 = position + aim * 90.0
 			_explode(center, 150.0, 60.0 * _damage_scale(player), int(player["id"]), "player", 0)
 			_emit("slash", center, {"aim": aim, "radius": 150.0, "player": player["id"], "skill": true})
@@ -794,6 +860,7 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 	var push: float = signf(Vector2(player["pos"]).x - source.x)
 	player["vel"] = Vector2(push * 165.0, -150.0)
 	player["jump_rising"] = false
+	_cancel_movement_ability(player)
 	_emit("hit", player["pos"], {"amount": amount, "crit": false, "player": player["id"], "friendly": true})
 	if float(player["hp"]) <= 0.0:
 		if int(player.get("phoenix_spent", 0)) < mini(2, _stacks(player, "phoenix")):
@@ -1761,7 +1828,9 @@ func _build_stage(stage: int) -> void:
 		player["fire_cd"] = 0.0
 		player["skill_cd"] = 0.0
 		player["dash_cd"] = 0.0
-		player["dash_timer"] = 0.0
+		_cancel_movement_ability(player)
+		player["dash_id"] = 0
+		player["stun_timer"] = 0.0
 		player["drop_timer"] = 0.0
 		player["shield"] = 0.0
 		player["shield_timer"] = 0.0

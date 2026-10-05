@@ -5,11 +5,14 @@ var capture_view: SubViewport
 var game: Node
 var captures: int = 0
 var button_bounds: Dictionary = {}
+var output_prefix: String = "res://tools/results/ui-style-"
 
 func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--prefix="): output_prefix = argument.trim_prefix("--prefix=")
 	var existed: bool = FileAccess.file_exists("user://profile.cfg")
 	var saved: PackedByteArray = FileAccess.get_file_as_bytes("user://profile.cfg") if existed else PackedByteArray()
 	capture_view = SubViewport.new()
@@ -103,7 +106,7 @@ func _run() -> void:
 		await _save(language + "-web-menu")
 		game._show_settings()
 		await _save(language + "-web-settings")
-	var bounds_file := FileAccess.open("res://tools/results/ui-style-buttons.json", FileAccess.WRITE)
+	var bounds_file := FileAccess.open(output_prefix + "buttons.json", FileAccess.WRITE)
 	bounds_file.store_string(JSON.stringify(button_bounds, "\t"))
 	var current_exists: bool = FileAccess.file_exists("user://profile.cfg")
 	var current: PackedByteArray = FileAccess.get_file_as_bytes("user://profile.cfg") if current_exists else PackedByteArray()
@@ -119,7 +122,7 @@ func _save(label: String) -> void:
 	for frame: int in range(4): await process_frame
 	await RenderingServer.frame_post_draw
 	button_bounds[label] = _button_rects(game.ui)
-	var path: String = ProjectSettings.globalize_path("res://tools/results/ui-style-" + label + ".png")
+	var path: String = ProjectSettings.globalize_path(output_prefix + label + ".png")
 	assert(capture_view.get_texture().get_image().save_png(path) == OK)
 	print("CAPTURE_UI_STYLE ", path)
 

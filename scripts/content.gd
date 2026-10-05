@@ -3,13 +3,23 @@ extends RefCounted
 
 static var _definitions: Dictionary = {}
 
+## Character-owned Shift abilities are independent of replaceable equipment.
+static func movement_ability(character: String) -> Dictionary:
+	if character == "vanguard":
+		return {"id": "shoulder_rush", "name": "破阵突进", "description": "朝移动方向水平突进，静止时按瞄准左右；约90距离，每敌16基础伤害一次，短暂硬直。基础冷却3.2秒，免伤0.12秒。角色专属，不随装备更换。",
+			"speed": 500.0, "duration": 0.18, "cooldown": 3.2, "minimum_cooldown": 1.2,
+			"invuln": 0.12, "damage": 16.0, "stun": 0.32, "boss_stun": 0.08, "horizontal": true}
+	return {"id": "phase_dash", "name": "相位闪身", "description": "朝移动方向快速闪身，静止时朝瞄准方向；约115距离。基础冷却2.4秒，免伤0.23秒。角色专属，不随装备更换。",
+		"speed": 720.0, "duration": 0.16, "cooldown": 2.4, "minimum_cooldown": 0.8,
+		"invuln": 0.23, "damage": 0.0, "stun": 0.0, "boss_stun": 0.0, "horizontal": false}
+
 static func passives() -> Array:
 	return [
 		_record("overclock", "超频芯片", "每层 +13% 普通攻击速度。", "67e5ef", "passive"),
 		_record("capacitor", "裂变电容", "每层 +12% 伤害，武器与伤害型主动装备均生效。", "ffd06f", "passive"),
 		_record("lens", "棱镜目镜", "每层 +8% 暴击率（上限85%）；暴击造成双倍伤害。", "ff84be", "passive"),
 		_record("vitality", "共生核心", "每层 +25 基础最大生命，获得时回复增加的生命；受脆晶倍率影响。", "98e39b", "passive"),
-		_record("thruster", "矢量推进器", "每层 +9% 移速，并缩短冲刺冷却。", "a0b4ff", "passive"),
+		_record("thruster", "矢量推进器", "每层 +9% 移速，并缩短角色技能冷却。", "a0b4ff", "passive"),
 		_record("arc", "电弧线圈", "命中概率向最多3个邻敌弹射电弧；叠层提高概率和伤害，电弧不再次触发。", "9bf5ff", "passive", "rare"),
 		_record("ember", "余烬孢子", "直接击杀产生115范围爆炸；每层 +9 爆炸伤害，连锁击杀不再爆炸。", "ff8b61", "passive", "rare"),
 		_record("moss", "星苔", "每层每秒回复0.65生命；5秒未受伤时翻倍。", "b6e89f", "passive"),
@@ -22,7 +32,7 @@ static func passives() -> Array:
 		_record("harvest", "丰收协议", "击杀金币每层增加15%，最多翻倍；采用存活队员的最高加成，全队自动到账。首领固定奖金不加成。", "7fd4a0", "passive", "uncommon"),
 		_record("battery", "静息电池", "6秒未受伤后每秒恢复护盾，每层最高8点；总上限为最大生命60%。", "7fd4a0", "passive", "uncommon"),
 		_record("frost", "霜凝结晶", "直接命中使敌人减速1.5秒；首层20%，每额外层+5%，上限50%。", "7fd4a0", "passive", "uncommon"),
-		_record("momentum", "惯性飞轮", "冲刺后1.2秒内每层 +15%伤害，最多+60%。", "7fd4a0", "passive", "uncommon"),
+		_record("momentum", "惯性飞轮", "使用角色技能后1.2秒内每层 +15%伤害，最多+60%。", "7fd4a0", "passive", "uncommon"),
 		_record("toxin", "蚀骨菌株", "直接命中附加4秒中毒，每层每秒3伤害，最多按8层计算；持续伤害不触发连锁。", "b49af5", "passive", "rare"),
 		_record("echo", "第六回声", "每第6次普通攻击追加自动共鸣打击，每层12伤害（最多8层），搜索范围650。", "b49af5", "passive", "rare"),
 		_record("piercer", "穿界针", "非爆炸弹丸每层多穿透1个目标，最多增加3次；同次飞行不重复命中。", "b49af5", "passive", "rare"),

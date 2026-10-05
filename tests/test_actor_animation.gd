@@ -160,14 +160,64 @@ func _run() -> void:
 	world.free()
 	_check_landing_weapon()
 	_check_distance_stride(image)
+	_check_dedicated_retreat(image)
 	canvas.free()
 	other_canvas.free()
 	Pixels.reload_manifest()
 	for id: String in ["ranger", "vanguard"]:
 		var actor: Dictionary = Pixels._actors[id]
 		_check(float(actor.stride_distance) >= 48.0 and float(actor.stride_distance) <= 72.0, "%s authored two-step gait is calibrated to its foot sweep instead of the former 127px slide" % id)
+		_check(actor.animations.get("backpedal", []).size() == 8 and actor.animations.run.size() == 8 and not actor.animations.run.any(func(index: Variant) -> bool: return index in actor.animations.backpedal), "%s forward and retreat use sixteen distinct authored poses" % id)
 	print("ACTOR_ANIMATION_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
+
+func _check_dedicated_retreat(image: Image) -> void:
+	var record: Dictionary = _record()
+	record.stride_distance = 80.0
+	record.stride_distances = {"backpedal":40.0}
+	record.animations.backpedal = [6,7,8,9]
+	for index: int in [6,7,8,9]:
+		record.frames[index]["texture"] = "retreat_fixture"
+		record.frames[index]["scale"] = 0.5
+	var alternate := Image.create(16,1,false,Image.FORMAT_RGBA8)
+	alternate.fill(Color(0.2,0.5,0.7,1))
+	Pixels.install_manifest({"version":1,"actors":{"ranger":record}}, {"fixture":ImageTexture.create_from_image(image),"retreat_fixture":ImageTexture.create_from_image(alternate)})
+	_check(Pixels.stats().errors.is_empty() and Pixels.stats().textures == 2 and Pixels._actors.ranger.frames[6].source_path == "retreat_fixture", "Per-frame source sheets and scales load into the same bounded actor atlas")
+	_check(Pixels._actors.ranger.frames[6].draw_target == Pixels._actors.ranger.frames[2].draw_target, "Supplemental retreat sheets keep a common integer body canvas")
+	var canvas := Node2D.new()
+	var player: Dictionary = _player()
+	player.aim = Vector2.RIGHT
+	player.vel = Vector2(200,0)
+	Pixels.tracked_frame_for(canvas,"ranger",player,0.0,true)
+	player.pos.x += 20.0
+	var forward: Dictionary = Pixels.tracked_frame_for(canvas,"ranger",player,0.1,true)
+	player.vel.x = -200.0
+	var retreat: Dictionary = Pixels.tracked_frame_for(canvas,"ranger",player,0.1,true)
+	_check(forward.index == 3 and retreat.index == 7 and is_equal_approx(forward.elapsed,retreat.elapsed), "Changing travel direction selects the dedicated retreat while preserving planted-leg phase")
+	player.pos.x -= 10.0
+	retreat = Pixels.tracked_frame_for(canvas,"ranger",player,0.15,true)
+	_check(retreat.index == 8 and is_equal_approx(retreat.elapsed,0.2), "Retreat advances its authored order by the shorter step distance, rather than reversing the forward clip")
+	var before: PackedByteArray = var_to_bytes(player)
+	var repeated: Dictionary = Pixels.tracked_frame_for(canvas,"ranger",player,0.15,true)
+	_check(repeated.index == retreat.index and repeated.elapsed == retreat.elapsed and before == var_to_bytes(player), "Body and weapon reads cannot double-step retreat or mutate the player")
+	player.aim = Vector2.LEFT
+	var turned: Dictionary = Pixels.tracked_frame_for(canvas,"ranger",player,0.15,true)
+	_check(turned.animation == "run" and turned.index == 4, "Aiming toward travel restores forward gait at the same foot-contact phase")
+	player.aim = Vector2.RIGHT
+	player.grounded = false
+	player.vel.y = -100.0
+	_check(Pixels.tracked_frame_for(canvas,"ranger",player,0.2,true).animation == "rise", "A backwards run-jump uses the authored airborne pose instead of moving feet on an invisible floor")
+	var phases: Array[float] = []
+	for rate: int in [30,60,120,165]:
+		Pixels.reset_tracks(canvas)
+		player.grounded = true
+		player.vel = Vector2(-40,0)
+		for tick: int in range(rate + 1):
+			player.pos = Vector2(100.0 - 40.0 * float(tick) / rate,200)
+			retreat = Pixels.tracked_frame_for(canvas,"ranger",player,float(tick)/rate,true)
+		phases.append(retreat.elapsed)
+	_check(phases.all(func(value: float) -> bool: return absf(value - 0.4) < 0.00001), "Independent retreat foot contacts cover one forty-pixel stride at 30, 60, 120 and 165 FPS")
+	canvas.free()
 
 func _check_distance_stride(image: Image) -> void:
 	var record: Dictionary = _record()

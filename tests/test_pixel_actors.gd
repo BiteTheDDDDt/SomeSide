@@ -99,7 +99,7 @@ func _run() -> void:
 	Pixels.reload_manifest()
 	var actual_stats: Dictionary = Pixels.stats()
 	_check(actual_stats.errors.is_empty(), "The installed production manifest has no invalid actors or textures")
-	_check(actual_stats.actors == 14 and actual_stats.textures == 6, "Production art requires all fourteen actors and all six actual source sheets")
+	_check(actual_stats.actors == 14 and actual_stats.textures == 8, "Production art requires all fourteen actors and eight actual source sheets, including both dedicated locomotion sheets")
 	if int(actual_stats.actors) > 0:
 		var sim = Simulation.new()
 		sim.start_run([{"id": 1, "name": "Pixels", "character": "ranger"}], 1010)

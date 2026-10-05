@@ -36,6 +36,8 @@ static func texture(id: String, size: int = 64) -> Texture2D:
 
 static func color(id: String) -> Color:
 	match id:
+		"phase_dash": return Color("6cd6bd")
+		"shoulder_rush": return Color("f2b96d")
 		"overclock": return Color("67e5ef")
 		"capacitor": return Color("ffd06f")
 		"lens": return Color("ff84be")
@@ -146,8 +148,10 @@ static func _drawing(id: String) -> String:
 			return '<path d="M10 47V37C10 10 54 10 54 37V47" fill="#294d43" fill-opacity=".8" stroke="ACCENT" stroke-width="2.5" stroke-dasharray="5 4"/><path d="M26 24H38V31H45V41H38V48H26V41H19V31H26Z" fill="ACCENT"/><path d="M10 52H54" stroke="#e2eccb" stroke-width="3"/>'
 		"aegis":
 			return '<path d="M32 10L51 17V32C51 44 39 51 32 55C25 51 13 44 13 32V17Z" fill="#385777" stroke="ACCENT" stroke-width="3"/><path d="M32 17L43 22V32C43 39 37 44 32 47Z" fill="ACCENT"/><path d="M23 23V32C23 36 27 40 29 41" fill="none" stroke="#e4f0ed" stroke-width="2.5"/>'
-		"dash":
+		"dash", "phase_dash":
 			return '<path d="M30 16H39L37 33L49 41V49H28L20 42L25 31Z" fill="#626a88" stroke="ACCENT" stroke-width="2.5"/><path d="M28 45H46M11 25H24M8 33H20M10 41H17" stroke="#e1e5ef" stroke-width="3"/><path d="M33 21L29 32L34 35" fill="none" stroke="ACCENT" stroke-width="3"/>'
+		"shoulder_rush":
+			return '<path d="M28 13L43 18L51 31L44 47L29 52L23 35Z" fill="#72583d" stroke="ACCENT" stroke-width="3"/><path d="M31 21L39 24L44 32L39 42L32 45L28 34Z" fill="ACCENT"/><path d="M7 23H21M4 32H18M7 41H21" stroke="#e7d9bd" stroke-width="3"/><path d="M49 17L55 13M54 30H59M50 44L56 49" stroke="ACCENT" stroke-width="2.5"/>'
 		"cache":
 			return '<path d="M11 30L16 18H48L53 30V50H11Z" fill="#66583f" stroke="ACCENT" stroke-width="2.5"/><path d="M12 31H52M22 20V49M43 20V49" stroke="#debd83" stroke-width="3"/><rect x="28" y="28" width="8" height="12" rx="2" fill="ACCENT"/><path d="M32 32V35" stroke="#23323b" stroke-width="2"/>'
 		"choice":

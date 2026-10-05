@@ -86,12 +86,17 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 			if not frame_value is Dictionary:
 				break
 			var frame: Dictionary = frame_value
+			var frame_path: String = str(frame.get("texture", path))
+			var frame_texture: Texture2D = _load_texture(frame_path, supplied_textures)
+			var frame_scale: float = float(frame.get("scale", scale_value))
+			if frame_texture == null or not is_finite(frame_scale) or frame_scale <= 0.0 or frame_scale > 8.0:
+				break
 			if not _numbers(frame.get("rect"), 4) or not _numbers(frame.get("anchor"), 2):
 				break
 			var rect: Rect2 = _rect(frame.rect)
 			var anchor: Vector2 = Vector2(float(frame.anchor[0]), float(frame.anchor[1]))
 			var duration: float = float(frame.get("duration", 0.12))
-			if rect.size.x <= 0.0 or rect.size.y <= 0.0 or not Rect2(Vector2.ZERO, texture.get_size()).encloses(rect) or not is_finite(duration) or duration <= 0.0:
+			if rect.size.x <= 0.0 or rect.size.y <= 0.0 or not Rect2(Vector2.ZERO, frame_texture.get_size()).encloses(rect) or not is_finite(duration) or duration <= 0.0:
 				break
 			# Anchors may sit just outside a tightly cropped image, but not explode
 			# geometry if a malformed manifest uses an unbounded value.
@@ -106,12 +111,14 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 				shoulder = Vector2(float(frame.shoulder[0]), float(frame.shoulder[1]))
 				if shoulder.abs().x > 64.0 or shoulder.abs().y > 64.0:
 					break
-			var target: Rect2 = Rect2(-anchor * scale_value, rect.size * scale_value)
+			var target: Rect2 = Rect2(-anchor * frame_scale, rect.size * frame_scale)
 			var atlas := AtlasTexture.new()
-			atlas.atlas = texture
+			atlas.atlas = frame_texture
 			atlas.region = rect
 			atlas.filter_clip = true
-			frames.append({"source": rect, "anchor": anchor, "target": target, "duration": clampf(duration, 0.016, 5.0), "texture": atlas, "shoulder": shoulder})
+			frames.append({"source": rect, "source_path": frame_path, "source_scale": frame_scale, "anchor": anchor, "target": target, "duration": clampf(duration, 0.016, 5.0), "texture": atlas, "shoulder": shoulder})
+			if not images.has(frame_path):
+				images[frame_path] = frame_texture.diffuse_texture.get_image()
 			union = target if frames.size() == 1 else union.merge(target)
 		if frames.size() != frame_values.size():
 			_errors.append("Invalid crop, anchor, timing or shoulder: " + id)
@@ -119,9 +126,7 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 		# Downsample once at a fixed actor-local phase. Sampling a 1536px sheet
 		# directly at 0.125 scale selected different source texels each time the
 		# camera moved by a fraction of a pixel, making an unchanged pose shimmer.
-		if not images.has(path):
-			images[path] = texture.diffuse_texture.get_image()
-		if not _bake_frames(images[path], frames, union, scale_value):
+		if not _bake_frames(images, frames, union):
 			_errors.append("Invalid or oversized logical-pixel canvas: " + id)
 			continue
 		var animations: Dictionary = {}
@@ -156,13 +161,14 @@ static func install_manifest(data: Dictionary, supplied_textures: Dictionary = {
 		var stride_distance: float = float(source.get("stride_distance", 0.0))
 		if not is_finite(stride_distance) or stride_distance < 0.0 or stride_distance > 4096.0:
 			stride_distance = 0.0
-		_actors[id] = {"path": path, "frames": frames, "animations": animations, "animation_modes": modes, "movement_speed": movement_speed, "stride_distance": stride_distance, "bounds": bounds, "scale": scale_value}
+		var stride_distances: Dictionary = {}
+		var declared_strides: Dictionary = source.get("stride_distances", {}) if source.get("stride_distances", {}) is Dictionary else {}
+		for animation: String in animations:
+			var distance: float = float(declared_strides.get(animation, stride_distance))
+			stride_distances[animation] = distance if is_finite(distance) and distance >= 0.0 and distance <= 4096.0 else stride_distance
+		_actors[id] = {"path": path, "frames": frames, "animations": animations, "animation_modes": modes, "movement_speed": movement_speed, "stride_distance": stride_distance, "stride_distances": stride_distances, "bounds": bounds, "scale": scale_value}
 
-static func _bake_frames(image: Image, frames: Array, union: Rect2, scale_value: float) -> bool:
-	if image == null or image.is_empty():
-		return false
-	if image.is_compressed() and image.decompress() != OK:
-		return false
+static func _bake_frames(images: Dictionary, frames: Array, union: Rect2) -> bool:
 	# Every animation frame shares this integer pivot and size. A differently
 	# cropped hand/foot may move, but cannot change the sampling phase of the torso.
 	var target := Rect2(union.position.floor(), union.end.ceil() - union.position.floor())
@@ -178,6 +184,10 @@ static func _bake_frames(image: Image, frames: Array, union: Rect2, scale_value:
 	baked.fill(Color.TRANSPARENT)
 	for index: int in range(frames.size()):
 		var frame: Dictionary = frames[index]
+		var image: Image = images.get(frame.source_path)
+		if image == null or image.is_empty() or (image.is_compressed() and image.decompress() != OK):
+			return false
+		var scale_value: float = float(frame.source_scale)
 		var rect: Rect2 = frame.source
 		var anchor: Vector2 = frame.anchor
 		var offset := Vector2i((index % columns) * size_value.x, (index / columns) * size_value.y)
@@ -275,7 +285,10 @@ static func animation_for(state: Dictionary, player: bool = false) -> String:
 			return "dash"
 		if not bool(state.get("grounded", false)):
 			return "rise" if velocity.y < 0.0 else "fall"
-		return "run" if absf(velocity.x) > 15.0 else "idle"
+		if absf(velocity.x) <= 15.0:
+			return "idle"
+		var facing: float = 1.0 if Vector2(state.get("aim", Vector2.RIGHT)).x >= 0.0 else -1.0
+		return "backpedal" if velocity.x * facing < 0.0 else "run"
 	if float(state.get("telegraph", 0.0)) > 0.0:
 		return "windup"
 	if float(state.get("charge_timer", 0.0)) > 0.0 or (not str(state.get("attack_kind", "")).is_empty() and float(state.get("attack_cd", 0.0)) > float(state.get("attack_cooldown", 3.0)) - 0.18):
@@ -297,7 +310,7 @@ static func frame_for(id: String, state: Dictionary, clock: float, player: bool 
 
 static func _resolve_animation(actor: Dictionary, requested: String) -> String:
 	var animation: String = requested
-	var aliases: Dictionary = {"run": "move", "move": "run", "rise": "jump", "fall": "jump", "dash": "run", "land": "idle", "attack": "move", "windup": "idle", "dead": "idle"}
+	var aliases: Dictionary = {"backpedal": "run", "run": "move", "move": "run", "rise": "jump", "fall": "jump", "dash": "run", "land": "idle", "attack": "move", "windup": "idle", "dead": "idle"}
 	if not actor.animations.has(animation):
 		animation = str(aliases.get(animation, "idle"))
 	if not actor.animations.has(animation):
@@ -360,15 +373,15 @@ static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary,
 			restart = true
 			if landing:
 				land_position = position_value
-		elif requested in ["idle", "run"] and str(track.animation) in ["land", "attack"] and float(track.elapsed) + dt < _duration(actor, str(track.animation)):
+		elif requested in ["idle", "run", "backpedal"] and str(track.animation) in ["land", "attack"] and float(track.elapsed) + dt < _duration(actor, str(track.animation)):
 			# A landing is visual only: walking, aiming and firing remain live.
 			# Running immediately interrupts a standing attack pose.
-			var left_contact: bool = str(track.animation) == "land" and requested == "run" and dt > 0.0 and absf(position_value.x - land_position.x) > 4.0
+			var left_contact: bool = str(track.animation) == "land" and requested in ["run", "backpedal"] and dt > 0.0 and absf(position_value.x - land_position.x) > 4.0
 			if not left_contact and (str(track.animation) == "land" or requested == "idle"):
 				animation = str(track.animation)
 	var velocity: Vector2 = state.get("vel", Vector2.ZERO)
 	var rate: float = 1.0
-	if animation in ["run", "move"]:
+	if animation in ["run", "backpedal", "move"]:
 		var speed: float = absf(velocity.x) if player or not bool(state.get("flying", false)) else velocity.length()
 		# Hovering still has a full wing cycle; ground feet follow travel speed.
 		rate = clampf(speed / float(actor.movement_speed), 0.4, 2.0)
@@ -376,9 +389,15 @@ static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary,
 			rate = maxf(1.0, rate)
 	var elapsed: float = 0.0
 	var tracked_position: Vector2 = position_value
-	if not reset and not restart and animation == str(track.get("animation", "")):
+	var previous_animation: String = str(track.get("animation", ""))
+	var changing_gait: bool = player and animation in ["run", "backpedal"] and previous_animation in ["run", "backpedal"]
+	if not reset and not restart and (animation == previous_animation or changing_gait):
 		elapsed = float(track.elapsed)
-		if player and animation == "run" and float(actor.stride_distance) > 0.0:
+		if changing_gait and animation != previous_animation:
+			# Keep the same planted leg when aim or travel changes direction.
+			elapsed *= _duration(actor, animation) / _duration(actor, previous_animation)
+		var stride: float = float(actor.stride_distances.get(animation, 0.0))
+		if player and animation in ["run", "backpedal"] and stride > 0.0:
 			# A planted foot must sweep opposite actual travel. Aim mirrors the
 			# body independently, so backpedalling reverses the gait. Measure the
 			# rendered position: no skating through stops, clamped haste cadence,
@@ -386,7 +405,10 @@ static func tracked_frame_for(canvas: CanvasItem, id: String, state: Dictionary,
 			if dt > 0.0:
 				var facing: float = 1.0 if Vector2(state.get("aim", Vector2.RIGHT)).x >= 0.0 else -1.0
 				var travel: float = position_value.x - Vector2(track.pos).x
-				elapsed += travel * facing * _duration(actor, animation) / float(actor.stride_distance)
+				# A dedicated retreat clip is authored in its own forward order.
+				# Old sheets without it retain the backwards-compatible reversed run.
+				var gait_travel: float = absf(travel) if actor.animations.has("backpedal") else travel * facing
+				elapsed += gait_travel * _duration(actor, animation) / stride
 			else:
 				# A projectile may ask for its muzzle during set_frame, before the
 				# world clock advances. Keep that travel for the next render sample.

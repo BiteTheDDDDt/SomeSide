@@ -14,10 +14,10 @@ const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.15.0"
+const VERSION: String = "0.16.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
-const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "equipment", "drop"]
+const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "equipment", "drop"]
 const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
 const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
 const INK := Color("0b1e27")
@@ -1521,7 +1521,7 @@ func _show_guide() -> void:
 		["S + Space", "穿过脚下的平台"],
 		["鼠标左键", "使用当前主武器，跟随鼠标瞄准"],
 		["鼠标右键 / Q", "使用当前主动装备；下方显示冷却"],
-		["Shift", "移动方向冲刺；静止时朝瞄准方向"],
+		["Shift", "角色技能：游侠闪身，先锋向前突进"],
 		["E", "拾取 / 使用设施 / 激活裂隙门 / 救援"],
 		["F   /   按住 Alt", "切换附近目标 / 展开道具与装备详情"],
 		["Tab / M / Esc / F3", "构筑 / 地图 / 菜单 / 帧率"] if _is_web() else ["Tab / M / Esc / F11 / F3", "构筑 / 地图 / 菜单 / 全屏 / 帧率"]
@@ -1882,16 +1882,20 @@ func _refresh_relics(inventory: Dictionary) -> void:
 	_hud_labels.hint.position.y = _relic_strip.position.y - 42
 	_update_inspection_visibility()
 
-func _update_slot(key: String, id: String, cooldown: float, maximum: float) -> void:
+func _update_slot(key: String, id: String, cooldown: float, maximum: float, definition_override: Dictionary = {}) -> void:
 	var slot: Dictionary = _slot_ui[key]
-	var definition: Dictionary = Simulation.loot_definition(id)
+	var definition: Dictionary = definition_override if not definition_override.is_empty() else Simulation.loot_definition(id)
 	if str(slot.id) != id:
 		slot.icon.texture = Icons.texture(id, 72)
 		slot.id = id
 		var frame: StyleBoxFlat = slot.panel.get_theme_stylebox("panel").duplicate()
-		frame.border_color = Content.rarity_color(str(definition.get("rarity", "common"))) if key != "dash" else Color("30444c")
+		frame.border_color = Content.rarity_color(str(definition.get("rarity", "common"))) if key != "dash" else Icons.color(id).darkened(0.45)
 		slot.panel.add_theme_stylebox_override("panel", frame)
-	slot.name.text = Locale.text("相位冲刺" if key == "dash" else str(definition.get("name", id)))
+		if key == "dash":
+			var fill: StyleBoxFlat = slot.bar.get_theme_stylebox("fill").duplicate()
+			fill.bg_color = Icons.color(id)
+			slot.bar.add_theme_stylebox_override("fill", fill)
+	slot.name.text = Locale.text(str(definition.get("name", id)))
 	var unavailable: bool = cooldown > 0.1 and key != "weapon"
 	slot.cooldown.text = str(ceili(cooldown)) if unavailable else ""
 	slot.icon.modulate = Color(0.4, 0.5, 0.52, 0.8) if unavailable else Color.WHITE
@@ -1929,7 +1933,8 @@ func _update_hud() -> void:
 	var equipment: String = str(player.get("equipment", "grenade"))
 	_update_slot("weapon", weapon, float(player.fire_cd), float(Simulation.loot_definition(weapon).get("fire_interval", 0.19)))
 	_update_slot("equipment", equipment, float(player.skill_cd), float(Simulation.loot_definition(equipment).get("cooldown", 8.0)))
-	_update_slot("dash", "dash", float(player.dash_cd), Simulation.DASH_COOLDOWN)
+	var movement_ability: Dictionary = Simulation.movement_ability(player)
+	_update_slot("dash", str(movement_ability.id), float(player.dash_cd), float(movement_ability.cooldown), movement_ability)
 	_hud_labels.relics.text = Locale.format("遗物 %d 件  ·  %d 种", [_item_total(player.items), player.items.size()])
 	_refresh_relics(player.items)
 	if player.dead:
@@ -2116,6 +2121,10 @@ func _show_inventory() -> void:
 	_label(content, "背包与图鉴", 30, PAPER)
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
 	_label(content, Locale.format("%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s", [Locale.text("游侠" if player.get("character", "ranger") == "ranger" else "先锋"), ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), Locale.text("合作远征仍在继续" if online else "远征已暂停")]), 14, MUTED)
+	var innate: Dictionary = Simulation.movement_ability(player)
+	var innate_description: Label = _label(content, "Shift  ·  " + Locale.text(str(innate.name)) + "  ·  " + Locale.text(str(innate.description)), 13, MUTED)
+	innate_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	innate_description.custom_minimum_size.x = 1136
 	_inventory_filters.clear()
 	var filters := HBoxContainer.new()
 	filters.add_theme_constant_override("separation", 10)

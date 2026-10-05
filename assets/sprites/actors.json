@@ -60,107 +60,123 @@
         },
         {
           "rect": [
-            79,
-            354,
-            212,
-            292
+            62,
+            34,
+            232,
+            306
           ],
           "anchor": [
-            128.716,
-            166.471
+            148.657757,
+            171.501598
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.158492478
         },
         {
           "rect": [
-            400,
-            354,
-            148,
-            292
+            389,
+            35,
+            155,
+            305
           ],
           "anchor": [
-            94.956,
-            166.471
+            113.310187,
+            171.322379
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.159480402
         },
         {
           "rect": [
-            688,
-            351,
-            205,
+            675,
+            35,
+            178,
+            306
+          ],
+          "anchor": [
+            133.061704,
+            172.14451
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.159265268
+        },
+        {
+          "rect": [
+            972,
+            35,
+            228,
+            304
+          ],
+          "anchor": [
+            137.805849,
+            169.974313
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.159059956
+        },
+        {
+          "rect": [
+            53,
+            349,
+            245,
+            297
+          ],
+          "anchor": [
+            164.024444,
+            167.133333
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.164233577
+        },
+        {
+          "rect": [
+            375,
+            349,
+            175,
+            292
+          ],
+          "anchor": [
+            132.335846,
+            164.283547
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.167042575
+        },
+        {
+          "rect": [
+            667,
+            349,
+            193,
+            297
+          ],
+          "anchor": [
+            149.5091,
+            167.110106
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.164203748
+        },
+        {
+          "rect": [
+            970,
+            349,
+            249,
             295
           ],
           "anchor": [
-            110.136,
-            169.471
+            151.295269,
+            165.242929
           ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            973,
-            351,
-            226,
-            287
-          ],
-          "anchor": [
-            130.206,
-            161.471
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            77,
-            666,
-            233,
-            289
-          ],
-          "anchor": [
-            131.146,
-            163.471
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            403,
-            667,
-            149,
-            288
-          ],
-          "anchor": [
-            96.216,
-            162.471
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            686,
-            667,
-            218,
-            293
-          ],
-          "anchor": [
-            114.706,
-            167.471
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            1013,
-            663,
-            148,
-            292
-          ],
-          "anchor": [
-            94.826,
-            166.471
-          ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.164374464
         },
         {
           "rect": [
@@ -217,6 +233,158 @@
             0,
             7
           ]
+        },
+        {
+          "rect": [
+            93,
+            661,
+            174,
+            298
+          ],
+          "anchor": [
+            131.080127,
+            160.616272
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.155114653,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            395,
+            663,
+            159,
+            294
+          ],
+          "anchor": [
+            118.788903,
+            158.406634
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.157193434,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            693,
+            663,
+            161,
+            296
+          ],
+          "anchor": [
+            114.807369,
+            160.363636
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.157142857,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            1001,
+            662,
+            158,
+            297
+          ],
+          "anchor": [
+            106.750967,
+            161.037512
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.156760301,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            79,
+            962,
+            194,
+            281
+          ],
+          "anchor": [
+            132.551987,
+            153.580404
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.167437949,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            389,
+            969,
+            160,
+            271
+          ],
+          "anchor": [
+            120.471044,
+            147.255051
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.172491755,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            688,
+            971,
+            163,
+            269
+          ],
+          "anchor": [
+            120.946615,
+            146.49323
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.174264069,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            1000,
+            971,
+            191,
+            272
+          ],
+          "anchor": [
+            122.700877,
+            148.381579
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/ranger-locomotion-v3.png",
+          "scale": 0.172671211,
+          "shoulder": [
+            0,
+            -3
+          ]
         }
       ],
       "animations": {
@@ -230,11 +398,11 @@
           4,
           5,
           6,
-          7,
           8,
           9,
           10,
-          11
+          11,
+          7
         ],
         "rise": [
           12
@@ -247,6 +415,16 @@
         ],
         "land": [
           15
+        ],
+        "backpedal": [
+          23,
+          22,
+          21,
+          20,
+          19,
+          18,
+          17,
+          16
         ]
       },
       "animation_modes": {
@@ -255,7 +433,8 @@
         "rise": "once",
         "fall": "once",
         "dash": "once",
-        "land": "once"
+        "land": "once",
+        "backpedal": "loop"
       },
       "movement_speed": 245,
       "bounds": [
@@ -264,7 +443,11 @@
         50,
         58
       ],
-      "stride_distance": 60
+      "stride_distance": 64,
+      "stride_distances": {
+        "run": 64,
+        "backpedal": 48
+      }
     },
     "vanguard": {
       "texture": "res://assets/sprites/vanguard-v2.png",
@@ -324,107 +507,123 @@
         },
         {
           "rect": [
-            71,
-            345,
-            205,
-            287
+            67,
+            25,
+            215,
+            298
           ],
           "anchor": [
-            121.12,
-            165.0
+            133.504316,
+            171.907264
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.169228278
         },
         {
           "rect": [
-            403,
-            345,
-            156,
-            287
+            368,
+            25,
+            183,
+            298
           ],
           "anchor": [
-            102.25,
-            165.0
+            126.166546,
+            171.673262
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.168909764
         },
         {
           "rect": [
-            706,
-            345,
-            171,
-            287
+            692,
+            25,
+            194,
+            299
           ],
           "anchor": [
-            112.54,
-            165.0
+            120.144917,
+            173.046333
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.169418143
         },
         {
           "rect": [
-            1020,
-            343,
-            167,
-            288
+            1003,
+            25,
+            182,
+            299
           ],
           "anchor": [
-            121.38,
-            166.0
+            123.827813,
+            173.558709
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.170121358
         },
         {
           "rect": [
-            74,
-            655,
-            218,
-            290
-          ],
-          "anchor": [
-            133.41,
-            168.0
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            400,
-            658,
-            168,
-            286
-          ],
-          "anchor": [
-            119.17,
-            164.0
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            711,
-            655,
-            167,
-            289
-          ],
-          "anchor": [
-            112.04,
-            167.0
-          ],
-          "duration": 0.065
-        },
-        {
-          "rect": [
-            1029,
-            646,
-            170,
+            55,
+            347,
+            227,
             291
           ],
           "anchor": [
-            118.87,
-            169.0
+            141.46505,
+            169.200201
           ],
-          "duration": 0.065
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.175292447
+        },
+        {
+          "rect": [
+            383,
+            348,
+            185,
+            291
+          ],
+          "anchor": [
+            130.94491,
+            166.966154
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.172083408
+        },
+        {
+          "rect": [
+            695,
+            346,
+            184,
+            293
+          ],
+          "anchor": [
+            130.396487,
+            167.076474
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.169459349
+        },
+        {
+          "rect": [
+            998,
+            349,
+            244,
+            289
+          ],
+          "anchor": [
+            139.580271,
+            166.871739
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.174813152
         },
         {
           "rect": [
@@ -481,6 +680,158 @@
             0,
             7
           ]
+        },
+        {
+          "rect": [
+            66,
+            664,
+            196,
+            287
+          ],
+          "anchor": [
+            132.54209,
+            159.678357
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.167568821,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            376,
+            661,
+            183,
+            291
+          ],
+          "anchor": [
+            125.704116,
+            161.431684
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.164617678,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            686,
+            663,
+            184,
+            272
+          ],
+          "anchor": [
+            126.452505,
+            153.608504
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.180425553,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            999,
+            662,
+            184,
+            289
+          ],
+          "anchor": [
+            124.325196,
+            159.468457
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.164665145,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            65,
+            969,
+            194,
+            273
+          ],
+          "anchor": [
+            128.82632,
+            153.138836
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.178175738,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            367,
+            967,
+            185,
+            275
+          ],
+          "anchor": [
+            128.544562,
+            152.683658
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.174539881,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            695,
+            967,
+            189,
+            273
+          ],
+          "anchor": [
+            129.901492,
+            152.47831
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.177182759,
+          "shoulder": [
+            0,
+            -3
+          ]
+        },
+        {
+          "rect": [
+            1005,
+            969,
+            186,
+            271
+          ],
+          "anchor": [
+            130.802846,
+            150.493297
+          ],
+          "duration": 0.065,
+          "texture": "res://assets/sprites/vanguard-locomotion-v3.png",
+          "scale": 0.177205166,
+          "shoulder": [
+            0,
+            -3
+          ]
         }
       ],
       "animations": {
@@ -494,11 +845,11 @@
           4,
           5,
           6,
-          7,
           8,
           9,
           10,
-          11
+          11,
+          7
         ],
         "rise": [
           12
@@ -511,6 +862,16 @@
         ],
         "land": [
           15
+        ],
+        "backpedal": [
+          23,
+          22,
+          21,
+          20,
+          19,
+          18,
+          17,
+          16
         ]
       },
       "animation_modes": {
@@ -519,7 +880,8 @@
         "rise": "once",
         "fall": "once",
         "dash": "once",
-        "land": "once"
+        "land": "once",
+        "backpedal": "loop"
       },
       "movement_speed": 245,
       "bounds": [
@@ -528,7 +890,11 @@
         50,
         58
       ],
-      "stride_distance": 60
+      "stride_distance": 64,
+      "stride_distances": {
+        "run": 64,
+        "backpedal": 48
+      }
     },
     "crawler": {
       "texture": "res://assets/sprites/forest-enemies-v2.png",

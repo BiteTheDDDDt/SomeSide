@@ -79,10 +79,13 @@ func _run() -> void:
 			animations[animation] = {"sequence_count":actor.animations[animation].size(),"unique_pixels":hashes.size(),"duration":duration,
 				"upper_centroid_span":[span.x,span.y],"foot_span":feet_max-feet_min,"indices":actor.animations[animation]}
 		if require_expanded:
-			var expected: int = 16 if id in ["ranger","vanguard"] else 8
+			var hero: bool = id in ["ranger","vanguard"]
+			var expected: int = (24 if actor.animations.has("backpedal") else 16) if hero else 8
 			if frames.size() != expected or unique.size() != expected:
 				issues.append("Expanded %s must have %d actually distinct baked poses (found %d frames, %d distinct)" % [id,expected,frames.size(),unique.size()])
-			var required_clips: Dictionary = {"idle":4,"run":8,"rise":1,"fall":1,"dash":1,"land":1} if expected==16 else ({"idle":4,"windup":2,"attack":2} if id.begins_with("boss_") else {"move":6,"windup":1,"attack":1})
+			var required_clips: Dictionary = {"idle":4,"run":8,"rise":1,"fall":1,"dash":1,"land":1} if hero else ({"idle":4,"windup":2,"attack":2} if id.begins_with("boss_") else {"move":6,"windup":1,"attack":1})
+			if hero and expected == 24:
+				required_clips.backpedal = 8
 			for clip: String in required_clips:
 				if not animations.has(clip) or int(animations[clip].unique_pixels) != int(required_clips[clip]):
 					issues.append("Missing expanded unique clip frames: %s/%s needs %d" % [id,clip,required_clips[clip]])

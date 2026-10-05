@@ -838,9 +838,15 @@ func push_events(events: Array) -> void:
 				_add_effect(swipe)
 				_burst(position_value,Color("ffa45c") if flame else Color("abead8"),clampi(int(3.0*strength),3,9),160.0 if flame else 90.0,0.32,direction,0.33 if flame else 0.8,"ember" if flame else "spark")
 			"dash":
-				var dash_color: Color = Color("eea27c") if bool(event.get("enemy",false)) else TEAL
+				var rushing: bool = str(event.get("ability", "")) == "shoulder_rush"
+				var dash_color: Color = GOLD if rushing else (Color("eea27c") if bool(event.get("enemy",false)) else TEAL)
 				_spark(position_value, dash_color, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
-				_add_effect({"kind":"dash", "pos":position_value, "angle":direction.angle(), "color":dash_color, "strength":strength, "age":0.0, "life":0.22})
+				_add_effect({"kind":"rush" if rushing else "dash", "pos":position_value, "angle":direction.angle(), "color":dash_color, "strength":strength, "age":0.0, "life":0.22})
+			"ability_hit":
+				if str(event.get("ability", "")) == "shoulder_rush":
+					_burst(position_value, GOLD, 7, 135.0, 0.28, direction, 0.8, "spark")
+					_add_effect({"kind":"rush_hit", "pos":position_value, "angle":direction.angle(), "color":GOLD, "strength":1.0, "age":0.0, "life":0.20})
+					_shake = minf(5.0, maxf(_shake, 1.4))
 			"pickup":
 				if str(event.get("kind", "")) == "coin":
 					_spark(position_value, GOLD, 4, 42.0, 0.26)
@@ -1137,7 +1143,7 @@ func _draw_chests() -> void:
 	for value: Variant in _frame.get("chests", []):
 		var chest: Dictionary = value
 		var world_p: Vector2 = chest.get("pos", Vector2.ZERO)
-		var p: Vector2 = world_to_screen(world_p) + Vector2(0.0, 7.0)
+		var p: Vector2 = Pixels.snap_position(self, world_to_screen(world_p) + Vector2(0.0, 7.0))
 		if not _visible(p, 65.0):
 			continue
 		var opened: bool = chest.get("opened", false)
@@ -1168,6 +1174,16 @@ func _draw_chests() -> void:
 		draw_rect(Rect2(p + Vector2(-3.0, -5.0), Vector2(6.0, 6.0)), Color("33413a") if opened else GOLD)
 
 
+func facility_icon_rect(p: Vector2, chest: Dictionary, kind: String) -> Rect2:
+	var offset: Vector2 = Vector2(-12.0, -27.0)
+	if kind == "choice":
+		# Screen X changes with every camera movement. It must never drive the
+		# hover phase: running used to turn a slow bob into dozens of Hz.
+		var phase: float = fposmod(float(chest.get("id", 0)) * 2.39996323, TAU)
+		offset.y = -41.0 + sin(_clock * 2.0 + phase) * 1.5
+	return Rect2(Pixels.snap_position(self, p + offset), Vector2(24.0, 24.0))
+
+
 func _draw_facility(p: Vector2, chest: Dictionary, kind: String, accent: Color, depleted: bool) -> void:
 	var dark: Color = Color("193840")
 	var steel: Color = Color("48605d") if not depleted else Color("293c3d")
@@ -1181,8 +1197,7 @@ func _draw_facility(p: Vector2, chest: Dictionary, kind: String, accent: Color, 
 			draw_line(p + Vector2(-5.0, -5.0), p + Vector2(5.0, -5.0), Color(accent, 0.55), 1.5, true)
 			if not depleted:
 				var item_id: String = str(chest.get("item", ""))
-				var hover: Vector2 = p + Vector2(-12.0, -41.0 + sin(_clock * 2.0 + p.x) * 1.5)
-				draw_texture_rect(ItemIcons.texture(item_id, 32), Rect2(hover, Vector2(24.0, 24.0)), false, Color(1.0, 1.0, 1.0, 0.85))
+				draw_texture_rect(ItemIcons.texture(item_id, 24), facility_icon_rect(p, chest, kind), false, Color(1.0, 1.0, 1.0, 0.85))
 				draw_line(p + Vector2(-7.0, -12.0), p + Vector2(-11.0, -28.0), Color(accent, 0.16), 1.0, true)
 				draw_line(p + Vector2(7.0, -12.0), p + Vector2(11.0, -28.0), Color(accent, 0.16), 1.0, true)
 			else:
@@ -1214,7 +1229,7 @@ func _draw_facility(p: Vector2, chest: Dictionary, kind: String, accent: Color, 
 			draw_line(p + Vector2(-17.0, -28.0), p + Vector2(-17.0, 0.0), accent, 2.0)
 			draw_line(p + Vector2(17.0, -28.0), p + Vector2(17.0, 0.0), accent, 2.0)
 			if not depleted:
-				draw_texture_rect(ItemIcons.texture(str(chest.get("item", "grenade")), 32), Rect2(p + Vector2(-12.0, -27.0), Vector2(24.0, 24.0)), false)
+				draw_texture_rect(ItemIcons.texture(str(chest.get("item", "grenade")), 24), facility_icon_rect(p, chest, kind), false)
 			else:
 				draw_line(p + Vector2(-10.0, -14.0), p + Vector2(10.0, -14.0), accent, 2.0)
 			draw_line(p + Vector2(-8.0, 4.0), p + Vector2(8.0, 4.0), steel, 2.0)
@@ -1240,6 +1255,8 @@ func _draw_pickups() -> void:
 		var kind: String = pickup.get("kind", "coin")
 		var id_value: int = pickup.get("id", 0)
 		p.y += sin(_clock * 3.0 + float(id_value)) * 3.0
+		if kind == "item":
+			p = Pixels.snap_position(self, p)
 		var item_id: String = str(pickup.get("item", ""))
 		var color_value: Color = GOLD if kind == "coin" else (Color("a7e9a8") if kind == "heal" else ItemIcons.color(item_id))
 		_glow(p, 15.0 if kind == "coin" else 25.0, Color(color_value, 0.045), 3)
@@ -1261,7 +1278,7 @@ func _draw_pickups() -> void:
 			draw_colored_polygon(PackedVector2Array([p + Vector2(-2.0, 12.0), p + Vector2(-3.0 - rank, -beam_height), p + Vector2(3.0 + rank, -beam_height), p + Vector2(2.0, 12.0)]), Color(beam_color, 0.055 + float(rank) * 0.015))
 			draw_line(p + Vector2(0.0, -beam_height), p + Vector2(0.0, 12.0), Color(beam_color, 0.29 if focused else 0.16 + float(rank) * 0.035), 1.0, true)
 			draw_arc(p + Vector2(0,13),12.0 + float(rank) * 1.5,0.0,PI,18,Color(beam_color,0.46),1.2,true)
-			draw_texture_rect(ItemIcons.texture(item_id, 32), Rect2(p - Vector2(icon_size * 0.5, icon_size * 0.5), Vector2(icon_size, icon_size)), false)
+			draw_texture_rect(ItemIcons.texture(item_id, int(icon_size)), Rect2(Pixels.snap_position(self, p - Vector2.ONE * icon_size * 0.5), Vector2.ONE * icon_size), false)
 			draw_rect(Rect2(p - Vector2.ONE * (icon_size * 0.5 + 1.0), Vector2.ONE * (icon_size + 2.0)), Color(beam_color,0.85), false,1.2,true)
 			# Small rank pips supplement colour; theme colours remain inside icons.
 			for pip: int in range(rank + 1):
@@ -1451,6 +1468,7 @@ func _draw_players() -> void:
 			draw_set_transform(world_to_screen(pose.shoulder), aim.angle(), Vector2(1.0, facing))
 			_draw_weapon(weapon)
 		draw_set_transform(Vector2.ZERO)
+		_draw_movement_ability(player, p)
 		if float(player.get("chrono_timer", 0.0)) > 0.0:
 			var phase: float = _clock * 1.7
 			draw_arc(p,32.0,phase,phase+PI*1.2,30,Color(0.54,0.86,0.93,0.42),1.2,true)
@@ -1470,6 +1488,23 @@ func _draw_players() -> void:
 			_world_label(p + Vector2(0.0, -42.0), str(player.get("name", "PILOT")), color_value if int(key) == _local_id else CREAM, 11)
 		if int(key) == _local_id:
 			draw_colored_polygon(PackedVector2Array([p + Vector2(-3.0, -37.0), p + Vector2(3.0, -37.0), p + Vector2(0.0, -33.0)]), Color(color_value, 0.75))
+
+
+func _draw_movement_ability(player: Dictionary, p: Vector2) -> void:
+	# State-driven so a local movement prediction and remote snapshots both
+	# show the front of the rush without extra attacks or replayed particles.
+	if float(player.get("dash_timer", 0.0)) <= 0.0 or str(player.get("dash_kind", "")) != "shoulder_rush":
+		return
+	var side: float = 1.0 if Vector2(player.get("dash_dir", Vector2.RIGHT)).x >= 0.0 else -1.0
+	draw_set_transform(p, 0.0, Vector2(side, 1.0))
+	var rim := PackedVector2Array([Vector2(10,-23),Vector2(24,-17),Vector2(28,-3),Vector2(23,13),Vector2(12,19)])
+	draw_colored_polygon(rim, Color(GOLD, 0.15))
+	draw_polyline(rim, Color(GOLD, 0.85), 2.0, true)
+	draw_polyline(PackedVector2Array([Vector2(12,-18),Vector2(20,-13),Vector2(23,-3),Vector2(19,10)]), Color(CREAM,0.7), 1.0, true)
+	for index: int in range(3):
+		var y: float = -12.0 + index * 11.0
+		draw_line(Vector2(-27-index*4,y),Vector2(-11,y),Color(GOLD,0.35),1.5,true)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_melee_actor(player: Dictionary, pose: Dictionary) -> void:
@@ -1850,6 +1885,13 @@ func _draw_effects() -> void:
 					draw_line(p+direction*spread*0.7,p+direction*spread,Color(color_value,0.65*(1-t)),1.4,true)
 				if t < 0.3:
 					_glow(p,25.0+strength*5.0,Color(color_value,0.04*(1-t/0.3)),3)
+			"rush", "rush_hit":
+				var angle: float = float(effect.get("angle", 0.0))
+				var strike: bool = str(effect.kind) == "rush_hit"
+				var radius: float = (10.0 + t * 25.0) if strike else (10.0 + t * 14.0)
+				draw_arc(p, radius, angle-1.15, angle+1.15, 15, Color(color_value,0.85*(1-t)), 3.0*(1-t)+0.6, true)
+				if strike:
+					draw_arc(p, radius+5.0, angle-0.75, angle+0.75, 12, Color(CREAM,0.55*(1-t)), 1.0, true)
 			"dash":
 				var direction: Vector2 = Vector2.from_angle(float(effect.get("angle",0.0)))
 				var side: Vector2 = direction.orthogonal()
