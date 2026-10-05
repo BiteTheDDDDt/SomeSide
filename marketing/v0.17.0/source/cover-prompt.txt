@@ -1,0 +1,14 @@
+Tool: built-in image_gen.imagegen (edit mode, opaque background).
+Input: forest-coop-cover-base.png; native Godot 4.7.2 capture of SomeSide v0.17.0.
+Generation output: ../covers/SomeSide-cover-master.png.
+The old root cover.png was inspected as a comparison, not used as a reference, and remains unchanged.
+Final 630x500 and 315x250 copies are technical size exports only.
+
+Use case: compositing / restrained screenshot retouch.
+Asset type: itch.io game cover for SomeSide. Output landscape 1260 x 1000 pixels, exactly 63:50 aspect ratio, readable when reduced to 630 x 500 and 315 x 250.
+Image 1 is the EDIT TARGET: an actual SomeSide game screenshot. Use this screenshot as a locked background plate, not as inspiration for a new illustration. Preserve the actual game appearance: the exact flat teal forest silhouettes, ringed moon in the upper right, horizontal mossy platform, small crisp pixel-sprite characters and insect enemies, existing weapon shapes and cyan electric arc. Preserve character proportions and side-on orthographic view.
+Make only these graphic-design edits:
+1. Remove small floating gameplay labels (Ranger, Vanguard), damage numbers, health bars, target/cursor symbols and tiny overhead markers, filling those tiny areas with the existing background.
+2. Add the exact title "SomeSide" in the open sky in the upper-left/upper-middle area, approximately x=90..1080 and y=255..425. Large confident cream/off-white bold compact geometric sans lettering, one line, flat solid ink with a very subtle dark offset shadow for contrast. Preserve the capital S in Some and Side. Clean, deliberate indie-game wordmark; no bevel, no metallic/chrome texture, no distressed texture, no emblem. A short fine mint rule beneath the title is enough.
+3. Slightly strengthen the separation between the dark background and the existing combat sprites: small restrained cyan/orange highlights only along the existing electric arc and guard ring, mild local contrast. The artwork must still look immediately like the supplied in-game screenshot.
+Keep all original level geometry, sprite silhouettes, palette, positions and the moon. Do not paint new scenery or replace the sprites. Do not add new weapons, enemies, architecture, planets, particles or attacks. No painterly illustration, no photorealistic lighting, no volumetric beams, no cinematic depth of field, no gradients inside the title, no giant heroes, no excessive bloom. No other text, tagline, badges, frame or watermark. Full bleed, opaque background. This is a thoughtfully typeset actual-game screenshot cover, not fantasy concept art.

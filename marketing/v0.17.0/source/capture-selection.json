@@ -1,0 +1,311 @@
+{
+  "version": "0.17.0",
+  "capture_script": "tools/capture-promo-v017.gd",
+  "simulation_hz": 60,
+  "renderer": "Native Godot OpenGL Compatibility; production main.tscn, WorldView and HUD",
+  "output_size": [
+    1920,
+    1080
+  ],
+  "logical_view": [
+    1280,
+    720
+  ],
+  "language": "en",
+  "fps_overlay": false,
+  "postprocessing": "None. Direct SubViewport texture PNGs; no compositing, color grading, resizing, invented particles or replacement sprites.",
+  "staging": "Deterministic authored starting positions, legal loadouts/item stacks, seeded stage/time/threat values and initial enemy attack cooldowns. Natural director replenishment is disabled during the short take. Combat, movement, enemy decisions, guardian activation, damage, deaths and gold collection run through real Simulation.step inputs. These are staged in-engine scenes, not an unbroken organic playthrough.",
+  "profile_unchanged": true,
+  "sources": [
+    {
+      "file": "forest-coop-068-hud.png",
+      "caption": "Two-player forest combat: pulse rifle, arc blade and chain lightning.",
+      "stage": 1,
+      "weapon": "pulse_rifle",
+      "equipment": "grenade",
+      "items": [
+        "overclock",
+        "capacitor",
+        "arc",
+        "feather",
+        "harvest"
+      ],
+      "coop": true,
+      "tick": 68,
+      "sha256": "72abc11b233b9169875fcd397ff9bfe350cecbd7d9acebf33ef0578e60d15c81",
+      "frame_evidence": {
+        "coin_pickups": 1,
+        "enemies": 4,
+        "events": [],
+        "file": "forest-coop-068-hud.png",
+        "tick": 68
+      },
+      "scene_events": {
+        "coin_drop": 3,
+        "death": 3,
+        "explosion": 1,
+        "hit": 38,
+        "land": 2,
+        "pickup": 3,
+        "shoot": 16,
+        "slash": 6
+      },
+      "delivered_file": "screenshots/02-forest-coop.png"
+    },
+    {
+      "file": "forest-gold-068-hud.png",
+      "caption": "Flamethrower and grenade kills create real automatic gold drops.",
+      "stage": 1,
+      "weapon": "flamethrower",
+      "equipment": "grenade",
+      "items": [
+        "capacitor",
+        "harvest",
+        "ember",
+        "magnet",
+        "plating"
+      ],
+      "coop": false,
+      "tick": 68,
+      "sha256": "396794ebc25cab85ea3b753478f1c14753055d46adb36453037f6a8c78b242a6",
+      "frame_evidence": {
+        "coin_pickups": 2,
+        "enemies": 0,
+        "events": [],
+        "file": "forest-gold-068-hud.png",
+        "tick": 68
+      },
+      "scene_events": {
+        "coin_drop": 5,
+        "death": 5,
+        "explosion": 5,
+        "hit": 13,
+        "pickup": 5,
+        "shoot": 1,
+        "slash": 19
+      },
+      "delivered_file": "screenshots/06-forest-gold.png"
+    },
+    {
+      "file": "canyon-blade-027-hud.png",
+      "caption": "Vanguard arc-blade recovery after a real delayed melee hit.",
+      "stage": 2,
+      "weapon": "arc_blade",
+      "equipment": "shockwave",
+      "items": [
+        "capacitor",
+        "plating",
+        "vitality",
+        "momentum",
+        "frost"
+      ],
+      "coop": false,
+      "tick": 27,
+      "sha256": "e680eebffc5d4c2b78328fbe377c176b7e5ca4a229d6057f0d5c1443ae0d644c",
+      "frame_evidence": {
+        "coin_pickups": 0,
+        "enemies": 4,
+        "events": [],
+        "file": "canyon-blade-027-hud.png",
+        "tick": 27
+      },
+      "scene_events": {
+        "coin_drop": 2,
+        "dash": 1,
+        "death": 2,
+        "explosion": 1,
+        "hit": 10,
+        "land": 3,
+        "pickup": 2,
+        "shoot": 3,
+        "slash": 5
+      },
+      "delivered_file": "screenshots/04-canyon-blade.png"
+    },
+    {
+      "file": "canyon-counter-093-hud.png",
+      "caption": "Vanguard guard release after absorbing real enemy attacks.",
+      "stage": 2,
+      "weapon": "arc_blade",
+      "equipment": "shockwave",
+      "items": [
+        "plating",
+        "vitality",
+        "momentum",
+        "battery",
+        "siphon"
+      ],
+      "coop": false,
+      "tick": 93,
+      "sha256": "73b7daa207a10f57b555b263959d4f9c17d12dd01675c8c70db45361e1f77a00",
+      "frame_evidence": {
+        "coin_pickups": 1,
+        "enemies": 3,
+        "events": [],
+        "file": "canyon-counter-093-hud.png",
+        "tick": 93
+      },
+      "scene_events": {
+        "ability": 4,
+        "coin_drop": 2,
+        "dash": 1,
+        "death": 2,
+        "explosion": 1,
+        "hit": 6,
+        "pickup": 2,
+        "shoot": 3,
+        "slash": 2
+      },
+      "delivered_file": "screenshots/05-canyon-counter.png"
+    },
+    {
+      "file": "ruins-storm-093-hud.png",
+      "caption": "Storm staff and graviton against the gate-spawned Silentlight Archon.",
+      "stage": 3,
+      "weapon": "storm_staff",
+      "equipment": "graviton",
+      "items": [
+        "overclock",
+        "arc",
+        "frost",
+        "battery",
+        "feather",
+        "piercer"
+      ],
+      "coop": false,
+      "tick": 93,
+      "sha256": "918664ea40a140f15300b6656e19e1a2a7356f1c598a66db131ed376999a17ae",
+      "frame_evidence": {
+        "coin_pickups": 0,
+        "enemies": 1,
+        "events": [],
+        "file": "ruins-storm-093-hud.png",
+        "tick": 93
+      },
+      "scene_events": {
+        "coin_drop": 3,
+        "death": 3,
+        "explosion": 1,
+        "gate": 1,
+        "hit": 24,
+        "pickup": 3,
+        "shoot": 6
+      },
+      "delivered_file": "screenshots/07-ruins-storm.png"
+    },
+    {
+      "file": "ruins-sun-068-hud.png",
+      "caption": "Sun lance and delayed meteor impacts against the same stage guardian.",
+      "stage": 3,
+      "weapon": "sun_lance",
+      "equipment": "meteor",
+      "items": [
+        "capacitor",
+        "lens",
+        "lens",
+        "resonator",
+        "plating",
+        "phoenix"
+      ],
+      "coop": false,
+      "tick": 68,
+      "sha256": "78fd1dc40bb6ef7682feec19f4f5539cbc46b000c77829794a6518db838da9f0",
+      "frame_evidence": {
+        "coin_pickups": 2,
+        "enemies": 2,
+        "events": [],
+        "file": "ruins-sun-068-hud.png",
+        "tick": 68
+      },
+      "scene_events": {
+        "coin_drop": 3,
+        "death": 3,
+        "equipment": 1,
+        "explosion": 7,
+        "gate": 1,
+        "hit": 15,
+        "land": 1,
+        "pickup": 3,
+        "shoot": 3
+      },
+      "delivered_file": "screenshots/01-ruins-meteor.png"
+    },
+    {
+      "file": "canyon-air-047-hud.png",
+      "caption": "Ranger holds right movement and jumps up the stairs while firing a railgun.",
+      "stage": 2,
+      "weapon": "railgun",
+      "equipment": "aegis",
+      "items": [
+        "feather",
+        "overclock",
+        "plating",
+        "capacitor",
+        "piercer"
+      ],
+      "coop": false,
+      "tick": 47,
+      "sha256": "a11554ededac01e71f55d7a7a31a72e8fc5d03604045ed400bcdb86255ee7bc5",
+      "frame_evidence": {
+        "coin_pickups": 2,
+        "command": {
+          "aim": "(0.934784, -0.355218)",
+          "dash": false,
+          "fire": true,
+          "interact": false,
+          "interact_target": {
+            "id": -1,
+            "kind": "gate"
+          },
+          "jump": false,
+          "jump_held": true,
+          "move": 1.0,
+          "skill": false
+        },
+        "enemies": 2,
+        "events": [],
+        "file": "canyon-air-047-hud.png",
+        "player": {
+          "aim": [
+            0.934783637523651,
+            -0.355217784643173
+          ],
+          "grounded": false,
+          "hp": 100.0,
+          "position": [
+            1886.00183105469,
+            1057.77783203125
+          ],
+          "velocity": [
+            245.0,
+            -198.333312988281
+          ],
+          "weapon": "railgun"
+        },
+        "tick": 47
+      },
+      "scene_events": {
+        "coin_drop": 3,
+        "death": 3,
+        "hit": 3,
+        "jump": 1,
+        "land": 1,
+        "pickup": 3,
+        "shoot": 9
+      },
+      "delivered_file": "screenshots/03-canyon-airborne.png"
+    }
+  ],
+  "cover_source": {
+    "file": "forest-coop-068-cover-clean.png",
+    "size": [
+      1260,
+      1000
+    ],
+    "logical_view": [
+      900,
+      714
+    ],
+    "camera": "Same simulation tick, HUD hidden and a narrower native camera centered 130 px right / 140 px above player one. No rearranged world objects or pixel editing."
+  }
+}

@@ -1,0 +1,72 @@
+﻿[
+    {
+        "file":  "covers/SomeSide-cover-315x250.png",
+        "width":  315,
+        "height":  250,
+        "bytes":  102179,
+        "sha256":  "548D51CF918B7F572A5290B9F0E2CDB8156F407BA52E44BF54E7AB21DEB17D5A"
+    },
+    {
+        "file":  "covers/SomeSide-cover-630x500.png",
+        "width":  630,
+        "height":  500,
+        "bytes":  376341,
+        "sha256":  "07FEB7CB8803D37432DE1C2D5385141A477AB414E714E3A7A9D6F6725D71316A"
+    },
+    {
+        "file":  "covers/SomeSide-cover-master.png",
+        "width":  1408,
+        "height":  1117,
+        "bytes":  1182254,
+        "sha256":  "571B4F964B2B5EF2310E69E2352E7B1E0191DA9249E68DB446EEE7921BF27C1A"
+    },
+    {
+        "file":  "screenshots/01-ruins-meteor.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  368771,
+        "sha256":  "78FD1DC40BB6EF7682FEEC19F4F5539CBC46B000C77829794A6518DB838DA9F0"
+    },
+    {
+        "file":  "screenshots/02-forest-coop.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  269027,
+        "sha256":  "72ABC11B233B9169875FCD397FF9BFE350CECBD7D9ACEBF33EF0578E60D15C81"
+    },
+    {
+        "file":  "screenshots/03-canyon-airborne.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  174948,
+        "sha256":  "A11554EDEDAC01E71F55D7A7A31A72E8FC5D03604045ED400BCDB86255EE7BC5"
+    },
+    {
+        "file":  "screenshots/04-canyon-blade.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  175773,
+        "sha256":  "E680EEBFFC5D4C2B78328FBE377C176B7E5CA4A229D6057F0D5C1443AE0D644C"
+    },
+    {
+        "file":  "screenshots/05-canyon-counter.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  172197,
+        "sha256":  "73B7DAA207A10F57B555B263959D4F9C17D12DD01675C8C70DB45361E1F77A00"
+    },
+    {
+        "file":  "screenshots/06-forest-gold.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  310775,
+        "sha256":  "396794EBC25CAB85EA3B753478F1C14753055D46ADB36453037F6A8C78B242A6"
+    },
+    {
+        "file":  "screenshots/07-ruins-storm.png",
+        "width":  1920,
+        "height":  1080,
+        "bytes":  280212,
+        "sha256":  "918664EA40A140F15300B6656E19E1A2A7356F1C598A66DB131ED376999A17AE"
+    }
+]

@@ -1,0 +1,702 @@
+[
+	{
+		"air": true,
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": false,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-air-018-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						1767.583984375,
+						1169.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": false,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-air-022-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						1783.91748046875,
+						1169.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 22
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": false,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-air-027-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						1804.33435058594,
+						1169.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 27
+			},
+			{
+				"coin_pickups": 1,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-air-038-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": false,
+					"hp": 100.0,
+					"position": [
+						1849.25146484375,
+						1105.02783203125
+					],
+					"velocity": [
+						245.0,
+						-460.833251953125
+					],
+					"weapon": "railgun"
+				},
+				"tick": 38
+			},
+			{
+				"coin_pickups": 1,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-air-040-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": false,
+					"hp": 100.0,
+					"position": [
+						1857.41821289063,
+						1091.125
+					],
+					"velocity": [
+						245.0,
+						-402.499938964844
+					],
+					"weapon": "railgun"
+				},
+				"tick": 40
+			},
+			{
+				"coin_pickups": 2,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [
+					"hit",
+					"death",
+					"coin_drop"
+				],
+				"file": "canyon-air-043-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": false,
+					"hp": 100.0,
+					"position": [
+						1869.66833496094,
+						1073.91674804688
+					],
+					"velocity": [
+						245.0,
+						-314.999969482422
+					],
+					"weapon": "railgun"
+				},
+				"tick": 43
+			},
+			{
+				"coin_pickups": 2,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": true,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-air-047-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": false,
+					"hp": 100.0,
+					"position": [
+						1886.00183105469,
+						1057.77783203125
+					],
+					"velocity": [
+						245.0,
+						-198.333312988281
+					],
+					"weapon": "railgun"
+				},
+				"tick": 47
+			},
+			{
+				"coin_pickups": 2,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-air-054-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": false,
+					"hp": 100.0,
+					"position": [
+						1914.58544921875,
+						1048.25
+					],
+					"velocity": [
+						245.0,
+						5.8333592414856
+					],
+					"weapon": "railgun"
+				},
+				"tick": 54
+			},
+			{
+				"coin_pickups": 1,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-air-068-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						1971.75268554688,
+						1079.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 68
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-air-084-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2037.08666992188,
+						1079.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 84
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-air-090-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2061.58642578125,
+						1079.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 90
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [
+					"shoot"
+				],
+				"file": "canyon-air-093-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2073.83618164063,
+						1079.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 93
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-air-096-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2086.0859375,
+						1079.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 96
+			},
+			{
+				"coin_pickups": 1,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 1.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-air-102-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2110.58544921875,
+						1079.0
+					],
+					"velocity": [
+						245.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 102
+			},
+			{
+				"coin_pickups": 1,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 0.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-air-120-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2128.751953125,
+						1079.0
+					],
+					"velocity": [
+						0.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 120
+			},
+			{
+				"coin_pickups": 1,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 0.0,
+					"skill": false
+				},
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-air-144-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2128.751953125,
+						1079.0
+					],
+					"velocity": [
+						0.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"command": {
+					"aim": "(0.934784, -0.355218)",
+					"dash": false,
+					"fire": true,
+					"interact": false,
+					"interact_target": {
+						"id": -1,
+						"kind": "gate"
+					},
+					"jump": false,
+					"jump_held": false,
+					"move": 0.0,
+					"skill": false
+				},
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-air-155-hud.png",
+				"player": {
+					"aim": [
+						0.934783637523651,
+						-0.355217784643173
+					],
+					"grounded": true,
+					"hp": 100.0,
+					"position": [
+						2128.751953125,
+						1079.0
+					],
+					"velocity": [
+						0.0,
+						0.0
+					],
+					"weapon": "railgun"
+				},
+				"tick": 155
+			}
+		],
+		"enemies": [
+			[
+				"drone",
+				330,
+				-210
+			],
+			[
+				"drone",
+				470,
+				-270
+			],
+			[
+				"charger",
+				250,
+				-88
+			],
+			[
+				"burrower",
+				480,
+				-178
+			]
+		],
+		"equipment": "aegis",
+		"events_seen": {
+			"coin_drop": 3,
+			"death": 3,
+			"hit": 3,
+			"jump": 1,
+			"land": 1,
+			"pickup": 3,
+			"shoot": 9
+		},
+		"items": [
+			"feather",
+			"overclock",
+			"plating",
+			"capacitor",
+			"piercer"
+		],
+		"name": "canyon-air",
+		"pos": "(1700.0, 1169.0)",
+		"stage": 2,
+		"weapon": "railgun"
+	}
+]

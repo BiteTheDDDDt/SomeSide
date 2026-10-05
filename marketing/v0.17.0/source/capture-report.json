@@ -1,0 +1,919 @@
+[
+	{
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"enemies": 5,
+				"events": [],
+				"file": "forest-coop-018-hud.png",
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 5,
+				"events": [],
+				"file": "forest-coop-022-hud.png",
+				"tick": 22
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 5,
+				"events": [
+					"hit"
+				],
+				"file": "forest-coop-027-hud.png",
+				"tick": 27
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 5,
+				"events": [],
+				"file": "forest-coop-040-hud.png",
+				"tick": 40
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 4,
+				"events": [],
+				"file": "forest-coop-054-hud.png",
+				"tick": 54
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 4,
+				"events": [],
+				"file": "forest-coop-068-hud.png",
+				"tick": 68
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "forest-coop-084-hud.png",
+				"tick": 84
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "forest-coop-090-hud.png",
+				"tick": 90
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "forest-coop-093-hud.png",
+				"tick": 93
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [
+					"shoot"
+				],
+				"file": "forest-coop-096-hud.png",
+				"tick": 96
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 3,
+				"events": [
+					"hit"
+				],
+				"file": "forest-coop-102-hud.png",
+				"tick": 102
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 2,
+				"events": [
+					"slash"
+				],
+				"file": "forest-coop-120-hud.png",
+				"tick": 120
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 2,
+				"events": [],
+				"file": "forest-coop-144-hud.png",
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 2,
+				"events": [],
+				"file": "forest-coop-155-hud.png",
+				"tick": 155
+			}
+		],
+		"coop": true,
+		"enemies": [
+			[
+				"crawler",
+				230,
+				2
+			],
+			[
+				"crawler",
+				310,
+				2
+			],
+			[
+				"spitter",
+				420,
+				2
+			],
+			[
+				"spore_moth",
+				365,
+				-120
+			],
+			[
+				"spitter",
+				560,
+				2
+			]
+		],
+		"equipment": "grenade",
+		"events_seen": {
+			"coin_drop": 3,
+			"death": 3,
+			"explosion": 1,
+			"hit": 38,
+			"land": 2,
+			"pickup": 3,
+			"shoot": 16,
+			"slash": 6
+		},
+		"items": [
+			"overclock",
+			"capacitor",
+			"arc",
+			"feather",
+			"harvest"
+		],
+		"name": "forest-coop",
+		"pos": "(2320.0, 1079.0)",
+		"stage": 1,
+		"weapon": "pulse_rifle"
+	},
+	{
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"enemies": 5,
+				"events": [],
+				"file": "forest-gold-018-hud.png",
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 5,
+				"events": [],
+				"file": "forest-gold-022-hud.png",
+				"tick": 22
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 2,
+				"events": [],
+				"file": "forest-gold-027-hud.png",
+				"tick": 27
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 2,
+				"events": [
+					"slash"
+				],
+				"file": "forest-gold-040-hud.png",
+				"tick": 40
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 2,
+				"events": [],
+				"file": "forest-gold-054-hud.png",
+				"tick": 54
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 0,
+				"events": [],
+				"file": "forest-gold-068-hud.png",
+				"tick": 68
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 0,
+				"events": [],
+				"file": "forest-gold-084-hud.png",
+				"tick": 84
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 0,
+				"events": [],
+				"file": "forest-gold-090-hud.png",
+				"tick": 90
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 0,
+				"events": [],
+				"file": "forest-gold-093-hud.png",
+				"tick": 93
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 0,
+				"events": [
+					"slash"
+				],
+				"file": "forest-gold-096-hud.png",
+				"tick": 96
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 0,
+				"events": [],
+				"file": "forest-gold-102-hud.png",
+				"tick": 102
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 0,
+				"events": [
+					"slash"
+				],
+				"file": "forest-gold-120-hud.png",
+				"tick": 120
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 0,
+				"events": [
+					"slash"
+				],
+				"file": "forest-gold-144-hud.png",
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 0,
+				"events": [],
+				"file": "forest-gold-155-hud.png",
+				"tick": 155
+			}
+		],
+		"enemies": [
+			[
+				"crawler",
+				100,
+				2
+			],
+			[
+				"crawler",
+				155,
+				2
+			],
+			[
+				"crawler",
+				205,
+				2
+			],
+			[
+				"spitter",
+				390,
+				2
+			],
+			[
+				"spore_moth",
+				315,
+				-130
+			]
+		],
+		"equipment": "grenade",
+		"events_seen": {
+			"coin_drop": 5,
+			"death": 5,
+			"explosion": 5,
+			"hit": 13,
+			"pickup": 5,
+			"shoot": 1,
+			"slash": 19
+		},
+		"items": [
+			"capacitor",
+			"harvest",
+			"ember",
+			"magnet",
+			"plating"
+		],
+		"name": "forest-gold",
+		"pos": "(2430.0, 1079.0)",
+		"stage": 1,
+		"weapon": "flamethrower"
+	},
+	{
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-blade-018-hud.png",
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-blade-022-hud.png",
+				"tick": 22
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-blade-027-hud.png",
+				"tick": 27
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [
+					"slash"
+				],
+				"file": "canyon-blade-040-hud.png",
+				"tick": 40
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-blade-054-hud.png",
+				"tick": 54
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-blade-068-hud.png",
+				"tick": 68
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-blade-084-hud.png",
+				"tick": 84
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-blade-090-hud.png",
+				"tick": 90
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-blade-093-hud.png",
+				"tick": 93
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 3,
+				"events": [
+					"pickup"
+				],
+				"file": "canyon-blade-096-hud.png",
+				"tick": 96
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-blade-102-hud.png",
+				"tick": 102
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-blade-120-hud.png",
+				"tick": 120
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-blade-144-hud.png",
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-blade-155-hud.png",
+				"tick": 155
+			}
+		],
+		"character": "vanguard",
+		"enemies": [
+			[
+				"charger",
+				105,
+				2
+			],
+			[
+				"burrower",
+				210,
+				2
+			],
+			[
+				"drone",
+				305,
+				-95
+			],
+			[
+				"charger",
+				375,
+				2
+			]
+		],
+		"equipment": "shockwave",
+		"events_seen": {
+			"coin_drop": 2,
+			"dash": 1,
+			"death": 2,
+			"explosion": 1,
+			"hit": 10,
+			"land": 3,
+			"pickup": 2,
+			"shoot": 3,
+			"slash": 5
+		},
+		"items": [
+			"capacitor",
+			"plating",
+			"vitality",
+			"momentum",
+			"frost"
+		],
+		"name": "canyon-blade",
+		"pos": "(4460.0, 1619.0)",
+		"stage": 2,
+		"weapon": "arc_blade"
+	},
+	{
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-018-hud.png",
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-022-hud.png",
+				"tick": 22
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-027-hud.png",
+				"tick": 27
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-040-hud.png",
+				"tick": 40
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-054-hud.png",
+				"tick": 54
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-068-hud.png",
+				"tick": 68
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "canyon-counter-084-hud.png",
+				"tick": 84
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [
+					"ability",
+					"hit",
+					"hit",
+					"death",
+					"coin_drop",
+					"hit"
+				],
+				"file": "canyon-counter-090-hud.png",
+				"tick": 90
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-counter-093-hud.png",
+				"tick": 93
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-counter-096-hud.png",
+				"tick": 96
+			},
+			{
+				"coin_pickups": 1,
+				"enemies": 3,
+				"events": [],
+				"file": "canyon-counter-102-hud.png",
+				"tick": 102
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-counter-120-hud.png",
+				"tick": 120
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-counter-144-hud.png",
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 2,
+				"events": [],
+				"file": "canyon-counter-155-hud.png",
+				"tick": 155
+			}
+		],
+		"character": "vanguard",
+		"enemies": [
+			[
+				"charger",
+				85,
+				2
+			],
+			[
+				"charger",
+				130,
+				2
+			],
+			[
+				"drone",
+				190,
+				-70
+			],
+			[
+				"burrower",
+				250,
+				2
+			]
+		],
+		"equipment": "shockwave",
+		"events_seen": {
+			"ability": 4,
+			"coin_drop": 2,
+			"dash": 1,
+			"death": 2,
+			"explosion": 1,
+			"hit": 6,
+			"pickup": 2,
+			"shoot": 3,
+			"slash": 2
+		},
+		"items": [
+			"plating",
+			"vitality",
+			"momentum",
+			"battery",
+			"siphon"
+		],
+		"name": "canyon-counter",
+		"pos": "(4460.0, 1619.0)",
+		"stage": 2,
+		"weapon": "arc_blade"
+	},
+	{
+		"boss": true,
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-storm-018-hud.png",
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [
+					"hit",
+					"hit",
+					"hit",
+					"hit",
+					"hit"
+				],
+				"file": "ruins-storm-022-hud.png",
+				"tick": 22
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-storm-027-hud.png",
+				"tick": 27
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-040-hud.png",
+				"tick": 40
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-054-hud.png",
+				"tick": 54
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-068-hud.png",
+				"tick": 68
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-084-hud.png",
+				"tick": 84
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-090-hud.png",
+				"tick": 90
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-093-hud.png",
+				"tick": 93
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-096-hud.png",
+				"tick": 96
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-102-hud.png",
+				"tick": 102
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-120-hud.png",
+				"tick": 120
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-144-hud.png",
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-storm-155-hud.png",
+				"tick": 155
+			}
+		],
+		"enemies": [
+			[
+				"sentinel",
+				-180,
+				2
+			],
+			[
+				"conductor",
+				-275,
+				-100
+			],
+			[
+				"skirmisher",
+				-320,
+				2
+			]
+		],
+		"equipment": "graviton",
+		"events_seen": {
+			"coin_drop": 3,
+			"death": 3,
+			"explosion": 1,
+			"gate": 1,
+			"hit": 24,
+			"pickup": 3,
+			"shoot": 6
+		},
+		"items": [
+			"overclock",
+			"arc",
+			"frost",
+			"battery",
+			"feather",
+			"piercer"
+		],
+		"name": "ruins-storm",
+		"pos": "(4350.0, 579.0)",
+		"stage": 3,
+		"weapon": "storm_staff"
+	},
+	{
+		"boss": true,
+		"captures": [
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-sun-018-hud.png",
+				"tick": 18
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-sun-022-hud.png",
+				"tick": 22
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-sun-027-hud.png",
+				"tick": 27
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-sun-040-hud.png",
+				"tick": 40
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 4,
+				"events": [],
+				"file": "ruins-sun-054-hud.png",
+				"tick": 54
+			},
+			{
+				"coin_pickups": 2,
+				"enemies": 2,
+				"events": [],
+				"file": "ruins-sun-068-hud.png",
+				"tick": 68
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-084-hud.png",
+				"tick": 84
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-090-hud.png",
+				"tick": 90
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-093-hud.png",
+				"tick": 93
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-096-hud.png",
+				"tick": 96
+			},
+			{
+				"coin_pickups": 3,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-102-hud.png",
+				"tick": 102
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-120-hud.png",
+				"tick": 120
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-144-hud.png",
+				"tick": 144
+			},
+			{
+				"coin_pickups": 0,
+				"enemies": 1,
+				"events": [],
+				"file": "ruins-sun-155-hud.png",
+				"tick": 155
+			}
+		],
+		"enemies": [
+			[
+				"sentinel",
+				-160,
+				2
+			],
+			[
+				"conductor",
+				-285,
+				-100
+			],
+			[
+				"sentinel",
+				-400,
+				2
+			]
+		],
+		"equipment": "meteor",
+		"events_seen": {
+			"coin_drop": 3,
+			"death": 3,
+			"equipment": 1,
+			"explosion": 7,
+			"gate": 1,
+			"hit": 15,
+			"land": 1,
+			"pickup": 3,
+			"shoot": 3
+		},
+		"items": [
+			"capacitor",
+			"lens",
+			"lens",
+			"resonator",
+			"plating",
+			"phoenix"
+		],
+		"name": "ruins-sun",
+		"pos": "(4350.0, 579.0)",
+		"stage": 3,
+		"weapon": "sun_lance"
+	}
+]
