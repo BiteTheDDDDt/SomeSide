@@ -217,11 +217,13 @@ func _test_shared_economy() -> void:
 		var enemy: Dictionary = simulation.state.enemies.back()
 		simulation._damage_enemy(enemy, 9999.0, 1, false, 0)
 	simulation.step(DT, {})
+	_check(simulation.state.players.values().all(func(player): return int(player.coins)==35), "Shared gold remains in flight until it reaches a player")
+	for tick: int in range(250): simulation._step_coin_pickups(DT)
 	var everyone_paid: bool = true
 	for player_value in simulation.state.players.values():
 		var player: Dictionary = player_value
 		everyone_paid = everyone_paid and int(player.coins) == 83
-	_check(everyone_paid, "Twelve common kills pay 48 shared coins to every player, enough for another chest each")
+	_check(everyone_paid and simulation.state.coin_pickups.is_empty(), "Twelve common kills deliver exactly 48 shared coins to every player after attraction")
 
 func _test_four_player_stress(with_build: bool) -> void:
 	var simulation = _new_sim(4)

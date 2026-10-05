@@ -1,11 +1,12 @@
-SomeSide 0.16.0 - Windows x64
+SomeSide 0.17.0 - Windows x64
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
 另有浏览器单人版；2–4 人合作请使用此 Windows 下载版。
 首次启动按系统语言选择：中文系统使用中文，其他语言默认英文。
 可在设置中切换简体中文 / English；之后优先使用已保存的选择。
-击杀金币自动给全队到账，无需来回拾取；右上角金色数字显示当前余额。
+击杀金币先喷出，再自动吸附到玩家身上并给全队到账，无需来回拾取。
+右上角金色数字显示余额。Shift：游侠闪身；先锋架盾减伤，随后范围反击。
 金币下方默认显示实际 FPS，可按 F3 或在设置中切换，选择会保存。
 
 玩法
@@ -25,7 +26,7 @@ SomeSide 0.16.0 - Windows x64
 三张扩大后的地图具有不同地形与支路，按 M 查看关卡地图。
 三关重绘了各自背景、平台材质与地标，角色、怪物和弹道也已细化。
 两名角色、九种怪物和三种首领使用像素精灵图与多帧姿态。
-角色各有16帧，包含待机、跑步、上升、下落、冲刺和落地姿态；
+角色使用多帧姿态与双腿关节步态，前跑和后退都有清楚的抬脚、落脚；
 九种怪物与三种首领各有8帧，移动动画的节奏随实际速度变化。
 雨林敌人擅长跳扑、吐弹与落点孢子；峡谷擅长冲锋、钻地与散射；
 遗迹有锁定射线、闪现齐射与修复支援，共九种普通敌人与三种首领。
@@ -45,7 +46,7 @@ S + Space：向下穿过平台
 鼠标移动：瞄准
 鼠标左键：主攻击
 鼠标右键 / Q：当前主动装备
-Shift：冲刺
+Shift：角色技能（游侠闪身 / 先锋铁壁反击）
 E：拾取所显示的战利品、设施、传送门、救援队友
 F：切换附近或重叠的交互目标
 按住 Alt：展开附近物品完整详情与操作提示；松开收起说明
@@ -81,14 +82,15 @@ Your saved preference is used on later launches. Co-op players can use
 different languages. Your gold balance is shown in gold at the top right.
 Actual FPS appears below it by default. F3 or Settings toggles the display;
 your choice is saved. Characters and enemies now use animated pixel sprites.
-Each hero has 16 frames for idle, running, rising, falling, dashing and landing.
+Heroes combine animated poses with planted, articulated legs for running and retreating.
 Each enemy and boss has 8 frames; movement animation follows actual speed.
 
 A/D or Left/Right: move; last pressed direction wins. Space/W/Up: jump.
 
 Tap for a low jump, hold for height. S + Space: drop through platforms.
 Mouse: aim. Left mouse: primary weapon. Right mouse or Q: active equipment.
-Shift: dash. E: use the highlighted item, facility, rift, or rescue target.
+Shift: Ranger phase dash / Vanguard guard and counter.
+E: use the highlighted item, facility, rift, or rescue target.
 F: cycle nearby targets. Hold Alt: expand nearby item details.
 Hover over owned item icons to read their effects. Tab: build and catalog.
 M: map. Esc: pause/menu (co-op keeps running). F11: fullscreen.

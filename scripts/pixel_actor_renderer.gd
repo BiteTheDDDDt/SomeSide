@@ -5,6 +5,7 @@ extends RefCounted
 ## local facing transform; weapons, relics, health bars and telegraphs stay live.
 ## Every frame owns an explicit crop and center anchor, never an assumed grid.
 const MANIFEST_PATH: String = "res://assets/sprites/actors.json"
+const Gait = preload("res://scripts/player_gait.gd")
 const MAX_ACTORS: int = 32
 const MAX_FRAMES: int = 64
 const MAX_TEXTURE_BYTES: int = 64 * 1024 * 1024
@@ -336,6 +337,7 @@ static func _enemy_action_time(actor: Dictionary, animation: String, state: Dict
 static func reset_tracks(canvas: CanvasItem) -> void:
 	if canvas.has_meta(TRACK_META):
 		canvas.remove_meta(TRACK_META)
+	Gait.reset(canvas)
 
 ## Tracks belong to the drawing canvas, not to snapshots or static global
 ## identities. A new world/preview gets its own clock and frees its own history.
@@ -452,8 +454,19 @@ static func _sample_frame(id: String, actor: Dictionary, state: Dictionary, anim
 	return {"actor": id, "animation": animation, "index": chosen, "texture": frame.texture, "source": frame.source, "target": frame.target, "draw_target": frame.draw_target, "tint": tint, "elapsed": elapsed, "duration": duration, "loop": loop, "shoulder": frame.shoulder}
 
 static func draw_player(canvas: Node2D, player: Dictionary, clock: float) -> bool:
-	var frame: Dictionary = tracked_frame_for(canvas, str(player.get("character", "ranger")), player, clock, true)
+	var character: String = str(player.get("character", "ranger"))
+	var frame: Dictionary = tracked_frame_for(canvas, character, player, clock, true)
 	var motion: Dictionary = player.get("_melee_pose", {})
+	if not frame.is_empty() and frame.draw_target.size.y >= 32 and character in ["ranger", "vanguard"]:
+		var gait: Dictionary = Gait.sample(canvas, player, clock, str(frame.animation))
+		if bool(gait.active):
+			# Ground motion owns two articulated legs, never the PNG's lower body.
+			# A stable authored torso avoids both eight-frame near/far-leg swaps
+			# and incidental torso flicker while the feet traverse their real paths.
+			frame = _sample_frame(character, _actors[character], player, str(frame.animation), 0.0, true)
+			Gait.draw(canvas, gait, character, frame.tint)
+			_draw_upper_body(canvas, frame, motion, Gait.CUT_Y)
+			return true
 	if frame.is_empty() or not bool(motion.get("active", false)) or not motion.has("draw_origin"):
 		return _draw(canvas, frame)
 	# Keep the original running/jumping legs. Rotate only the upper-body crop
@@ -468,6 +481,21 @@ static func draw_player(canvas: Node2D, player: Dictionary, clock: float) -> boo
 	canvas.draw_texture_rect_region(frame.texture, Rect2(target.position - Vector2(0, waist), Vector2(target.size.x, top_height)), Rect2(Vector2.ZERO, Vector2(target.size.x, top_height)), frame.tint)
 	canvas.draw_set_transform(motion.draw_origin, 0.0, Vector2(facing, 1))
 	return true
+
+static func _draw_upper_body(canvas: Node2D, frame: Dictionary, motion: Dictionary, cut: float) -> void:
+	var target: Rect2 = frame.draw_target
+	var height: float = cut - target.position.y
+	var destination := Rect2(target.position, Vector2(target.size.x, height))
+	var source := Rect2(Vector2.ZERO, destination.size)
+	if not bool(motion.get("active", false)) or not motion.has("draw_origin"):
+		canvas.draw_texture_rect_region(frame.texture, destination, source, frame.tint)
+		return
+	var facing: float = float(motion.facing)
+	var waist := Vector2(0,5)
+	canvas.draw_set_transform(Vector2(motion.draw_origin)+waist,float(motion.body_angle)*facing,Vector2(facing,1))
+	destination.position -= waist
+	canvas.draw_texture_rect_region(frame.texture,destination,source,frame.tint)
+	canvas.draw_set_transform(motion.draw_origin,0.0,Vector2(facing,1))
 
 static func draw_enemy(canvas: Node2D, enemy: Dictionary, clock: float) -> bool:
 	return _draw(canvas, tracked_frame_for(canvas, enemy_id(enemy), enemy, clock))

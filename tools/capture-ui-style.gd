@@ -96,6 +96,16 @@ func _run() -> void:
 			for actor: Dictionary in game.sim.state.players.values(): actor.name = "WWWWWWWWWWWWWWWWWW"
 			game.call("_show_results")
 			await _save(language + "-results-long")
+		game.call("_begin_local", [{"id":1,"name":"Pilot","character":"vanguard"}], 1717)
+		game.sim.state.players[1].invuln = 0.0
+		game.sim.state.players[1].guard_timer = 0.5
+		game.sim.state.players[1].guard_absorbed = 24.0
+		game.call("_update_hud")
+		game.world.set_frame(game.sim.get_snapshot(), 1, 1)
+		game.world.queue_redraw()
+		await _save(language + "-vanguard-hud")
+		game.call("_show_inventory")
+		await _save(language + "-vanguard-inventory")
 	game._web_runtime = true
 	for language: String in ["zh", "en"]:
 		Locale.set_language(language)

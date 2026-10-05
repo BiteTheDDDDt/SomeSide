@@ -1,5 +1,4 @@
 extends SceneTree
-
 const Sim = preload("res://scripts/simulation.gd")
 const Content = preload("res://scripts/content.gd")
 const Locale = preload("res://scripts/localization.gd")
@@ -10,7 +9,8 @@ var failed: int = 0
 func _initialize() -> void:
 	_catalog()
 	_movement()
-	_collisions()
+	_counter()
+	_mitigation()
 	_cancellation()
 	_equipment()
 	_prediction()
@@ -49,124 +49,155 @@ func _dummy(sim, offset: Vector2, kind: String = "crawler") -> Dictionary:
 	enemy.stun_timer = 9999.0
 	return enemy
 
-func _events(sim, type: String) -> Array:
-	return sim.events.filter(func(event: Dictionary): return event.get("type", "") == type)
+func _phases(events: Array, phase: String) -> Array:
+	return events.filter(func(event: Dictionary): return event.get("type", "") == "ability" and event.get("ability", "") == "guard_burst" and event.get("phase", "") == phase)
+
+func _finish(sim, ticks: int = 75) -> Array:
+	var events: Array = []
+	for tick in range(ticks):
+		sim.step(DT, {})
+		events.append_array(sim.events.duplicate(true))
+	return events
 
 func _catalog() -> void:
 	var ranger: Dictionary = Content.movement_ability("ranger")
-	var vanguard: Dictionary = Content.movement_ability("vanguard")
-	_check(ranger.id == "phase_dash" and vanguard.id == "shoulder_rush", "Character ability IDs are distinct and independent of replaceable gear")
-	_check(ranger.damage == 0.0 and vanguard.damage == 16.0 and vanguard.cooldown > ranger.cooldown, "The short offensive rush trades longer cooldown for modest impact damage")
-	_check(vanguard.speed * vanguard.duration < ranger.speed * ranger.duration and vanguard.invuln < ranger.invuln, "Vanguard gains neither Ranger's dash range nor its longer protection")
+	var guard: Dictionary = Content.movement_ability("vanguard")
+	_check(ranger.id == "phase_dash" and guard.id == "guard_burst", "Character skills distinguish mobile evasion from defensive counterplay")
+	_check(guard.speed == 0.0 and guard.invuln == 0.0 and guard.cooldown == 5.5 and guard.reduction == 0.8, "Guard reduces damage without supplying dash speed or invulnerability")
+	_check(guard.damage + guard.charge_cap * guard.charge_ratio == 42.0, "Stored damage has a modest explicit upper bound before build bonuses")
 	var sim = _fresh()
 	var player: Dictionary = sim.state.players[1]
 	player.items.thruster = 100
-	_check(is_equal_approx(Sim.movement_ability(player).cooldown, 1.2), "HUD and simulation share the bounded Vanguard ability cooldown")
+	_check(Sim.movement_ability(player).cooldown == 2.0, "The guard cooldown has a two-second floor with extreme thruster stacks")
 	player.character = "ranger"
-	_check(is_equal_approx(Sim.movement_ability(player).cooldown, 0.8), "Ranger preserves the existing minimum cooldown with many thruster stacks")
-	ranger.cooldown = 0.0
-	_check(Content.movement_ability("ranger").cooldown == 2.4, "Editing an ability catalog copy cannot mutate the next player's rules")
-	Locale.set_language("en")
-	for record: Dictionary in [Content.movement_ability("ranger"), vanguard]:
-		_check(Locale.has_translation(record.name) and Locale.has_translation(record.description), "Ability name and full numerical description have English coverage: " + str(record.id))
+	_check(Sim.movement_ability(player).cooldown == 0.8, "Ranger preserves its original minimum cooldown")
+	guard.damage = 9999.0
+	_check(Content.movement_ability("vanguard").damage == 12.0, "HUD catalog copies cannot mutate gameplay rules")
+	for record: Dictionary in [Content.movement_ability("ranger"), Content.movement_ability("vanguard")]:
+		_check(Locale.has_translation(record.name) and Locale.has_translation(record.description), "Both languages explain the current skill: " + str(record.id))
 	for record: Dictionary in Sim.character_catalog():
-		_check(Locale.has_translation(record.description), "The character's exclusive Shift ability is explained in both languages: " + str(record.id))
+		_check(Locale.has_translation(record.description), "Character selection explains the real exclusive ability: " + str(record.id))
 
 func _movement() -> void:
-	var distances: Dictionary = {}
-	for character: String in ["ranger", "vanguard"]:
-		var sim = _fresh(character)
-		var player: Dictionary = sim.state.players[1]
-		var start: Vector2 = player.pos
-		sim.step(DT, {1: {"dash": true, "aim": Vector2.RIGHT}})
-		var starts: Array = _events(sim, "dash")
-		_check(starts.size() == 1 and starts[0].ability == Content.movement_ability(character).id and starts[0].ability_id == 1 and starts[0].duration > 0.0, "The actual %s input emits one typed, serializable ability start" % character)
-		_check(is_equal_approx(player.dash_cd, Sim.movement_ability(player).cooldown) and is_equal_approx(player.invuln, Content.movement_ability(character).invuln), "The %s cooldown and protection match its public ability data" % character)
-		for tick in range(40):
-			if player.dash_timer <= DT: break
-			sim.step(DT, {})
-		distances[character] = Vector2(player.pos).distance_to(start)
-	_check(distances.vanguard < distances.ranger and distances.vanguard >= 85.0 and distances.vanguard <= 100.0, "Real fixed-step Vanguard travel stays short and below Ranger's displacement")
 	var sim = _fresh()
 	var player: Dictionary = sim.state.players[1]
-	sim.step(DT, {1: {"dash": true, "move": -1.0, "aim": Vector2.RIGHT}})
-	_check(player.dash_dir == Vector2.LEFT and player.vel.x == -500.0, "Movement direction has priority over the cursor for the shoulder rush")
+	sim.step(DT, {1: {"dash": true, "aim": Vector2.UP}})
+	var starts: Array = _phases(sim.events, "start")
+	_check(starts.size() == 1 and starts[0].ability_id == 1 and starts[0].duration == 0.8, "Actual Shift emits one identifiable guard start")
+	_check(player.pos == Vector2(800, 979) and player.vel == Vector2.ZERO and player.dash_timer == 0.0, "Guarding causes no forced horizontal or vertical movement")
+	_check(player.guard_timer == 0.8 and player.guard_absorbed == 0.0 and player.guard_id == 1 and player.dash_cd == 5.5 and player.invuln == 0.0, "Serialized initial stance and cooldown match the public data")
+	for tick in range(20): sim.step(DT, {1: {"dash": true, "move": 1.0}})
+	_check(is_equal_approx(player.vel.x, Sim.MOVE_SPEED * 0.35) and player.pos.x < 831.0 and player.dash_id == 1, "Guard permits slow voluntary walking; held Shift cannot rearm it")
 	sim = _fresh()
+	player = sim.state.players[1]
+	player.vel.x = 720.0
+	sim.step(DT, {1: {"dash": true}})
+	_check(absf(player.vel.x) <= Sim.MOVE_SPEED * 0.35 and player.pos.x < 802.0, "Bracing removes excess momentum instead of disguising an ongoing dash")
+	var base = _fresh()
+	var guarded = _fresh()
+	var parity: bool = true
+	for tick in range(70):
+		var command: Dictionary = {"jump": tick == 0, "jump_held": tick < 18}
+		base.step(DT, {1: command})
+		command["dash"] = tick == 0
+		guarded.step(DT, {1: command})
+		if base.state.players[1].pos.y != guarded.state.players[1].pos.y or base.state.players[1].vel.y != guarded.state.players[1].vel.y: parity = false
+	_check(parity, "Guard preserves actual jump/release/gravity/landing trajectories")
+	sim = _fresh("ranger")
 	player = sim.state.players[1]
 	sim.step(DT, {1: {"dash": true, "aim": Vector2.UP}})
-	_check(player.dash_dir == Vector2.RIGHT and player.pos.y == 979.0, "A vertical cursor cannot convert Vanguard's shoulder rush into an upward teleport")
-	sim = _fresh()
-	player = sim.state.players[1]
-	sim.step(DT, {1: {"dash": true, "jump": true, "jump_held": true, "aim": Vector2.RIGHT}})
-	_check(player.vel.y < -600.0 and player.jump_rising and _events(sim, "jump").size() == 1, "A shoulder rush preserves a real jump and its variable-height ownership")
-	sim.step(DT, {1: {"jump_held": false}})
-	_check(player.vel.y > -261.0 and not player.jump_rising, "Jump release still controls height during a shoulder rush")
+	_check(player.vel.y == -720.0 and player.dash_kind == "phase_dash" and player.guard_timer == 0.0, "Ranger still performs an aimed upward dash")
+	_check(player.dash_cd == 2.4 and player.invuln == 0.23, "Ranger retains its original cooldown and protection")
 
-func _collisions() -> void:
+func _counter() -> void:
 	var sim = _fresh()
 	var player: Dictionary = sim.state.players[1]
-	var first: Dictionary = _dummy(sim, Vector2(32, 0))
-	var second: Dictionary = _dummy(sim, Vector2(78, 0))
+	var front: Dictionary = _dummy(sim, Vector2(70, 0))
+	var behind: Dictionary = _dummy(sim, Vector2(-90, 0))
 	var far: Dictionary = _dummy(sim, Vector2(210, 0))
-	var impacts: Array = []
-	for tick in range(20):
-		sim.step(DT, {1: {"dash": tick == 0, "aim": Vector2.RIGHT}})
-		impacts.append_array(_events(sim, "ability_hit"))
-	_check(impacts.size() == 2 and impacts[0].enemy != impacts[1].enemy, "A complete rush hits each of two touched enemies once, never once per frame")
-	_check(10000.0 - first.hp in [16.0, 32.0] and 10000.0 - second.hp in [16.0, 32.0] and far.hp == 10000.0, "Rush damage follows the existing critical rule without a hidden area attack")
-	_check(player.dash_hits.is_empty() and player.dash_kind.is_empty(), "Expired actions release their bounded per-target state")
-	sim = _fresh("ranger")
-	first = _dummy(sim, Vector2(20, 0))
 	sim.step(DT, {1: {"dash": true}})
-	_check(first.hp == 10000.0 and _events(sim, "ability_hit").is_empty(), "The Ranger retains a purely evasive dash")
-	sim = _fresh()
-	first = _dummy(sim, Vector2(28, 0))
-	first.stun_timer = 0.0
-	sim.step(DT, {1: {"dash": true}})
-	_check(first.stun_timer > 0.29 and first.stun_timer <= 0.32, "A real collision briefly interrupts an ordinary enemy")
-	sim = _fresh()
-	first = _dummy(sim, Vector2(28, 0), "boss")
-	first.stun_timer = 0.0
-	sim.step(DT, {1: {"dash": true}})
-	_check(first.stun_timer > 0.05 and first.stun_timer <= 0.08, "Boss interruption has the smaller, bounded duration")
+	_check(front.hp == 10000.0 and behind.hp == 10000.0, "The stance produces no immediate contact or area damage")
+	var events: Array = _finish(sim)
+	_check(_phases(events, "release").size() == 1 and front.hp == 9988.0 and behind.hp == 9988.0 and far.hp == 10000.0, "Natural expiry produces one surrounding 12-damage counter with a finite radius")
+	_check(player.guard_timer == 0.0 and player.guard_absorbed == 0.0, "Completion clears charge and live defense state")
 	sim = _fresh()
 	player = sim.state.players[1]
-	player.pos.x = 2378.0
-	first = _dummy(sim, Vector2(-40, 0))
-	sim.step(0.05, {1: {"dash": true, "aim": Vector2.RIGHT}})
-	_check(player.pos.x <= 2380.0 and first.hp == 10000.0, "At a world wall collision uses the actual clipped path and cannot hit a target behind it")
-	sim = _fresh()
-	first = _dummy(sim, Vector2(22, 0))
-	sim.step(0.05, {1: {"dash": true}})
-	_check(first.hp < 10000.0, "Swept contact remains reliable at the maximum supported physics delta")
+	front = _dummy(sim, Vector2(75, 0))
+	sim._spawn_projectile(player.pos + Vector2(110, 0), Vector2(-600, 0), "enemy", "spit", 50.0, -1, 1.0, 6.0)
+	sim.step(DT, {1: {"dash": true}})
+	events = _finish(sim)
+	_check(player.hp == 135.0 and front.hp == 9958.0, "A real hostile projectile loses 80% damage and powers a 42-damage counter")
+	_check(_phases(events, "block").size() == 1 and _phases(events, "release").size() == 1 and _phases(events, "release")[0].absorbed == 40.0, "Projectile absorption and charged release each produce one authoritative event")
 	sim = _fresh()
 	player = sim.state.players[1]
-	for index in range(Sim.MAX_ENEMIES): _dummy(sim, Vector2(15, 0))
+	for item: String in ["lens", "arc", "toxin", "ember", "nova"]: player.items[item] = 100
+	front = _dummy(sim, Vector2(65, 0))
+	far = _dummy(sim, Vector2(220, 0))
 	sim.step(DT, {1: {"dash": true}})
-	_check(player.dash_hits.size() == Sim.MAX_ENEMIES and sim.events.size() <= 64, "Dense contact respects both the victim-state and event budgets")
-	_check(sim.state.enemies.all(func(enemy: Dictionary): return 10000.0 - float(enemy.hp) in [16.0, 32.0]), "Budget pressure never repeats or silently drops the actual one-hit gameplay rule")
+	_finish(sim)
+	_check(front.hp == 9988.0 and far.hp == 10000.0 and float(front.get("poison_timer", 0.0)) == 0.0, "Extreme proc stacks cannot crit, poison or recursively chain the counter")
+	sim = _fresh()
+	player = sim.state.players[1]
+	for index in range(Sim.MAX_ENEMIES): _dummy(sim, Vector2(70, 0))
+	sim.step(DT, {1: {"dash": true}})
+	events = _finish(sim)
+	_check(sim.state.enemies.all(func(enemy: Dictionary): return enemy.hp == 9988.0) and _phases(events, "release").size() == 1, "A full enemy budget receives precisely one counter hit per target")
+	sim.events.clear()
+	for index in range(64): sim._emit("hit", Vector2.ZERO)
+	sim._emit("ability", player.pos, {"ability": "guard_burst", "phase": "release"})
+	_check(sim.events.size() == 64 and _phases(sim.events, "release").size() == 1, "Cosmetic saturation cannot swallow the counter release cue")
+	for kind: String in ["crawler", "boss"]:
+		sim = _fresh()
+		front = _dummy(sim, Vector2(70, 0), kind)
+		front.stun_timer = 0.0
+		front.move_speed = 0.0
+		front.attack_cd = 9999.0
+		sim.step(DT, {1: {"dash": true}})
+		for tick in range(60):
+			sim.step(DT, {})
+			if not _phases(sim.events, "release").is_empty(): break
+		var expected: float = 0.06 if kind == "boss" else 0.28
+		_check(front.stun_timer > expected - DT - 0.00001 and front.stun_timer <= expected, "Counter interruption is independently bounded for " + kind)
+
+func _mitigation() -> void:
+	var sim = _fresh()
+	var player: Dictionary = sim.state.players[1]
+	player.items.plating = 10
+	player.shield = 25.0
+	sim.step(DT, {1: {"dash": true}})
+	sim._damage_player(player, 50.0, player.pos - Vector2.RIGHT)
+	_check(player.hp == 145.0 and player.shield == 17.0 and player.guard_absorbed == 32.0, "Armor applies first, followed by guard reduction, then ordinary shields")
+	_check(player.vel == Vector2.ZERO and player.guard_timer > 0.0, "Blocking resists knockback and retains the active guard")
+	var charge: float = player.guard_absorbed
+	sim._damage_player(player, 100.0, player.pos)
+	_check(player.guard_absorbed == charge, "Damage immunity cannot be converted into stored energy")
+	player.invuln = 0.0
+	sim._damage_player(player, 100.0, player.pos)
+	_check(player.guard_absorbed == 40.0, "Repeated accepted hits saturate at the charge cap")
 
 func _cancellation() -> void:
-	for reason: String in ["hurt", "dead", "stun", "stage"]:
+	for reason: String in ["death", "stun", "stage", "shockwave"]:
 		var sim = _fresh()
 		var player: Dictionary = sim.state.players[1]
+		var enemy: Dictionary = _dummy(sim, Vector2(-140, 0))
 		sim.step(DT, {1: {"dash": true}})
+		player.guard_absorbed = 30.0
 		var cooldown: float = player.dash_cd
 		match reason:
-			"hurt", "dead":
-				player.invuln = 0.0
-				sim._damage_player(player, 9999.0 if reason == "dead" else 2.0, player.pos - Vector2.RIGHT)
+			"death": sim._damage_player(player, 10000.0, player.pos)
 			"stun":
-				player.stun_timer = 0.3
+				player.stun_timer = 0.2
 				sim.step(DT, {1: {"dash": true}})
 			"stage": sim._build_stage(2)
-		_check(player.dash_timer == 0.0 and player.dash_kind.is_empty() and player.dash_hits.is_empty(), reason + " cancels the rush without leaving live collision state")
-		if reason != "stage": _check(player.dash_cd >= cooldown - DT - 0.00001, reason + " does not refund the spent ability cooldown")
+			"shockwave": sim._use_skill(player)
+		_check(player.guard_timer == 0.0 and player.guard_absorbed == 0.0, reason + " discards guard and charge")
+		if reason != "stage": _check(player.dash_cd >= cooldown - DT - 0.00001, reason + " cannot refund the spent cooldown")
+		_check(_phases(_finish(sim), "release").is_empty() and enemy.hp == 10000.0, reason + " cannot leak a delayed counter after cancellation")
 	var sim = _fresh()
 	var player: Dictionary = sim.state.players[1]
 	player.stun_timer = 0.2
 	sim.step(DT, {1: {"dash": true, "jump": true, "fire": true}})
-	_check(player.dash_id == 0 and player.pos == Vector2(800, 979) and _events(sim, "dash").is_empty() and not player.has("melee"), "A controlled player cannot begin a rush, jump or attack until control returns")
+	_check(player.guard_timer == 0.0 and player.dash_id == 0 and not player.has("melee"), "Control prevents guard and attack initiation")
 
 func _equipment() -> void:
 	var sim = _fresh()
@@ -176,17 +207,15 @@ func _equipment() -> void:
 	for item: String in ["railgun", "grenade"]:
 		var pickup: Dictionary = sim._spawn_pickup(player.pos, "item", item, 1)
 		sim._take_loot(player, pickup)
-	_check(Sim.movement_ability(player).id == "shoulder_rush" and player.dash_cd == cooldown and player.dash_kind == "shoulder_rush", "Weapon and active-equipment swaps retain the character skill and its cooldown")
-	for character: String in ["vanguard", "ranger"]:
+	_check(Sim.movement_ability(player).id == "guard_burst" and player.dash_cd == cooldown and player.guard_timer == 0.8, "Gear replacement preserves the character's guard and cooldown")
+	for character: String in ["ranger", "vanguard"]:
 		sim = _fresh(character)
 		player = sim.state.players[1]
 		player.equipment = "shockwave"
-		var enemy: Dictionary = _dummy(sim, Vector2(20, 0))
 		sim.step(DT, {1: {"skill": true, "aim": Vector2.UP}})
-		var hp: float = enemy.hp
 		sim.step(DT, {})
-		_check(player.dash_kind == "shockwave" and player.vel.y == -Sim.DASH_SPEED and player.dash_id == 0 and player.dash_cd == 0.0, "Equipped shockwave preserves its original directional movement on " + character)
-		_check(enemy.hp == hp and _events(sim, "ability_hit").is_empty(), "Shockwave never inherits shoulder collision damage on " + character)
+		_check(player.dash_kind == "shockwave" and player.vel.y == -Sim.DASH_SPEED and player.guard_timer == 0.0 and player.dash_id == 0, "Groundbreaker preserves its own movement on " + character)
+		_check(_phases(_finish(sim), "release").is_empty(), "Groundbreaker never schedules a counter on " + character)
 
 func _prediction() -> void:
 	for character: String in ["ranger", "vanguard"]:
@@ -200,18 +229,19 @@ func _prediction() -> void:
 			var command: Dictionary = {"move": 0.5, "dash": tick in [0, 85], "jump": tick in [0, 20], "jump_held": tick < 8 or tick >= 20, "aim": Vector2(-1, -1).normalized()}
 			sim.predict_player(predicted, command, DT)
 			sim.step(DT, {1: command})
-			for key: String in ["pos", "vel", "dash_timer", "dash_cd", "dash_kind", "dash_dir", "dash_id", "jumps", "jump_rising"]:
+			for key: String in ["pos", "vel", "dash_timer", "dash_cd", "dash_kind", "dash_dir", "dash_id", "jumps", "jump_rising", "guard_timer", "guard_absorbed", "guard_id"]:
 				if predicted[key] != player[key]: parity = false
-		_check(parity, character + " authority and local movement prediction match for every jump, dash and cooldown tick")
+		_check(parity, character + " authority and prediction match every stance, motion and cooldown tick")
 	var sim = _fresh()
-	var target: Dictionary = _dummy(sim, Vector2(25, 0))
-	var predicted: Dictionary = sim.state.players[1].duplicate(true)
+	var enemy: Dictionary = _dummy(sim, Vector2(40, 0))
 	var before: PackedByteArray = var_to_bytes(sim.get_snapshot())
-	sim.predict_player(predicted, {"dash": true}, DT)
-	_check(target.hp == 10000.0 and sim.events.is_empty() and before == var_to_bytes(sim.get_snapshot()), "Client prediction changes only its supplied player and cannot deal damage or emit impact feedback")
+	var predicted: Dictionary = sim.state.players[1].duplicate(true)
+	for tick in range(90): sim.predict_player(predicted, {"dash": tick == 0}, DT)
+	_check(enemy.hp == 10000.0 and sim.events.is_empty() and var_to_bytes(sim.get_snapshot()) == before, "Completing predicted guard cannot release damage or mutate authority state")
 	sim.step(DT, {1: {"dash": true}})
+	sim._damage_player(sim.state.players[1], 20.0, Vector2.ZERO)
 	var replica = Sim.new()
 	replica.apply_snapshot(sim.get_snapshot())
-	_check(replica.state.players[1].dash_hits == sim.state.players[1].dash_hits and replica.state.players[1].dash_kind == "shoulder_rush", "Action source, victim set and serial survive a cooperative snapshot")
-	replica.state.players[1].dash_hits.clear()
-	_check(not sim.state.players[1].dash_hits.is_empty(), "Snapshot consumers cannot mutate the authority victim set")
+	_check(replica.state.players[1].guard_timer == 0.8 and replica.state.players[1].guard_absorbed == 16.0 and replica.state.players[1].guard_id == 1, "Snapshots preserve remaining stance time, actual charge and action serial")
+	replica.state.players[1].guard_absorbed = 0.0
+	_check(sim.state.players[1].guard_absorbed == 16.0, "Client presentation cannot consume authority charge")

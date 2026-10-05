@@ -67,8 +67,8 @@ func _run() -> void:
 		if not shatter.is_empty(): materials[str(shatter.color)]=true
 	_check(materials.size()==3,"Organic, stone and mechanical deaths have distinct material palettes")
 	world._effects.clear()
-	world.push_events([{"type":"pickup","kind":"coin","automatic":true,"pos":player.pos}])
-	_check(world._effects.size()==5 and world._effects.all(func(effect: Dictionary) -> bool: return effect.color==World.GOLD) and world._effects.back().radius==15.0,"Automatic gold collection uses four gold motes and one compact ring")
+	world.push_events([{"type":"pickup","kind":"coin","automatic":true,"amount":4,"pos":player.pos}])
+	_check(world._effects.size()<=12 and world._effects.all(func(effect: Dictionary) -> bool: return effect.color==World.GOLD) and world._effects.any(func(effect: Dictionary) -> bool: return effect.kind=="coin_collect") and world._effects.any(func(effect: Dictionary) -> bool: return effect.kind=="ring" and float(effect.radius)<=28.0),"Gold arrival has a distinct flash and compact gold ring within its local effect budget")
 	world._effects.clear()
 	world.push_events([{"type":"pickup","kind":"item","pos":player.pos}])
 	_check(world._effects.size()==12 and world._effects.all(func(effect: Dictionary) -> bool: return effect.color==World.TEAL) and world._effects.back().radius==32.0,"Relic pickup retains its larger teal feedback")

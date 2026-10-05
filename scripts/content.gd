@@ -6,9 +6,10 @@ static var _definitions: Dictionary = {}
 ## Character-owned Shift abilities are independent of replaceable equipment.
 static func movement_ability(character: String) -> Dictionary:
 	if character == "vanguard":
-		return {"id": "shoulder_rush", "name": "破阵突进", "description": "朝移动方向水平突进，静止时按瞄准左右；约90距离，每敌16基础伤害一次，短暂硬直。基础冷却3.2秒，免伤0.12秒。角色专属，不随装备更换。",
-			"speed": 500.0, "duration": 0.18, "cooldown": 3.2, "minimum_cooldown": 1.2,
-			"invuln": 0.12, "damage": 16.0, "stun": 0.32, "boss_stun": 0.08, "horizontal": true}
+		return {"id": "guard_burst", "name": "铁壁反击", "description": "架盾0.8秒，移速降至35%，正常跳跃；减伤80%并抵抗击退，最多吸收40伤害。结束时释放145范围冲击：基础12伤害，加上吸收量的75%，最高42；不暴击或触发连锁。基础冷却5.5秒。角色专属，不随换装改变；施放裂地冲击会取消架盾。",
+			"speed": 0.0, "duration": 0.8, "cooldown": 5.5, "minimum_cooldown": 2.0,
+			"invuln": 0.0, "damage": 12.0, "stun": 0.28, "boss_stun": 0.06, "horizontal": false,
+			"move_scale": 0.35, "reduction": 0.8, "charge_cap": 40.0, "charge_ratio": 0.75, "radius": 145.0}
 	return {"id": "phase_dash", "name": "相位闪身", "description": "朝移动方向快速闪身，静止时朝瞄准方向；约115距离。基础冷却2.4秒，免伤0.23秒。角色专属，不随装备更换。",
 		"speed": 720.0, "duration": 0.16, "cooldown": 2.4, "minimum_cooldown": 0.8,
 		"invuln": 0.23, "damage": 0.0, "stun": 0.0, "boss_stun": 0.0, "horizontal": false}
@@ -28,8 +29,8 @@ static func passives() -> Array:
 		_record("feather", "跃迁羽翼", "每层增加1次空中跳跃。落地后恢复所有跳跃次数，可跨越阶梯走捷径。", "e1f1ff", "passive", "rare"),
 		_record("glass", "脆晶契约", "每层 +30% 伤害；每层将最大生命乘以0.85（最低为角色基础生命的20%）。", "fa80a1", "passive", "rare", "代价：立即降低最大生命！当前生命超过新上限时会被截断；叠层会继续降低。"),
 		_record("plating", "陶瓷装甲", "每层抵消1点受到的伤害，最多抵消该次伤害的60%。", "c7d0d5", "passive"),
-		_record("magnet", "牵引磁环", "每层增加35范围的治疗自动收集距离，上限350；金币自动到账，遗物仍需手动拾取。", "c7d0d5", "passive"),
-		_record("harvest", "丰收协议", "击杀金币每层增加15%，最多翻倍；采用存活队员的最高加成，全队自动到账。首领固定奖金不加成。", "7fd4a0", "passive", "uncommon"),
+		_record("magnet", "牵引磁环", "每层增加35治疗吸附范围，上限350；金币全图自动吸附，每层追踪速度+12%，上限60%；道具仍需手动拾取。", "c7d0d5", "passive"),
+		_record("harvest", "丰收协议", "击杀金币每层增加15%，最多翻倍；击杀时锁定存活队员的最高加成，吸附后全队共享。首领固定奖金不加成。", "7fd4a0", "passive", "uncommon"),
 		_record("battery", "静息电池", "6秒未受伤后每秒恢复护盾，每层最高8点；总上限为最大生命60%。", "7fd4a0", "passive", "uncommon"),
 		_record("frost", "霜凝结晶", "直接命中使敌人减速1.5秒；首层20%，每额外层+5%，上限50%。", "7fd4a0", "passive", "uncommon"),
 		_record("momentum", "惯性飞轮", "使用角色技能后1.2秒内每层 +15%伤害，最多+60%。", "7fd4a0", "passive", "uncommon"),

@@ -26,6 +26,7 @@ const EXPLORE_BUDGET: int = 2
 const MAX_ENEMIES: int = 44
 const MAX_PROJECTILES: int = 280
 const MAX_PICKUPS: int = 90
+const MAX_COIN_PICKUPS: int = 64
 const MAX_HAZARDS: int = 24
 const GATE_SECONDS: float = 22.0
 
@@ -39,7 +40,7 @@ var _spawn_clock: float = 1.8
 static func character_catalog() -> Array:
 	return [
 		{"id": "ranger", "name": "游侠", "description": "初始：脉冲步枪 + 震荡手雷\n100生命；Shift专属相位闪身。武器与主动装备可替换，角色技能保持不变。", "color": Color("65e2d6")},
-		{"id": "vanguard", "name": "先锋", "description": "初始：共鸣弧刃 + 裂地冲击\n145生命；Shift专属破阵突进，撞击并短暂压制敌人。武器与主动装备可替换，角色技能保持不变。", "color": Color("ffa66a")},
+		{"id": "vanguard", "name": "先锋", "description": "初始：共鸣弧刃 + 裂地冲击\n145生命；Shift专属铁壁反击，减伤蓄能后释放周围冲击。武器与主动装备可替换，角色技能保持不变。", "color": Color("ffa66a")},
 	]
 
 static func movement_ability(player: Dictionary) -> Dictionary:
@@ -87,7 +88,7 @@ func start_run(roster: Array, seed_value: int = 1) -> void:
 	state = {
 		"phase": "playing", "stage": 1, "time": 0.0, "stage_time": 0.0, "threat_time": 0.0,
 		"seed": seed_value, "kills": 0, "difficulty": 1.0,
-		"players": {}, "enemies": [], "projectiles": [], "pickups": [],
+		"players": {}, "enemies": [], "projectiles": [], "pickups": [], "coin_pickups": [],
 		"chests": [], "platforms": [], "world_size": WORLD_SIZE,
 		"deployables": [], "effects": [], "hazards": [], "loot_history": {"gear": [], "passive": []},
 		"gate": {}, "boss_alive": false,
@@ -124,6 +125,7 @@ func add_player(id: int, player_name: String, character: String) -> void:
 		"kills": 0, "revive": 0.0, "coyote": 0.0, "jumps": 0, "jump_rising": false, "land_ready": false,
 		"drop_timer": 0.0, "dash_timer": 0.0, "dash_dir": Vector2.RIGHT,
 		"dash_kind": "", "dash_speed": DASH_SPEED, "dash_id": 0, "dash_hits": [], "dash_damage": 0.0, "stun_timer": 0.0,
+		"guard_timer": 0.0, "guard_absorbed": 0.0, "guard_id": 0,
 		"hurt_timer": 0.0, "revive_timer": 0.0, "interact_cd": 0.0, "shield_timer": 0.0,
 		"explore_anchor": position, "explore_sites": [position], "explore_window": 0.0, "explore_budget": 0,
 		"chrono_timer": 0.0, "momentum_timer": 0.0, "nova_cd": 0.0, "attack_count": 0, "phoenix_spent": 0,
@@ -176,11 +178,13 @@ func step(delta: float, commands: Dictionary) -> void:
 	_step_hazards(dt)
 	_cleanup_enemies()
 	_step_challenges()
+	_step_coin_pickups(dt)
 	_step_pickups(dt)
 	_step_gate(dt)
 	_step_director(dt)
 	var alive: int = _alive_count()
 	if not players.is_empty() and alive == 0:
+		_flush_coin_pickups()
 		state["phase"] = "lost"
 		_emit("lose", _world_size() * Vector2(0.5, 0.6))
 
@@ -194,6 +198,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
 		_cancel_movement_ability(player)
+		_cancel_guard(player)
 		player.erase("melee")
 		player.erase("attack_pose")
 		player["jump_rising"] = false
@@ -218,16 +223,21 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 				_reset_exploration(player, false)
 				_emit("revive", player["pos"], {"player": player["id"]})
 		return
-	var previous_position: Vector2 = player["pos"]
 	var previous_dash_id: int = int(player.get("dash_id", 0))
 	var controlled: bool = float(player.get("stun_timer", 0.0)) > 0.0
-	_move_player(player, command, dt, true)
+	var stored_charge: float = float(player.get("guard_absorbed", 0.0))
+	var guard_finished: bool = _move_player(player, command, dt, true)
 	if int(player.get("dash_id", 0)) > previous_dash_id:
 		var ability: Dictionary = movement_ability(player)
 		player["invuln"] = maxf(float(player["invuln"]), float(ability.invuln))
-		_emit("dash", player["pos"], {"aim": player["dash_dir"], "player": player["id"],
-			"ability": ability.id, "duration": ability.duration, "ability_id": player["dash_id"]})
-	_step_shoulder_rush(player, previous_position)
+		if str(ability.id) == "guard_burst":
+			_emit("ability", player["pos"], {"ability": "guard_burst", "phase": "start", "player": player.id,
+				"duration": ability.duration, "ability_id": player.guard_id})
+		else:
+			_emit("dash", player["pos"], {"aim": player["dash_dir"], "player": player["id"],
+				"ability": ability.id, "duration": ability.duration, "ability_id": player["dash_id"]})
+	if guard_finished:
+		_release_guard(player, stored_charge)
 	_step_melee(player, dt)
 	if player.has("attack_pose"):
 		player.attack_pose.elapsed = float(player.attack_pose.elapsed) + dt
@@ -250,15 +260,19 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		_interact(player, command.get("interact_target", {}))
 
 
-func _move_player(player: Dictionary, command: Dictionary, dt: float, report_events: bool = false) -> void:
+func _move_player(player: Dictionary, command: Dictionary, dt: float, report_events: bool = false) -> bool:
 	var controlled: bool = float(player.get("stun_timer", 0.0)) > 0.0
 	player["stun_timer"] = maxf(0.0, float(player.get("stun_timer", 0.0)) - dt)
 	if controlled:
 		_cancel_movement_ability(player)
+		_cancel_guard(player)
 		player.erase("melee")
 		player.erase("attack_pose")
 	player["chrono_timer"] = maxf(0.0, float(player.get("chrono_timer", 0.0)) - dt)
 	player["momentum_timer"] = maxf(0.0, float(player.get("momentum_timer", 0.0)) - dt)
+	var guard_finished: bool = float(player.get("guard_timer", 0.0)) > 0.0 and float(player.get("guard_timer", 0.0)) <= dt
+	player["guard_timer"] = maxf(0.0, float(player.get("guard_timer", 0.0)) - dt)
+	if float(player["guard_timer"]) <= 0.0: player["guard_absorbed"] = 0.0
 	var direction: Vector2 = command.get("aim", player.get("aim", Vector2.RIGHT))
 	if direction.is_finite() and direction.length_squared() > 0.0001:
 		player["aim"] = direction.normalized()
@@ -276,7 +290,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 		player["land_ready"] = true
 	# Only a deliberate jump owns variable-height control. Dash momentum,
 	# knockback and simply walking off a ledge must never be cut by this input.
-	if grounded or velocity.y >= 0.0 or (float(player.get("dash_timer", 0.0)) > 0.0 and str(player.get("dash_kind", "")) != "shoulder_rush"):
+	if grounded or velocity.y >= 0.0 or float(player.get("dash_timer", 0.0)) > 0.0:
 		player["jump_rising"] = false
 	player["coyote"] = 0.105 if grounded else maxf(0.0, float(player.get("coyote", 0.0)) - dt)
 	player["drop_timer"] = maxf(0.0, float(player.get("drop_timer", 0.0)) - dt)
@@ -316,16 +330,24 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 		if bool(ability.horizontal):
 			dash_direction = Vector2(-1.0 if dash_direction.x < 0.0 else 1.0, 0.0)
 		player["dash_dir"] = dash_direction.normalized()
-		player["dash_timer"] = ability.duration
 		player["dash_cd"] = ability.cooldown
-		player["dash_kind"] = ability.id
-		player["dash_speed"] = ability.speed
 		player["dash_id"] = int(player.get("dash_id", 0)) + 1
-		player["dash_hits"] = []
 		player["momentum_timer"] = 1.2
-		player["dash_damage"] = float(ability.damage) * _damage_scale(player)
-	var rushing: bool = float(player["dash_timer"]) > 0.0 and str(player.get("dash_kind", "")) == "shoulder_rush"
-	if float(player["dash_timer"]) > 0.0 and not rushing:
+		if str(ability.id) == "guard_burst":
+			_cancel_movement_ability(player)
+			player["guard_timer"] = ability.duration
+			player["guard_absorbed"] = 0.0
+			player["guard_id"] = player["dash_id"]
+		else:
+			player["dash_timer"] = ability.duration
+			player["dash_kind"] = ability.id
+			player["dash_speed"] = ability.speed
+	if float(player["guard_timer"]) > 0.0:
+		var guarding_ability: Dictionary = Content.movement_ability("vanguard")
+		speed *= float(guarding_ability.move_scale)
+		# Brace horizontal momentum immediately, without changing the jump arc.
+		velocity.x = clampf(velocity.x, -speed, speed)
+	if float(player["dash_timer"]) > 0.0:
 		player["jump_rising"] = false
 		velocity = Vector2(player["dash_dir"]) * float(player.get("dash_speed", DASH_SPEED))
 	else:
@@ -337,7 +359,6 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 			player["jump_rising"] = false
 		velocity.x = move_toward(velocity.x, move * speed, (2500.0 if grounded else 1800.0) * dt)
 		velocity.y = minf(1100.0, velocity.y + GRAVITY * dt)
-		if rushing: velocity.x = Vector2(player["dash_dir"]).x * float(player["dash_speed"])
 	if jumped:
 		player["land_ready"] = true
 	var result: Dictionary = _move_body(position, velocity, dt, PLAYER_HALF, float(player["drop_timer"]) > 0.0)
@@ -345,7 +366,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 	player["vel"] = result["vel"]
 	player["grounded"] = result["grounded"]
 	if report_events:
-		if jumped and (float(player["dash_timer"]) <= 0.0 or rushing):
+		if jumped and float(player["dash_timer"]) <= 0.0:
 			_emit("jump", player["pos"], {"player": player["id"], "double": double_jump})
 		if not was_grounded and bool(result["grounded"]) and bool(player.get("land_ready", false)) and velocity.y >= 120.0:
 			_emit("land", player["pos"], {"player": player["id"], "impact_speed": velocity.y})
@@ -361,6 +382,9 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 		player["jump_rising"] = false
 		player["land_ready"] = false
 		_cancel_movement_ability(player)
+		_cancel_guard(player)
+		guard_finished = false
+	return guard_finished
 
 
 func _cancel_movement_ability(player: Dictionary) -> void:
@@ -371,25 +395,27 @@ func _cancel_movement_ability(player: Dictionary) -> void:
 	player["dash_speed"] = DASH_SPEED
 
 
-## Authority only: sweep the actual collision-resolved movement, never the
-## intended displacement or a client replay. One bounded victim set per action.
-func _step_shoulder_rush(player: Dictionary, from: Vector2) -> void:
-	if str(player.get("dash_kind", "")) != "shoulder_rush" or float(player.get("dash_timer", 0.0)) <= 0.0 or bool(player.get("dead", false)):
-		return
-	var hits: Array = player.get("dash_hits", [])
+func _cancel_guard(player: Dictionary) -> void:
+	player["guard_timer"] = 0.0
+	player["guard_absorbed"] = 0.0
+
+
+## Only the authoritative player step consumes a naturally completed guard.
+## Client movement replay advances its stance but never calls this function.
+func _release_guard(player: Dictionary, charge: float) -> void:
 	var ability: Dictionary = Content.movement_ability("vanguard")
+	var absorbed: float = clampf(charge, 0.0, float(ability.charge_cap))
+	var damage: float = (float(ability.damage) + absorbed * float(ability.charge_ratio)) * _damage_scale(player)
+	# Emit once before target hits so heavy contact cannot consume the feedback
+	# budget first. This is a counter, not a recursive item-triggering explosion.
+	_emit("ability", player["pos"], {"ability": "guard_burst", "phase": "release", "player": player.id,
+		"ability_id": player.guard_id, "radius": ability.radius, "damage": damage, "absorbed": absorbed})
 	for enemy: Dictionary in Array(state["enemies"]):
-		if hits.size() >= MAX_ENEMIES: break
-		if float(enemy.get("hp", 0.0)) <= 0.0 or hits.has(int(enemy.id)): continue
-		if _segment_circle(from, player["pos"], enemy["pos"], _enemy_radius(enemy) + PLAYER_HALF.x) < 0.0: continue
-		hits.append(int(enemy.id))
-		var damage: float = float(player.get("dash_damage", ability.damage))
+		if float(enemy.get("hp", 0.0)) <= 0.0: continue
+		if Vector2(enemy.pos).distance_to(player.pos) > float(ability.radius) + _enemy_radius(enemy): continue
 		var stun: float = float(ability.boss_stun) if str(enemy.kind) == "boss" else float(ability.stun)
 		enemy["stun_timer"] = maxf(float(enemy.get("stun_timer", 0.0)), stun)
-		_damage_enemy(enemy, damage, int(player.id), true, 0)
-		_emit("ability_hit", enemy["pos"], {"ability": "shoulder_rush", "player": player.id, "enemy": enemy.id,
-			"ability_id": player["dash_id"], "aim": player["dash_dir"], "damage": damage, "stun": stun})
-	player["dash_hits"] = hits
+		_damage_enemy(enemy, damage, int(player.id), false, 1)
 
 
 func _move_body(position: Vector2, velocity: Vector2, dt: float, half: Vector2, drop: bool = false) -> Dictionary:
@@ -514,6 +540,7 @@ func _use_skill(player: Dictionary) -> void:
 	match equipment:
 		"shockwave":
 			_cancel_movement_ability(player)
+			_cancel_guard(player)
 			player["jump_rising"] = false
 			player["invuln"] = maxf(float(player["invuln"]), 0.45)
 			player["dash_timer"] = 0.2
@@ -773,10 +800,9 @@ func _kill_enemy(enemy: Dictionary, player: Dictionary, owner: int, depth: int) 
 	if not player.is_empty():
 		player["kills"] = int(player["kills"]) + 1
 		player["hp"] = minf(float(player["max_hp"]), float(player["hp"]) + _stacks(player, "siphon") * 1.8)
-	# Currency is authority-side progress, not a collectible that can expire or
-	# fall behind the team. A squad's best living collector supplies the bonus;
-	# everybody keeps the existing full shared reward, including downed allies.
-	_credit_coins(9 if bool(enemy["elite"]) else 4, position, _coin_bonus_player(), "enemy_kill", owner, 35 if str(enemy["kind"]) == "boss" else 0)
+	# Gold briefly scatters, then seeks a living teammate automatically. Its
+	# amount is locked at death and the full squad is credited once on arrival.
+	_drop_coin_pickup(9 if bool(enemy["elite"]) else 4, position, owner, 35 if str(enemy["kind"]) == "boss" else 0)
 	if _rng.randf() < 0.12:
 		_spawn_pickup(position + Vector2(12.0, -12.0), "heal", "", 18)
 	if str(enemy["kind"]) == "boss":
@@ -807,23 +833,112 @@ func _coin_bonus_player() -> Dictionary:
 
 
 func _credit_coins(base_amount: int, position: Vector2, collector: Dictionary, source: String = "pickup", owner: int = -1, fixed_bonus: int = 0) -> int:
-	var players: Dictionary = state.get("players", {})
-	if players.is_empty():
-		return 0
 	var harvest: int = 0 if collector.is_empty() else _stacks(collector, "harvest")
 	var reward: int = int(round(maxi(0, base_amount) * (1.0 + minf(1.0, harvest * 0.15)))) + maxi(0, fixed_bonus)
-	if reward <= 0:
+	return _credit_coin_amount(reward, position, {"source":source, "owner":owner, "bonus_player":-1 if collector.is_empty() else int(collector.id), "base_amount":base_amount, "fixed_bonus":fixed_bonus})
+
+
+func _credit_coin_amount(reward: int, position: Vector2, metadata: Dictionary) -> int:
+	var players: Dictionary = state.get("players", {})
+	if reward <= 0 or players.is_empty():
 		return 0
 	var recipients: Array = players.keys()
 	recipients.sort()
 	for id: Variant in recipients:
 		var recipient: Dictionary = players[id]
 		recipient["coins"] = int(recipient["coins"]) + reward
-	var bonus_player: int = -1 if collector.is_empty() else int(collector["id"])
-	_emit("pickup", position, {"kind": "coin", "item": "", "automatic": source == "enemy_kill", "source": source,
-		"player": bonus_player if bonus_player >= 0 else int(recipients[0]), "owner": owner, "bonus_player": bonus_player,
-		"amount": reward, "base_amount": base_amount, "fixed_bonus": fixed_bonus, "recipients": recipients})
+	var data: Dictionary = {"kind":"coin", "item":"", "automatic":true, "amount":reward, "recipients":recipients}
+	for key: String in ["source", "owner", "bonus_player", "base_amount", "fixed_bonus"]:
+		if metadata.has(key): data[key] = metadata[key]
+	data["coin_id"] = int(metadata.get("id", -1))
+	data["player"] = int(metadata.get("collector", metadata.get("bonus_player", -1)))
+	if int(data.player) < 0: data.player = int(recipients[0])
+	_emit("pickup", position, data)
 	return reward
+
+
+func _coin_target(position: Vector2, preferred: int = -1) -> Dictionary:
+	var players: Dictionary = state.get("players", {})
+	if players.has(preferred) and not bool(players[preferred].dead): return players[preferred]
+	var best: Dictionary = {}
+	var distance: float = INF
+	for player: Dictionary in players.values():
+		if bool(player.dead): continue
+		var candidate: float = position.distance_squared_to(player.pos)
+		if candidate < distance or (is_equal_approx(candidate, distance) and (best.is_empty() or int(player.id) < int(best.id))):
+			distance = candidate
+			best = player
+	return best
+
+
+func _drop_coin_pickup(base_amount: int, position: Vector2, owner: int, fixed_bonus: int = 0) -> Dictionary:
+	var bonus: Dictionary = _coin_bonus_player()
+	var harvest: int = 0 if bonus.is_empty() else _stacks(bonus, "harvest")
+	var reward: int = int(round(maxi(0, base_amount) * (1.0 + minf(1.0, harvest * 0.15)))) + maxi(0, fixed_bonus)
+	if reward <= 0: return {}
+	var target: Dictionary = _coin_target(position)
+	var id_value: int = _id()
+	var phase: float = fposmod(float(id_value) * 2.39996323, TAU)
+	var coin: Dictionary = {"id":id_value, "pos":position, "origin":position, "vel":Vector2(sin(phase) * 130.0, -170.0 - cos(phase) * 45.0),
+		"age":0.0, "delay":0.22 + fposmod(phase, 0.10), "seeking":false, "amount":reward,
+		"target":-1 if target.is_empty() else int(target.id), "owner":owner, "bonus_player":-1 if bonus.is_empty() else int(bonus.id),
+		"base_amount":base_amount, "fixed_bonus":fixed_bonus, "source":"enemy_kill"}
+	var coins: Array = state.get("coin_pickups", [])
+	if coins.size() >= MAX_COIN_PICKUPS:
+		# Settle the oldest bundle before replacement: no item eviction, no gold
+		# loss, and no dependence on the cosmetic event queue having free space.
+		var oldest: Dictionary = coins.pop_front()
+		_credit_coin_amount(int(oldest.amount), oldest.pos, oldest)
+	coins.append(coin)
+	state["coin_pickups"] = coins
+	_emit("coin_drop", position, {"amount":reward, "coin_id":id_value, "target":coin.target})
+	return coin
+
+
+func _step_coin_pickups(dt: float) -> void:
+	var kept: Array = []
+	for coin: Dictionary in state.get("coin_pickups", []):
+		coin.age = float(coin.age) + dt
+		var target: Dictionary = _coin_target(coin.pos, int(coin.target))
+		if target.is_empty():
+			_credit_coin_amount(int(coin.amount), coin.pos, coin)
+			continue
+		coin.target = int(target.id)
+		var destination: Vector2 = Vector2(target.pos) + Vector2(0, -4)
+		var position: Vector2 = coin.pos
+		var velocity: Vector2 = coin.vel
+		if float(coin.age) < float(coin.delay):
+			velocity.y += 760.0 * dt
+			var moved: Dictionary = _move_body(position, velocity, dt, Vector2(3, 3))
+			position = moved.pos
+			velocity = moved.vel
+		else:
+			coin.seeking = true
+			var offset: Vector2 = destination - position
+			var seek_age: float = float(coin.age) - float(coin.delay)
+			var speed: float = minf(1900.0, 340.0 + seek_age * 1900.0) * (1.0 + minf(0.6, _stacks(target, "magnet") * 0.12))
+			# There is no pickup radius and no terrain collision during attraction;
+			# coins cannot get stuck beneath a platform or require backtracking.
+			velocity = velocity.lerp(offset.normalized() * speed, minf(1.0, dt * 12.0))
+			var next: Vector2 = position + velocity * dt
+			if offset.length() < 22.0 or _segment_circle(position, next, destination, 22.0) >= 0.0 or float(coin.age) >= 4.0:
+				coin["collector"] = int(target.id)
+				_credit_coin_amount(int(coin.amount), destination, coin)
+				continue
+			position = next
+		coin.pos = position
+		coin.vel = velocity
+		kept.append(coin)
+	state["coin_pickups"] = kept
+
+
+func _flush_coin_pickups() -> void:
+	var pending: Array = state.get("coin_pickups", [])
+	state["coin_pickups"] = []
+	for coin: Dictionary in pending:
+		var target: Dictionary = _coin_target(coin.pos, int(coin.target))
+		coin["collector"] = -1 if target.is_empty() else int(target.id)
+		_credit_coin_amount(int(coin.amount), coin.pos if target.is_empty() else target.pos, coin)
 
 
 func _explode(position: Vector2, radius: float, damage: float, owner: int, team: String, depth: int, effect_kind: String = "") -> void:
@@ -847,9 +962,17 @@ func _explode(position: Vector2, radius: float, damage: float, owner: int, team:
 
 
 func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
-	if bool(player["dead"]) or float(player["invuln"]) > 0.0:
+	if bool(player["dead"]) or float(player["invuln"]) > 0.0 or not is_finite(amount) or amount <= 0.0:
 		return
 	amount -= minf(amount * 0.6, float(_stacks(player, "plating")))
+	var guarding: bool = float(player.get("guard_timer", 0.0)) > 0.0 and float(player.get("stun_timer", 0.0)) <= 0.0
+	if guarding:
+		var ability: Dictionary = Content.movement_ability("vanguard")
+		var prevented: float = amount * float(ability.reduction)
+		player["guard_absorbed"] = minf(float(ability.charge_cap), float(player.get("guard_absorbed", 0.0)) + prevented)
+		amount -= prevented
+		_emit("ability", player["pos"], {"ability": "guard_burst", "phase": "block", "player": player.id,
+			"ability_id": player.guard_id, "amount": prevented, "absorbed": player.guard_absorbed})
 	var shield: float = float(player["shield"])
 	var absorbed: float = minf(shield, amount)
 	player["shield"] = shield - absorbed
@@ -857,12 +980,15 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 	player["hp"] = maxf(0.0, float(player["hp"]) - amount)
 	player["invuln"] = 0.48
 	player["hurt_timer"] = 6.0
-	var push: float = signf(Vector2(player["pos"]).x - source.x)
-	player["vel"] = Vector2(push * 165.0, -150.0)
-	player["jump_rising"] = false
-	_cancel_movement_ability(player)
+	if not guarding:
+		var push: float = signf(Vector2(player["pos"]).x - source.x)
+		player["vel"] = Vector2(push * 165.0, -150.0)
+		player["jump_rising"] = false
+		_cancel_movement_ability(player)
+		_cancel_guard(player)
 	_emit("hit", player["pos"], {"amount": amount, "crit": false, "player": player["id"], "friendly": true})
 	if float(player["hp"]) <= 0.0:
+		_cancel_guard(player)
 		if int(player.get("phoenix_spent", 0)) < mini(2, _stacks(player, "phoenix")):
 			player["phoenix_spent"] = int(player.get("phoenix_spent", 0)) + 1
 			player["hp"] = float(player["max_hp"]) * 0.35
@@ -876,6 +1002,12 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 
 
 func _step_enemies(dt: float) -> void:
+	# Observe real support once per player, not once per pursuer. Airborne
+	# height is not a navigation goal: a short hop should not cue the crowd.
+	var target_supports: Dictionary = {}
+	for player: Dictionary in Dictionary(state["players"]).values():
+		if bool(player.get("grounded", false)) and not bool(player.get("dead", false)):
+			target_supports[int(player.id)] = _enemy_support_surface(player.pos, PLAYER_HALF)
 	for enemy_value in Array(state["enemies"]):
 		var enemy: Dictionary = enemy_value
 		if float(enemy["hp"]) <= 0.0:
@@ -899,10 +1031,10 @@ func _step_enemies(dt: float) -> void:
 		elif float(enemy["attack_cd"]) <= 0.0 and float(enemy.get("charge_timer", 0.0)) <= 0.0:
 			if Vector2(enemy["pos"]).distance_to(target["pos"]) <= float(enemy.get("attack_range", 650.0)):
 				_begin_enemy_attack(enemy, target)
-		_move_enemy(enemy, target, dt)
+		_move_enemy(enemy, target, dt, target_supports.get(int(target.id), Rect2()))
 
 
-func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float) -> void:
+func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float, target_support: Rect2 = Rect2()) -> void:
 	var position: Vector2 = enemy["pos"]
 	var offset: Vector2 = Vector2(target["pos"]) - position
 	var velocity: Vector2 = enemy["vel"]
@@ -911,6 +1043,7 @@ func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float) -> void:
 	var slow: float = float(enemy.get("slow_factor", 1.0)) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0
 	var winding: bool = float(enemy.get("telegraph", 0.0)) > 0.0
 	var charging: bool = float(enemy.get("charge_timer", 0.0)) > 0.0
+	var navigation: Dictionary = {} if bool(enemy.get("flying", false)) else _enemy_platform_navigation(enemy, target, target_support, dt)
 	if str(enemy.get("attack_kind", "")) in ["beam", "prism_beam", "prism_cross"] and (winding or float(enemy["attack_cd"]) > float(enemy["attack_cooldown"]) - 0.25):
 		# Beam geometry remains fixed through both warning and active frames.
 		# A hovering boss stops in place; a ground sentinel only starts landed.
@@ -928,6 +1061,8 @@ func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float) -> void:
 		var move_direction: float = signf(offset.x)
 		if str(enemy["kind"]) in ["spitter", "sentinel", "skirmisher"] and absf(offset.x) < 290.0:
 			move_direction = -move_direction * 0.5 if absf(offset.x) < 160.0 else 0.0
+		if navigation.has("move"):
+			move_direction = float(navigation.move)
 		if winding:
 			move_direction = 0.0
 		velocity.x = move_toward(velocity.x, move_direction * float(enemy["move_speed"]) * elite_scale * slow, 750.0 * dt)
@@ -937,9 +1072,10 @@ func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float) -> void:
 		position.y = clampf(position.y, 70.0, _floor_y() - 35.0)
 	else:
 		velocity.y = minf(1000.0, velocity.y + GRAVITY * dt)
-		if not winding and not charging and bool(enemy.get("grounded", false)) and float(enemy["jump_cd"]) <= 0.0 and offset.y < -48.0:
-			velocity.y = -690.0 if boss else -650.0
-			enemy["jump_cd"] = 1.7
+		if not winding and not charging and bool(enemy.get("grounded", false)) and float(enemy["jump_cd"]) <= 0.0 and navigation.has("jump_speed"):
+			velocity.y = -float(navigation.jump_speed)
+			enemy["nav_jumps"] = int(enemy.get("nav_jumps", 0)) + 1
+			enemy["jump_cd"] = 1.05 + _enemy_navigation_variant(int(enemy.id), int(enemy.nav_jumps) + 5) * 0.8
 		var moved: Dictionary = _move_body(position, velocity, dt, Vector2(39.0, 44.0) if boss else Vector2(15.0, 17.0))
 		position = moved["pos"]
 		velocity = moved["vel"]
@@ -960,6 +1096,95 @@ func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float) -> void:
 			enemy["charge_hit_ids"] = hit_ids
 		var damage: float = (17.0 if boss else (14.0 if charging else 10.0)) * elite_scale
 		_damage_player(player, damage * _enemy_damage_scale(), position)
+
+
+func _enemy_navigation_variant(id: int, salt: int) -> float:
+	# Stable serializable personality, without consuming combat/drop RNG.
+	return float(posmod(id * 92821 + int(state.get("seed", 0)) * 37 + salt * 68917, 997)) / 996.0
+
+
+func _enemy_support_surface(position: Vector2, half: Vector2) -> Rect2:
+	for platform: Rect2 in Array(state.get("platforms", [])):
+		if absf(position.y + half.y - platform.position.y) <= 3.0 and position.x + half.x > platform.position.x and position.x - half.x < platform.end.x:
+			return platform
+	return Rect2()
+
+
+func _enemy_platform_navigation(enemy: Dictionary, target: Dictionary, support: Rect2, dt: float) -> Dictionary:
+	var id: int = int(enemy.id)
+	var half: Vector2 = Vector2(39, 44) if str(enemy.kind) == "boss" else Vector2(15, 17)
+	var position: Vector2 = enemy.pos
+	var feet: float = position.y + half.y
+	if int(enemy.get("nav_target", -1)) != int(target.id):
+		enemy["nav_target"] = int(target.id)
+		enemy["nav_support"] = Rect2()
+		enemy["nav_stable"] = 0.0
+		enemy["nav_plan"] = Rect2()
+	if support.size != Vector2.ZERO:
+		if Rect2(enemy.get("nav_support", Rect2())) != support:
+			enemy["nav_support"] = support
+			enemy["nav_stable"] = 0.0
+			enemy["nav_plan"] = Rect2()
+		else:
+			enemy["nav_stable"] = float(enemy.get("nav_stable", 0.0)) + dt
+		enemy["nav_air_age"] = 0.0
+	else:
+		enemy["nav_air_age"] = float(enemy.get("nav_air_age", 0.0)) + dt
+		if float(enemy.nav_air_age) > 0.75:
+			enemy["nav_support"] = Rect2()
+			enemy["nav_stable"] = 0.0
+	var goal: Rect2 = enemy.get("nav_support", Rect2())
+	var plan: Rect2 = enemy.get("nav_plan", Rect2())
+	enemy["nav_decision_cd"] = maxf(0.0, float(enemy.get("nav_decision_cd", 0.0)) - dt)
+	# Keep a chosen landing point through the airborne part of a jump.
+	if bool(enemy.get("grounded", false)) and (plan.size == Vector2.ZERO or feet <= plan.position.y + 3.0):
+		enemy["nav_plan"] = Rect2()
+		plan = Rect2()
+		if goal.size == Vector2.ZERO or float(enemy.get("nav_stable", 0.0)) < 0.18 + _enemy_navigation_variant(id, 1) * 0.24:
+			return {}
+		if float(enemy.nav_decision_cd) <= 0.0:
+			enemy["nav_decision_cd"] = 0.14 + _enemy_navigation_variant(id, 2) * 0.19
+			var own: Rect2 = _enemy_support_surface(position, half)
+			var climbing: bool = goal.position.y < feet - 24.0
+			var heading: float = signf(Vector2(target.pos).x - position.x)
+			var edge_x: float = own.end.x + 1.0 if heading >= 0.0 else own.position.x - 1.0
+			var ahead_y: float = _surface_below(edge_x, feet - 3.0)
+			# Adjacent/overlapping rectangles can form one continuous bridge.
+			# A different support ID alone is not a reason to hop across its seam.
+			var gap: bool = not climbing and goal != own and absf(goal.position.y - feet) <= 24.0 and ahead_y > feet + 24.0
+			var best_score: float = INF
+			if climbing or gap:
+				for platform: Rect2 in Array(state.get("platforms", [])):
+					var rise: float = feet - platform.position.y
+					if platform == own or platform.size.x < half.x * 2.0 + 8.0 or rise < (-24.0 if gap else 24.0) or rise > 128.0 or platform.position.y < goal.position.y - 3.0:
+						continue
+					if gap and (absf(rise) > 24.0 or (platform.get_center().x - position.x) * (Vector2(target.pos).x - position.x) <= 0.0):
+						continue
+					var landing_x: float = clampf(position.x, platform.position.x + half.x + 4.0, platform.end.x - half.x - 4.0)
+					var goal_x: float = clampf(Vector2(target.pos).x, platform.position.x, platform.end.x)
+					var score: float = absf(landing_x - position.x) + absf(goal_x - Vector2(target.pos).x) * 0.35 + absf(platform.position.y - goal.position.y) * 0.4
+					if score < best_score:
+						best_score = score
+						plan = platform
+						enemy["nav_landing_x"] = landing_x
+				enemy["nav_plan"] = plan
+	if plan.size == Vector2.ZERO:
+		return {}
+	var destination: float = float(enemy.get("nav_landing_x", position.x))
+	var distance: float = destination - position.x
+	var result: Dictionary = {"move": signf(distance) if absf(distance) > 5.0 else 0.0}
+	if bool(enemy.get("grounded", false)) and float(enemy.get("jump_cd", 0.0)) <= 0.0:
+		var rise: float = feet - plan.position.y
+		if rise < -24.0 or rise > 128.0:
+			enemy["nav_plan"] = Rect2()
+			return {}
+		var variation: float = _enemy_navigation_variant(id, int(enemy.get("nav_jumps", 0)) + 3)
+		var jump_speed: float = maxf(630.0 + variation * 48.0, sqrt(2.0 * GRAVITY * (maxf(0.0, rise) + 10.0)) + variation * 12.0)
+		var flight: float = (jump_speed + sqrt(maxf(0.0, jump_speed * jump_speed - 2.0 * GRAVITY * rise))) / GRAVITY
+		var travel_speed: float = float(enemy.move_speed) * (1.15 if bool(enemy.elite) else 1.0) * float(enemy.get("slow_factor", 1.0) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0)
+		if absf(distance) <= maxf(5.0, travel_speed * flight * 0.65):
+			result["jump_speed"] = jump_speed
+	return result
 
 
 func _begin_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
@@ -1352,6 +1577,14 @@ func _spawn_enemy(kind: String, position: Vector2, elite: bool = false) -> Dicti
 		"primary_attack": str(definition.get("attack_kind", "")), "attack_kind": "", "attack_dir": Vector2.RIGHT,
 		"attack_target": position, "telegraph_max": float(definition.get("windup", 0.9)), "blink_target": position,
 		"charge_timer": 0.0, "charge_hit_ids": [], "attack_count": 0, "heal_budget": 48.0 if kind == "conductor" else 0.0}
+	enemy["jump_cd"] = 0.25 + _enemy_navigation_variant(int(enemy.id), 0) * 0.7
+	enemy["nav_target"] = -1
+	enemy["nav_support"] = Rect2()
+	enemy["nav_stable"] = 0.0
+	enemy["nav_air_age"] = 0.0
+	enemy["nav_plan"] = Rect2()
+	enemy["nav_decision_cd"] = _enemy_navigation_variant(int(enemy.id), 2) * 0.3
+	enemy["nav_jumps"] = 0
 	enemies.append(enemy)
 	return enemy
 
@@ -1528,6 +1761,7 @@ func _interact(player: Dictionary, target: Dictionary = {}) -> void:
 	if kind == "gate":
 		if bool(selected["ready"]):
 			if int(state["stage"]) >= 3:
+				_flush_coin_pickups()
 				state["phase"] = "won"
 				_emit("win", selected["pos"])
 			else:
@@ -1756,6 +1990,7 @@ func _grant_item(player: Dictionary, item: String) -> void:
 
 
 func _build_stage(stage: int) -> void:
+	_flush_coin_pickups()
 	events.clear()
 	state["stage"] = stage
 	state["stage_time"] = 0.0
@@ -1829,7 +2064,9 @@ func _build_stage(stage: int) -> void:
 		player["skill_cd"] = 0.0
 		player["dash_cd"] = 0.0
 		_cancel_movement_ability(player)
+		_cancel_guard(player)
 		player["dash_id"] = 0
+		player["guard_id"] = 0
 		player["stun_timer"] = 0.0
 		player["drop_timer"] = 0.0
 		player["shield"] = 0.0
@@ -2144,7 +2381,7 @@ func _id() -> int:
 
 func _emit(type: String, position: Vector2, extra: Dictionary = {}) -> void:
 	if events.size() >= 64:
-		if type not in ["notice", "pickup", "interact", "gate", "revive", "stage", "win", "lose"]:
+		if type not in ["notice", "pickup", "interact", "gate", "revive", "stage", "win", "lose", "ability"]:
 			return
 		# Keep intentional interactions and progression feedback visible even
 		# when a large proc chain fills the cosmetic hit/shot event budget.

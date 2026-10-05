@@ -58,19 +58,19 @@ func _run() -> void:
 			_check(str(slot.id) == str(ability.id) and snapshot == var_to_bytes(game.sim.state), "Equipment changes cannot replace or reset the innate ability through HUD rendering")
 		game._show_characters()
 		var selection: String = _labels(game.ui)
-		_check(selection.contains(Locale.text("相位闪身")) and selection.contains(Locale.text("破阵突进")), "Character selection explains both distinct abilities in " + language)
+		_check(selection.contains(Locale.text("相位闪身")) and selection.contains(Locale.text("铁壁反击")), "Character selection explains both distinct abilities in " + language)
 		game._show_guide()
-		_check(_labels(game.ui).contains(Locale.text("角色技能：游侠闪身，先锋向前突进")), "The Shift guide explains role-specific controls in " + language)
+		_check(_labels(game.ui).contains(Locale.text("角色技能：游侠闪身，先锋架盾反击")), "The Shift guide explains role-specific controls in " + language)
 		game._show_inventory()
 		var ability_details: Dictionary = Simulation.movement_ability(game.sim.state.players[1])
 		_check(_labels(game.ui).contains(Locale.text(str(ability_details.description))), "The build screen exposes innate ability mechanics and base cooldown in " + language)
-	_check(Icons.texture("phase_dash",72).get_image().get_data() != Icons.texture("shoulder_rush",72).get_image().get_data(), "The two role icons have different silhouettes and colours")
+	_check(Icons.texture("phase_dash",72).get_image().get_data() != Icons.texture("guard_burst",72).get_image().get_data(), "The two role icons have different silhouettes and colours")
 	var sound := Sound.new()
 	sound.enabled = false
 	root.add_child(sound)
-	_check(Sound.event_sound({"type":"dash","ability":"phase_dash"}) == "dash" and Sound.event_sound({"type":"dash","ability":"shoulder_rush"}) == "ability_shoulder_rush", "Phase dash and shoulder rush route to different movement sounds")
-	_check(Sound.event_sound({"type":"ability_hit","ability":"shoulder_rush"}) == "ability_shoulder_hit" and Sound.event_sound({"type":"dash","enemy":true,"ability":"shoulder_rush"}) == "enemy_shift", "Shoulder impact has a distinct cue without changing enemy dash audio")
-	_check(sound._streams.dash.data != sound._streams.ability_shoulder_rush.data and sound._streams.ability_shoulder_rush.data != sound._streams.ability_shoulder_hit.data, "Role activation and collision use distinct actual PCM samples")
+	_check(Sound.event_sound({"type":"dash","ability":"phase_dash"}) == "dash" and Sound.event_sound({"type":"ability","ability":"guard_burst","phase":"start"}) == "guard_start", "Dash and guard activation route to distinct sounds")
+	_check(Sound.event_sound({"type":"ability","ability":"guard_burst","phase":"block"}) == "guard_block" and Sound.event_sound({"type":"ability","ability":"guard_burst","phase":"release"}) == "guard_release", "Absorption and counter release have separate cues")
+	_check(sound._streams.dash.data != sound._streams.guard_start.data and sound._streams.guard_start.data != sound._streams.guard_release.data, "Defensive phases use distinct actual PCM samples")
 	var simulation = Simulation.new()
 	simulation.start_run([{"id":1,"name":"Audio","character":"vanguard"}],1602)
 	simulation.state.world_size = Vector2(2400,1100)
@@ -88,23 +88,32 @@ func _run() -> void:
 	sound.enabled = true
 	sound.wait_for_gesture = false
 	var accepted: Dictionary = {}
-	var impact_events: int = 0
 	for event: Dictionary in simulation.events:
 		var key: String = Sound.event_sound(event)
-		if key == "ability_shoulder_hit": impact_events += 1
 		if sound.play_game_event(event): accepted[key] = int(accepted.get(key,0)) + 1
-	_check(accepted.has("jump") and accepted.has("ability_shoulder_rush"), "A real jump-and-rush batch keeps the role activation cue after its jump cue")
-	_check(accepted.has("hit") and int(accepted.get("ability_shoulder_hit",0)) == 1 and impact_events == 3, "Real damage followed by three ability impacts plays the unique cue once without generic-hit suppression or stacking noise")
+	_check(accepted.has("jump") and accepted.has("guard_start"), "Real jump-and-guard events both retain their activation cues")
+	simulation.events.clear()
+	simulation._damage_player(actor,20.0,actor.pos+Vector2(20,0))
+	for event: Dictionary in simulation.events:
+		var key: String = Sound.event_sound(event)
+		if sound.play_game_event(event): accepted[key] = int(accepted.get(key,0)) + 1
+	_check(accepted.has("guard_block"), "The real incoming-hit batch preserves the shield impact sound")
+	var release_events: Array = []
+	for index: int in range(60):
+		simulation.step(1.0/60.0,{})
+		for event: Dictionary in simulation.events:
+			if event.type=="ability" and event.get("phase","")=="release": release_events.append(event)
+	_check(release_events.size()==1 and sound.play_game_event(release_events[0]), "One actual guard expiry plays one counter-release cue")
 	sound.shutdown()
 	sound.queue_free()
 	var view := World.new()
 	root.add_child(view)
 	view.set_process(false)
-	var events: Array = [{"type":"dash","ability":"phase_dash","pos":Vector2(50,50),"aim":Vector2.RIGHT}, {"type":"dash","ability":"shoulder_rush","pos":Vector2(50,50),"aim":Vector2.RIGHT}, {"type":"ability_hit","ability":"shoulder_rush","pos":Vector2(60,50),"aim":Vector2.RIGHT}]
+	var events: Array = [{"type":"dash","ability":"phase_dash","pos":Vector2(50,50),"aim":Vector2.RIGHT}, {"type":"ability","ability":"guard_burst","phase":"start","pos":Vector2(50,50)}, {"type":"ability","ability":"guard_burst","phase":"release","pos":Vector2(60,50),"absorbed":40.0,"radius":145.0}]
 	var before: PackedByteArray = var_to_bytes(events)
 	view.push_events(events)
 	var kinds: Array = view._effects.map(func(effect: Dictionary): return effect.kind)
-	_check(kinds.has("dash") and kinds.has("rush") and kinds.has("rush_hit"), "Distinct event families create phase trails, rush fronts and collision arcs")
+	_check(kinds.has("dash") and kinds.has("guard_release") and not kinds.has("rush"), "Role effects distinguish evasive trails from a radial defensive counter")
 	_check(before == var_to_bytes(events), "Ability presentation leaves gameplay event payloads untouched")
 	view.queue_free()
 	game.queue_free()

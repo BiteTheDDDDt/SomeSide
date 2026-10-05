@@ -14,10 +14,10 @@ const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.16.0"
+const VERSION: String = "0.17.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
-const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "equipment", "drop"]
+const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "coin_drop", "equipment", "drop"]
 const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
 const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
 const INK := Color("0b1e27")
@@ -1521,7 +1521,7 @@ func _show_guide() -> void:
 		["S + Space", "穿过脚下的平台"],
 		["鼠标左键", "使用当前主武器，跟随鼠标瞄准"],
 		["鼠标右键 / Q", "使用当前主动装备；下方显示冷却"],
-		["Shift", "角色技能：游侠闪身，先锋向前突进"],
+		["Shift", "角色技能：游侠闪身，先锋架盾反击"],
 		["E", "拾取 / 使用设施 / 激活裂隙门 / 救援"],
 		["F   /   按住 Alt", "切换附近目标 / 展开道具与装备详情"],
 		["Tab / M / Esc / F3", "构筑 / 地图 / 菜单 / 帧率"] if _is_web() else ["Tab / M / Esc / F11 / F3", "构筑 / 地图 / 菜单 / 全屏 / 帧率"]

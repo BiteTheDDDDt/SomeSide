@@ -164,6 +164,10 @@ static func event_sound(event: Dictionary) -> String:
 			if event.get("enemy", false): return "enemy_shift"
 			return "ability_shoulder_rush" if event.get("ability", "") == "shoulder_rush" else "dash"
 		"ability_hit": return "ability_shoulder_hit" if event.get("ability", "") == "shoulder_rush" else ""
+		"coin_drop": return "coin_scatter"
+		"ability":
+			if event.get("ability", "") == "guard_burst":
+				return "guard_" + str(event.get("phase", "start"))
 		"gate": return "gate_ready" if event.get("ready", false) else "gate_active"
 		"revive": return "phoenix" if event.get("phoenix", false) else ("revive_start" if event.get("started", false) else "revive")
 	return ""
@@ -272,6 +276,10 @@ static func _prepare_samples() -> void:
 	_add("enemy_beam", [_layer("flutter", .25, .6, 175, 85, 0, 1.2, 55), _layer("noise", .18, .45, 3000, 800)], 2, 180)
 	_add("enemy_shift", [_layer("air", .15, .6, 1500, 5200), _layer("fm", .09, .3, 400, 60, 0, 2, 5)], 0, 180, "enemy_shots", 100, .13)
 	_add("coin", _notes([1568, 2093], .028, .085), 3, 90, "", 0, .11)
+	_add("coin_scatter", [_layer("metal", .09, .35, 2700, 1800), _layer("bell", .16, .45, 1568, 1047, .02)], 1, 120, "", 0, .10)
+	_add("guard_start", [_layer("metal", .10, .55, 650, 180), _layer("fm", .28, .45, 100, 220, .03, 1.2, 2)], 2, 160, "", 0, .19)
+	_add("guard_block", [_layer("metal", .13, .60, 1200, 550), _layer("bell", .21, .4, 740, 960)], 2, 100, "", 0, .18)
+	_add("guard_release", [_layer("sine", .25, .65, 120, 38), _layer("noise", .19, .6, 2800, 320), _layer("bell", .33, .35, 880, 440, .02)], 2, 170, "", 0, .22)
 	_add("heal", _notes([523.25, 783.99], .06, .24, "sine"), 3, 180, "", 0, .17)
 	_add("pickup_common", _notes([659.25, 987.77], .085, .22), 4, 130, "", 0, .18)
 	_add("pickup_uncommon", _notes([523.25, 659.25, 1046.5], .085, .26), 4, 130)

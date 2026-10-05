@@ -434,10 +434,10 @@ func _update_render_positions(delta: float) -> void:
 		else:
 			_cache_entity_position(key, player, delta, 28.0)
 		alive[key] = true
-	for category: String in ["enemies", "projectiles"]:
+	for category: String in ["enemies", "projectiles", "coin_pickups"]:
 		for value: Variant in _frame.get(category, []):
 			var entity: Dictionary = value
-			var key: String = ("b" if category == "projectiles" else "e") + str(entity.get("id", 0))
+			var key: String = ("b" if category == "projectiles" else ("c" if category == "coin_pickups" else "e")) + str(entity.get("id", 0))
 			if interpolate_remote_entities:
 				_cache_entity_position(key, entity, delta, 42.0 if category == "projectiles" else 28.0)
 			else:
@@ -849,11 +849,30 @@ func push_events(events: Array) -> void:
 					_shake = minf(5.0, maxf(_shake, 1.4))
 			"pickup":
 				if str(event.get("kind", "")) == "coin":
-					_spark(position_value, GOLD, 4, 42.0, 0.26)
-					_ring(position_value, GOLD, 15.0, 0.24)
+					_burst(position_value, GOLD, 7, 78.0, 0.30, Vector2.UP, PI, "spark")
+					_ring(position_value, GOLD, 24.0, 0.24)
+					_add_effect({"kind":"coin_collect", "pos":position_value, "color":GOLD, "age":0.0, "life":0.25})
+					if _numbers.size() < MAX_DAMAGE_NUMBERS:
+						_numbers.append({"pos":position_value+Vector2(0,-27), "text":"+"+str(int(event.get("amount",0))), "color":GOLD, "age":0.0, "crit":false})
 				else:
 					_spark(position_value, TEAL, 11, 75.0, 0.5)
 					_ring(position_value, TEAL, 32.0, 0.45)
+			"coin_drop":
+				_burst(position_value, GOLD, 5, 110.0, 0.28, Vector2.UP, 0.9, "spark")
+			"ability":
+				if str(event.get("ability", "")) == "guard_burst":
+					var phase: String = str(event.get("phase", "start"))
+					if phase == "release":
+						var charge: float = clampf(float(event.get("absorbed", 0.0)) / 40.0, 0.0, 1.0)
+						_ring(position_value, GOLD, float(event.get("radius", 145.0)), 0.34)
+						_add_effect({"kind":"guard_release", "pos":position_value, "radius":float(event.get("radius",145.0)), "color":GOLD, "strength":1.0+charge, "age":0.0, "life":0.38})
+						_burst(position_value, GOLD, int(12+charge*8), 230.0+charge*80.0, 0.38, Vector2.UP, PI, "spark")
+						_shake = minf(5.0, maxf(_shake, 1.5 + charge))
+					elif phase == "block":
+						_ring(position_value, CREAM, 31.0, 0.20)
+						_burst(position_value, GOLD, 6, 85.0, 0.23, Vector2.UP, PI, "spark")
+					else:
+						_ring(position_value, GOLD, 32.0, 0.22)
 			"drop", "interact":
 				_spark(position_value, GOLD, 8, 70.0, 0.45)
 			"gate", "stage", "revive":
@@ -979,6 +998,7 @@ func _draw() -> void:
 	_draw_pickups()
 	_draw_enemies()
 	_draw_players()
+	_draw_coin_pickups()
 	_draw_effects()
 	_draw_projectiles()
 	_draw_atmosphere()
@@ -1233,6 +1253,39 @@ func _draw_facility(p: Vector2, chest: Dictionary, kind: String, accent: Color, 
 			else:
 				draw_line(p + Vector2(-10.0, -14.0), p + Vector2(10.0, -14.0), accent, 2.0)
 			draw_line(p + Vector2(-8.0, 4.0), p + Vector2(8.0, 4.0), steel, 2.0)
+
+
+func _draw_coin_pickups() -> void:
+	# One replicated bundle renders a small fan of coins. No unbounded trail
+	# history or individual physics bodies; tails are derived from velocity.
+	var bundle_count: int = Array(_frame.get("coin_pickups", [])).size()
+	var per_bundle: int = clampi((96 if fx_scale >= 0.75 else 64) / maxi(1, bundle_count), 1, 5)
+	for coin: Dictionary in _frame.get("coin_pickups", []):
+		var center: Vector2 = world_to_screen(_entity_draw_position("c" + str(coin.id), coin.pos))
+		if not _visible(center, 100.0): continue
+		var age: float = float(coin.get("age", 0.0))
+		var seeking: bool = bool(coin.get("seeking", false))
+		var velocity: Vector2 = coin.get("vel", Vector2.ZERO)
+		var direction: Vector2 = velocity.normalized() if velocity.length_squared() > 1.0 else Vector2.UP
+		var fan: float = clampf(age / 0.16, 0.0, 1.0) * (clampf(1.3 - age * 0.65, 0.12, 1.0) if seeking else 1.0)
+		var count: int = mini(per_bundle, 5 if int(coin.amount) >= 20 else 3)
+		var tail: float = minf(66.0, velocity.length() * 0.035) if seeking else 0.0
+		for index: int in range(count):
+			var phase: float = float(coin.id) * 2.39996323 + index * 2.1
+			var spread: Vector2 = Vector2(sin(phase) * 15.0, cos(phase) * 9.0 - index * 2.0) * fan
+			var p: Vector2 = Pixels.snap_position(self, center + spread)
+			if fx_scale > 0.0 and tail > 2.0:
+				draw_line(p - direction * tail, p - direction * tail * 0.40, Color(GOLD, 0.12 * fx_scale), 3.0, false)
+				draw_line(p - direction * tail * 0.40, p, Color(GOLD, 0.62 * fx_scale), 2.0, false)
+			var width: float = 1.0 + absf(sin(age * 11.0 + phase)) * 3.0
+			draw_rect(Rect2(p - Vector2(width + 1, 5), Vector2(width * 2 + 2, 10)), Color("764a2d"))
+			draw_rect(Rect2(p - Vector2(width, 4), Vector2(width * 2, 8)), GOLD)
+			draw_line(p + Vector2(-width, -3), p + Vector2(width, -3), CREAM, 1.0)
+			draw_line(p + Vector2(0, -2), p + Vector2(0, 2), Color("b77538"), 1.0)
+			if fx_scale >= 0.75 and sin(age * 15.0 + phase) > 0.83:
+				var glint: Vector2 = p + Vector2(width + 2, -5)
+				draw_line(glint - Vector2(3, 0), glint + Vector2(3, 0), CREAM, 1.0)
+				draw_line(glint - Vector2(0, 3), glint + Vector2(0, 3), CREAM, 1.0)
 
 
 func _draw_pickups() -> void:
@@ -1491,20 +1544,21 @@ func _draw_players() -> void:
 
 
 func _draw_movement_ability(player: Dictionary, p: Vector2) -> void:
-	# State-driven so a local movement prediction and remote snapshots both
-	# show the front of the rush without extra attacks or replayed particles.
-	if float(player.get("dash_timer", 0.0)) <= 0.0 or str(player.get("dash_kind", "")) != "shoulder_rush":
+	# Snapshot/prediction-driven shield: no replayed particles or gameplay writes.
+	if float(player.get("guard_timer", 0.0)) <= 0.0:
 		return
-	var side: float = 1.0 if Vector2(player.get("dash_dir", Vector2.RIGHT)).x >= 0.0 else -1.0
-	draw_set_transform(p, 0.0, Vector2(side, 1.0))
-	var rim := PackedVector2Array([Vector2(10,-23),Vector2(24,-17),Vector2(28,-3),Vector2(23,13),Vector2(12,19)])
-	draw_colored_polygon(rim, Color(GOLD, 0.15))
-	draw_polyline(rim, Color(GOLD, 0.85), 2.0, true)
-	draw_polyline(PackedVector2Array([Vector2(12,-18),Vector2(20,-13),Vector2(23,-3),Vector2(19,10)]), Color(CREAM,0.7), 1.0, true)
-	for index: int in range(3):
-		var y: float = -12.0 + index * 11.0
-		draw_line(Vector2(-27-index*4,y),Vector2(-11,y),Color(GOLD,0.35),1.5,true)
-	draw_set_transform(Vector2.ZERO)
+	var charge: float = clampf(float(player.get("guard_absorbed", 0.0)) / 40.0, 0.0, 1.0)
+	var radius: float = 30.0 + charge * 4.0
+	var rim := PackedVector2Array()
+	for index: int in range(7):
+		rim.append(p + Vector2.from_angle(PI / 6.0 + index * TAU / 6.0) * radius)
+	draw_colored_polygon(rim, Color(GOLD, 0.045 + charge * 0.06))
+	draw_polyline(rim, Color(GOLD, 0.8), 1.6 + charge, false)
+	var progress: float = clampf(1.0 - float(player.guard_timer) / 0.8, 0.0, 1.0)
+	draw_arc(p, radius + 5, -PI/2, -PI/2 + maxf(0.01, TAU * progress), 32, Color(CREAM,0.75), 1.5, true)
+	for index: int in range(4):
+		var tick: Vector2 = p + Vector2((index - 1.5) * 6.0, -radius - 8.0)
+		draw_rect(Rect2(tick, Vector2(4, 3)), GOLD if charge >= float(index+1)*0.25 else Color(GOLD,0.22))
 
 
 func _draw_melee_actor(player: Dictionary, pose: Dictionary) -> void:
@@ -1885,6 +1939,19 @@ func _draw_effects() -> void:
 					draw_line(p+direction*spread*0.7,p+direction*spread,Color(color_value,0.65*(1-t)),1.4,true)
 				if t < 0.3:
 					_glow(p,25.0+strength*5.0,Color(color_value,0.04*(1-t/0.3)),3)
+			"guard_release":
+				var radius: float = float(effect.get("radius",145.0)) * (1.0-pow(1.0-t,3.0))
+				for index: int in range(6):
+					var angle: float = index * TAU / 6.0 + PI / 6.0
+					var a: Vector2 = p + Vector2.from_angle(angle) * radius
+					var b: Vector2 = p + Vector2.from_angle(angle+TAU/6.0) * radius
+					draw_line(a, b, Color(GOLD,0.85*(1-t)), 2.5, false)
+					draw_line(a, p + Vector2.from_angle(angle)*radius*0.73, Color(CREAM,0.7*(1-t)), 1.5, false)
+			"coin_collect":
+				for index: int in range(4):
+					var angle: float = index * PI/2.0 + PI/4.0
+					var direction: Vector2 = Vector2.from_angle(angle)
+					draw_line(p+direction*(5+t*12),p+direction*(14+t*17),Color(GOLD,0.8*(1-t)),2.0,false)
 			"rush", "rush_hit":
 				var angle: float = float(effect.get("angle", 0.0))
 				var strike: bool = str(effect.kind) == "rush_hit"
@@ -1940,7 +2007,7 @@ func _draw_effects() -> void:
 		var age: float = number.get("age", 0.0)
 		var p: Vector2 = world_to_screen(number.get("pos", Vector2.ZERO)) + Vector2(0.0, -age * 34.0)
 		var crit: bool = number.get("crit", false)
-		var color_value: Color = GOLD if crit else CREAM
+		var color_value: Color = number.get("color", GOLD if crit else CREAM)
 		color_value.a = clampf((0.85 - age) * 3.0, 0.0, 1.0)
 		_world_label(p, str(number.get("text", "")), color_value, 18 if crit else 13)
 
