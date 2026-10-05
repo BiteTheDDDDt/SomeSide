@@ -1,4 +1,4 @@
-"""Check exported Web loader failures in fresh browser contexts on loopback.
+"""Check exported Web loader failures on loopback and direct file origins.
 
 Requests are intercepted only by Playwright: the export is never modified.
 The WASM module never starts; no gameplay or account session is opened.
@@ -25,6 +25,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("export", type=Path)
     parser.add_argument("--browser", required=True, type=Path)
+    parser.add_argument("--engine", choices=("chromium", "firefox"), default="chromium")
+    parser.add_argument("--file-only", action="store_true", help="Only verify direct-file guards in both languages")
     parser.add_argument("--output", type=Path, default=Path("tools/results/web-loader"))
     args = parser.parse_args()
     export = args.export.resolve(strict=True)
@@ -38,16 +40,18 @@ def main() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(QuietServer, directory=str(export)))
     Thread(target=server.serve_forever, daemon=True).start()
     origin = f"http://127.0.0.1:{server.server_port}/"
-    report = {"browser": str(args.browser), "export": str(export), "origin": origin, "cases": [], "errors": []}
+    report = {"browser": str(args.browser), "browser_engine": args.engine, "export": str(export), "origin": origin, "cases": [], "errors": []}
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(executable_path=str(args.browser), headless=True)
-            report["browser_version"] = browser.version
+            failures = ("local-file",) if args.file_only else ("missing-wasm", "missing-loader", "unsupported-webgl", "local-file")
             for language, locale in (("en", "en-US"), ("zh", "zh-CN")):
-                for failure in ("missing-wasm", "missing-loader", "unsupported-webgl"):
+                for failure in failures:
                     started = time.monotonic()
                     case = {"language": language, "failure": failure, "checks": [], "console_errors": [], "page_errors": [], "requests": [], "intercepts": 0}
                     report["cases"].append(case)
+                    # A fresh browser also isolates startup failures that leave a pending engine promise.
+                    browser = getattr(playwright, args.engine).launch(executable_path=str(args.browser), headless=True)
+                    report["browser_version"] = browser.version
                     context = browser.new_context(viewport={"width": 1280, "height": 720}, locale=locale)
                     page = context.new_page()
                     page.set_default_timeout(20_000)
@@ -66,30 +70,40 @@ def main() -> None:
                                 case["intercepts"] += 1
                                 route.fulfill(status=200, content_type="text/html", body=html)
                             page.route(origin, block_features)
-                        else:
+                        elif failure != "local-file":
                             target = "index.wasm" if failure == "missing-wasm" else "index.js"
                             def missing_asset(route):
                                 case["intercepts"] += 1
                                 route.fulfill(status=404, content_type="application/wasm" if target.endswith(".wasm") else "application/javascript", body="")
                             page.route(origin + target, missing_asset)
-                        page.goto(origin, wait_until="domcontentloaded")
+                        page.goto((export / "index.html").as_uri() if failure == "local-file" else origin, wait_until="domcontentloaded")
                         page.locator("#fallback").wait_for(state="visible")
                         case["fallback_seconds"] = round(time.monotonic() - started, 3)
                         message = page.locator("#message").inner_text()
                         case["message"] = message
-                        check(case["intercepts"] > 0, "The intended missing asset or feature was exercised")
-                        check(message.startswith("启动失败。" if language == "zh" else "Unable to start."), "Failure explanation is visible in the browser language")
+                        if failure == "local-file":
+                            check(page.url.startswith("file:") and case["intercepts"] == 0, "The actual local HTML file is opened without relaxed browser security or routing")
+                            expected = "请通过本地预览服务器或 itch.io 打开游戏；直接双击 HTML 无法加载游戏文件。" if language == "zh" else "Open this game through a local preview server or itch.io. Opening the HTML file directly cannot load the game files."
+                            check(expected in message, "Direct-file failure explains the required local server or itch.io launch")
+                            hint = "本地开发：双击项目根目录的 PlayWeb.cmd。" if language == "zh" else "Local development: run PlayWeb.cmd from the project folder."
+                            check(hint in page.locator("#hint").inner_text(), "The local-file hint names the actual project preview launcher")
+                            check(page.locator("#retry").is_hidden(), "Direct-file failure omits a pointless reload button")
+                            check(not any(url.endswith((".wasm", ".pck")) for url in case["requests"]), "The file-origin guard stops before requesting restricted game payloads")
+                        else:
+                            check(case["intercepts"] > 0, "The intended missing asset or feature was exercised")
+                            check(message.startswith("启动失败。" if language == "zh" else "Unable to start."), "Failure explanation is visible in the browser language")
+                            check(page.locator("#retry").is_visible() and page.locator("#retry").is_enabled() and page.locator("#retry").inner_text() == ("重试" if language == "zh" else "Retry"), "A localized retry action is visible and enabled")
                         check(page.locator("#status").is_visible() and page.locator("#progress").is_hidden(), "Failure replaces the loading spinner instead of waiting endlessly")
-                        check(page.locator("#retry").is_visible() and page.locator("#retry").is_enabled() and page.locator("#retry").inner_text() == ("重试" if language == "zh" else "Retry"), "A localized retry action is visible and enabled")
                         download = page.locator("#download")
                         check(download.is_visible() and download.inner_text() == ("下载 Windows 版" if language == "zh" else "Windows download") and download.get_attribute("href") == "https://bitetheddddt.itch.io/someside" and download.get_attribute("target") == "_blank" and "noopener" in download.get_attribute("rel"), "The localized fallback links to the user's Windows download page")
                         if failure == "unsupported-webgl":
                             check(not any(url.endswith((".wasm", ".pck")) for url in case["requests"]), "Unsupported WebGL stops before requesting the game payload")
-                        previous = case["intercepts"]
-                        with page.expect_navigation(wait_until="domcontentloaded"):
-                            page.locator("#retry").click()
-                        page.locator("#fallback").wait_for(state="visible")
-                        check(case["intercepts"] > previous and page.locator("#progress").is_hidden(), "Retry reloads and returns to a visible fallback if the fault persists")
+                        if failure != "local-file":
+                            previous = case["intercepts"]
+                            with page.expect_navigation(wait_until="domcontentloaded"):
+                                page.locator("#retry").click()
+                            page.locator("#fallback").wait_for(state="visible")
+                            check(case["intercepts"] > previous and page.locator("#progress").is_hidden(), "Retry reloads and returns to a visible fallback if the fault persists")
                         check(not case["page_errors"], "The failure path has no uncaught JavaScript exception")
                         page.screenshot(path=str(args.output / f"{language}-{failure}.png"))
                     except Exception as error:
@@ -98,8 +112,7 @@ def main() -> None:
                         page.screenshot(path=str(args.output / f"{language}-{failure}-failed.png"))
                     finally:
                         case["elapsed_seconds"] = round(time.monotonic() - started, 3)
-                        context.close()
-            browser.close()
+                        browser.close()
     finally:
         server.shutdown()
         server.server_close()

@@ -1,48 +1,32 @@
-# SomeSide v0.13.0 构建与验收
+# SomeSide v0.13.1 本地网页预览修复
 
-Godot 4.7.2 stable official `ed1daf0bf`。新增 itch.io HTML5 网页单人版，同时生成 Windows 单人 / 2–4 人合作包。旧记录见 [BUILD_REPORT_v0.12.0.md](BUILD_REPORT_v0.12.0.md)。
+用户在 Chrome 与 Firefox 中直接双击导出的 `index.html`，以 `file://` 运行，导致 WebAssembly / 资源下载被浏览器阻止，显示 `Failed to fetch`。问题与是否支持 WebGL 无关；旧加载页将所有启动失败都提示为浏览器兼容性问题，造成误导。
 
-## 网页运行
+## 修改
 
-- WebAssembly + WebGL 2 / Compatibility，使用官方单线程模板，不需要跨源隔离响应头或 PWA。安装脚本提取 Web 模板前校验官方 SHA512。
-- 中英加载进度、启动失败提示、重试与 Windows 下载链接。部分 WASM 下载错误未进入引擎 `startGame` 的拒绝回调，现增加仅加载期间有效的异常监听；后续进度不会覆盖错误提示。
-- 游戏初始语言跟随浏览器，后续优先使用保存设置；IndexedDB 保存语言、音量、FPS 等偏好。浏览器明确报告无法持久化时，设置页会提示。
-- 完整 PCM WAV 音频首次游戏内按键或点击后启用；全屏由实际输入触发，不在刷新时自动恢复。失焦暂停单人游戏并清除按键。
-- 网页版不使用当前 UDP/ENet 合作，菜单明确提供单人入口与 Windows 下载。未部署 WebSocket/WebRTC 服务。保留两名角色、三关、40 件物品、九种普通敌人、三名首领及 v0.12 的 128 姿态素材。
-
-## 绘制与性能
-
-网页远景使用带留白的纹理缓存，连续平移并在换缓存时以 0.22 秒淡入；大跨度镜头跳转在新缓存就绪前回退到完整绘制。平台植被保留在缓存内，省去细小风摆的逐帧曲线重建。角色、战斗、粒子、输入、碰撞和模拟未降频，原生版继续原绘制路径。
-
-1280×720 下单背景 6,995,968 bytes；过渡最多两个，共 13,991,936 bytes，上限 16 MiB。地形原有 48 MiB / 40 项上限保持。精灵为 14 actors / 6 sheets，源纹理约 36 MiB、逻辑帧约 2.9 MiB。
-
-同机 Chrome / AMD Radeon 610M / D3D11 短时演示：缓存前末段约 20 FPS、1052 次绘制，首次缓存候选约 28 FPS、578 次绘制。最终 Chrome / Edge 演示末段分别为 28 / 31 FPS。这些是短跑观察，不是固定场景统计或稳定帧率保证；Web 性能仍可能低于原生，复杂战斗可能下降。证据：`tools/results/web-profile/report.json`、`web-cached/report.json`、两份最终浏览器报告。
+- 新增项目根目录 `PlayWeb.cmd`，通过 `tools/serve-web.ps1` 和 Python 标准库预览服务，自动打开默认浏览器中的 `http://127.0.0.1:8765/`。只绑定本机，只提供 Web 导出目录；不开放目录列表或越界路径。游玩时保留控制台，Ctrl+C 停止。
+- 默认读取当前项目版本选择导出目录；可指定 `-Directory`、`-Port`，开发自动化可用 `-NoBrowser`。本地预览需要 Python 3，当前机器已安装；上传 itch 后，玩家无需 Python 或本地服务器。
+- 加载页在 `file://` 下提前停止，不请求 `.wasm` / `.pck`，明确提示使用预览服务器或 itch，并给出 `PlayWeb.cmd`；隐藏无意义的重试按钮，保留 Windows 下载链接。
+- 真实下载失败和缺少浏览器功能分别显示对应提示，不再把 `Failed to fetch` 归为 WebGL 不兼容。
+- 更新中英使用说明；游戏运行逻辑仅更新版本号，玩法、图像和联机没有变化。
 
 ## 验证
 
-- 完整 **26 套 / 1325 项通过 / 0 失败 / 0 运行时错误 / 0 警告**。新增 Web 适配 33 项、背景缓存 24 项，覆盖平台入口、输入、音频等待、连续移动、淡入、瞬移边界、预算、场景清理、快照只读和原生路径。证据：`tools/results/test-v0.13.0-final.log`、`test-v0.13.0-final-summary.json`。
-- 最终构建：Chrome 154.0.8037.93 在不同站点来源的 iframe 内运行，无 COOP/COEP。14 项自动检查通过，并目视复核实际键鼠战斗、背包、地图、失焦暂停、中英菜单，以及 960×540 / 1280×720 / 1920×1080 布局。全屏、刷新后的语言和 FPS 保存通过；AudioContext 运行且数字输出信号非零。无浏览器/网络/Godot 运行时错误。证据：`tools/results/web-chrome-final/report.json` 及截图。
-- 最终构建：Edge 154.0.4258.53 实战演示 542 tick，中文系统语言识别、14 个像素角色加载、运行时检查通过。证据：`tools/results/web-edge-final/report.json`。
-- 中英两语言分别注入 WASM 404、JS 404、WebGL 不支持：**6 场景 / 44 项通过**。WASM 失败约 3.6 秒后显示重试及下载链接；重复重试仍可恢复提示，无未捕获异常。证据：`tools/results/web-loader-v013-fixed/report.json`。
-- 最终 Windows EXE：英文主机 + 三个中文客户端真实本机 ENet，四端 `passed=true`、退出 0。证据：`tools/results/network-export-bilingual-20261005-031749/summary.json`。
-- Web ZIP 根目录为 `index.html`，11 文件，解压总计 62,040,747 bytes，最大单文件 WASM 39,514,754 bytes。相对依赖、大小、文件头及 itch 限制检查通过；包内哈希与导出一致。`dist/.gdignore` 防止重复导入输出图标，包内无 PNG 导入旁文件。证据：`tools/results/web-zip-audit.json`、`package-v013-verification.json`。
+- 真实启动新 Python 预览服务：HTTP/HEAD、WASM/PCK MIME、仅本机地址、越界路径拒绝检查通过。
+- Chrome **154.0.8037.93**、Firefox **148.0.2** 均从该服务加载最终 v0.13.1、点击进入单人并移动/射击，无浏览器或 Godot 运行时错误。合计 **11 项检查通过**。证据：`tools/results/web-preview-v0131/report.json` 及两浏览器菜单/实战截图。
+- 实际运行 `PlayWeb.cmd -NoBrowser -Port 0`，服务器返回 HTTP 200；随后通过 Ctrl+C 关闭测试会话。
+- Chrome 加载回归：中英 `file://`、WASM 404、JS 404、WebGL 缺失，共 **8 场景 / 60 项通过**。本地文件场景不发出 WASM/PCK 请求，显示准确说明。
+- Firefox 中英 `file://` 另测 **16 项通过**，无未捕获异常。证据：`tools/results/web-loader-v0131-chrome/report.json`、`web-loader-v0131-firefox/report.json`。浏览器与预览服务均已关闭。
+- 发布 ZIP 11 个文件，根目录 `index.html`，相对依赖、大小、文件头及 itch 限制检查通过，解压 62,041,758 bytes。证据：`tools/results/web-zip-v0131-audit.json`。
 
-浏览器使用全新独立 profile 和临时本机服务器；测试进程已关闭。未测试 Safari、手机触屏或公共互联网多人连接，未上传或修改 itch 页面。存储受浏览器隐私设置影响，不承诺跨设备同步。
+本补丁未修改玩法，未重复完整逻辑回归；v0.13.0 的 26 套 / 1325 项检查及 Windows 四人联机基线见 [上版构建报告](BUILD_REPORT_v0.13.0.md)。未修改 itch 页面。
 
-## 发布产物
+## 产物
 
-| 文件 | 大小 |
-| --- | ---: |
-| `dist/SomeSide-v0.13.0-web.zip` | 32,328,862 bytes |
-| `dist/SomeSide-v0.13.0-windows-x64.zip` | 60,145,720 bytes |
-| `dist/v0.13.0/SomeSide.exe` | 131,335,784 bytes |
+- Web：`dist/SomeSide-v0.13.1-web.zip`，32,329,360 bytes。
+- Web SHA256：`F6BFB15F7B13B10ECBD6E86C190F25D10D31AB3A4838B8AEC7046D6D103EC628`
+- Windows 同版本包：`dist/SomeSide-v0.13.1-windows-x64.zip`，60,145,712 bytes。
+- Windows ZIP SHA256：`272BCED49AAECE506DC745579D6CBB8BA9CD4688B63E80773BA2BC87158BCB27`
+- EXE SHA256：`4EA2C88B392D3A65940C8941401385F60403E5051BEA54E174853AC08022D71F`
 
-Web ZIP SHA256：`A04A607788B9334341F7FCE967557E20C40296A37C443CBA9544287AD7E601A6`
-
-Windows ZIP SHA256：`ABA0B60FDCAF560D270F537E450D7093700ABBD6016EABA5429FFDA14F2743DD`
-
-EXE SHA256：`CFC5C5B9E211574F3CB8F893FD095510D72BEA1BD81F385E52CE877DBF268FE8`
-
-两包保留 Godot 与字体许可，旧发行包保留。源码、测试与工具纳入 Git，运行时下载、证据和产物留在本地。用户 `cover.png` 及导入文件未修改、未纳入提交。
-
-上传步骤及双语页面说明见 [ITCH_WEB.zh-CN.md](ITCH_WEB.zh-CN.md)。依据：[itch.io HTML5 上传说明](https://itch.io/docs/creators/html5)、[Godot Web 导出说明](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html)。
+旧版本保留，用户封面及导入文件未修改。新的本地预览辅助脚本保存在源码工程，HTML5 上传包不包含 Windows 启动脚本。操作见 [网页使用与上传说明](ITCH_WEB.zh-CN.md)。

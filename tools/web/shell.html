@@ -66,25 +66,38 @@
         event.preventDefault();
         fail(event.reason || event.error || event.message || 'Download failed.');
       }
-      function fail(error) {
+      function fail(error, kind = 'download') {
         stopWatchingStartup();
         console.error(error);
         status.style.display = 'grid';
         progress.hidden = true;
         progress.style.display = 'none';
-        message.textContent = label('Unable to start. Try a current desktop browser with WebGL 2 enabled, or use the Windows download. ', '启动失败。请使用支持 WebGL 2 的新版桌面浏览器，或下载 Windows 版。') + String(error.message || error);
+        const explanation = kind === 'features'
+          ? label('Unable to start. This browser is missing a required feature: ', '启动失败。当前浏览器缺少运行所需的功能：')
+          : label('Unable to start. A game file could not be downloaded. Check the connection and retry, or use the Windows download. ', '启动失败。游戏文件未能下载，请检查网络后重试，或下载 Windows 版。');
+        message.textContent = explanation + String(error.message || error);
         document.getElementById('fallback').style.display = 'flex';
       }
       // Some engine download failures escape startGame's returned promise.
       // Keep these listeners only while loading, not during normal gameplay.
       window.addEventListener('error', startupError);
       window.addEventListener('unhandledrejection', startupError);
+      if (location.protocol === 'file:') {
+        stopWatchingStartup();
+        progress.hidden = true;
+        progress.style.display = 'none';
+        message.textContent = label('Open this game through a local preview server or itch.io. Opening the HTML file directly cannot load the game files.', '请通过本地预览服务器或 itch.io 打开游戏；直接双击 HTML 无法加载游戏文件。');
+        document.getElementById('hint').textContent = label('Local development: run PlayWeb.cmd from the project folder.', '本地开发：双击项目根目录的 PlayWeb.cmd。');
+        document.getElementById('retry').hidden = true;
+        document.getElementById('fallback').style.display = 'flex';
+        return;
+      }
       if (typeof Engine === 'undefined') {
         fail(label('The game loader could not be downloaded.', '游戏加载程序下载失败。'));
         return;
       }
       const missing = Engine.getMissingFeatures({ threads: GODOT_THREADS_ENABLED });
-      if (missing.length) { fail(missing.join(', ')); return; }
+      if (missing.length) { fail(missing.join(', '), 'features'); return; }
       const engine = new Engine(GODOT_CONFIG);
       engine.startGame({
         canvas,
