@@ -15,10 +15,12 @@ For local testing, run `PlayWeb.cmd` (Python 3 required), keep its console open 
 1. 在已有项目的编辑页，将 **Kind** 设为 **HTML Game**。不需要另建页面。
 2. 上传 `dist/SomeSide-v0.17.0-web.zip`，将这个 Web ZIP 标为 **This file will be played in the browser**。另将 `SomeSide-v0.17.0-windows-x64.zip` 保持为可下载文件并标为 Windows。
 3. Web ZIP 的根目录必须直接包含 `index.html`，以及同次导出的所有配套文件，例如 `index.js`、`index.wasm`、`index.pck`。不要再包一层文件夹，不要只上传 HTML，也不要改动导出文件名。
-4. 推荐页内嵌入 **1280 × 720**，保留 **Click to Play** 并启用 **Fullscreen Button**。使用桌面键盘和鼠标；本版没有触屏操作，不标记 **Mobile Friendly**。
+4. 在 **Embed options** 中优先选择 **Click to launch in fullscreen**，玩家点击后直接展开游玩，无须填写固定尺寸。若希望留在页面内，选择 **Embed in page**、设为 **1280 × 720**、保留 **Click to Play** 并启用 **Fullscreen Button**；不要保留640 × 360的小窗口。使用桌面键盘和鼠标；本版没有触屏操作，不标记 **Mobile Friendly**。
 5. 等 itch.io 处理完 ZIP，在预览中点击开始，检查载入、声音、瞄准和全屏，再保存页面更改。这份说明不代表已经上传或发布。
 
-Edit the existing project, choose HTML Game, upload the Web ZIP and mark it browser-playable. Keep the Windows ZIP as a separate Windows download. Place `index.html` and all companion export files at the ZIP root. Use a 1280 × 720 embed with click-to-start and fullscreen enabled; target desktop keyboard and mouse. Preview before saving. This document does not indicate that an upload has occurred. [itch.io upload reference](https://itch.io/docs/creators/html5)
+Edit the existing project, choose HTML Game, upload the Web ZIP and mark it browser-playable. Keep the Windows ZIP as a separate Windows download. Place `index.html` and all companion export files at the ZIP root. Prefer **Click to launch in fullscreen** under **Embed options**. For inline play, use a 1280 × 720 embed with click-to-start and the fullscreen button enabled. Target desktop keyboard and mouse. Preview before saving. This document does not indicate that an upload has occurred. [itch.io upload reference](https://itch.io/docs/creators/html5)
+
+嵌入尺寸由itch项目页控制；Godot的1280 × 720设计尺寸不会自动修改网站的iframe。当前画布已配置为跟随容器尺寸，960 × 540和1920 × 1080均经过浏览器验收。因此只调整以上网页设置，不需要重新打包上传。浏览器F11可能只放大浏览器外壳，应使用itch的全屏入口或游戏设置里的“切换全屏”。
 
 ## 页面说明建议 / Suggested page copy
 
@@ -36,6 +38,6 @@ The package includes a loading page and uses single-threaded Compatibility expor
 
 ## 本次核对 / Page snapshot checked
 
-只读检查 `tools/results/itch-public-page.html`：现有页面显示 **SomeSide by BiteTheDDDDt**、Windows 下载、状态 Released，以及 `SomeSide-v0.11.0-windows-x64.zip`（页面标注 54 MB）；没有浏览器游戏嵌入。以上来自已保存的公开页面快照，不是账号后台状态。
+2026-10-05通过浏览器只读检查公开页面：已有 **Run game** 网页入口和 `SomeSide-v0.17.0-windows-x64.zip` 下载。点击后，外层游戏容器与iframe实测均为 **640 × 360 CSS像素**，页面内容列宽960；iframe已允许全屏。公开页正文仍以Windows版本描述可用平台，建议按上方双语文案补充网页单人模式。
 
-The saved public-page snapshot lists the Windows v0.11.0 ZIP and no browser embed. Update the existing description's Windows-only availability sentence when adding Web play; retain the co-op explanation for the Windows download. No account access or page changes were performed.
+The public page checked on 2026-10-05 contains browser play and the Windows v0.17.0 ZIP. The loaded game iframe is only 640 × 360 CSS pixels inside a 960-pixel content column, so enlarge the embed or use fullscreen launch in the project settings. Update the Windows-only description to mention browser single-player. No account access or page changes were performed.
