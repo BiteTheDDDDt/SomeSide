@@ -3,10 +3,12 @@ extends RefCounted
 
 ## The same material plates form held weapons and all inventory/loot icons.
 ## Coordinates are gameplay weapon space: grip at x=7.5, fire along local +X.
-## SVG is baked once at logical pixel resolution; animation moves cached parts.
+## SVG is baked once; animation moves cached parts. Pulse rifle is a smooth
+## rendering trial at 4x resolution, while the remaining weapons use pixel art.
 const IDS: Array[String] = ["pulse_rifle","arc_blade","scattergun","railgun","flamethrower","boomerang","storm_staff","sun_lance"]
 const BOUNDS := Rect2(-6,-18,66,36)
 static var _cache: Dictionary = {}
+static var _cache_bytes: int = 0
 static var _icon_layouts: Dictionary = {}
 
 static func _body(id: String) -> String:
@@ -58,15 +60,22 @@ static func icon_drawing(id: String) -> String:
 
 static func _texture(key: String, drawing: String) -> Texture2D:
 	if _cache.has(key): return _cache[key]
-	var svg: String='<svg xmlns="http://www.w3.org/2000/svg" width="66" height="36" viewBox="-6 -18 66 36" shape-rendering="crispEdges">'+drawing+'</svg>'
+	var smooth: bool = key == "pulse_rifle"
+	var svg: String='<svg xmlns="http://www.w3.org/2000/svg" width="66" height="36" viewBox="-6 -18 66 36" shape-rendering="'+("geometricPrecision" if smooth else "crispEdges")+'">'+drawing+'</svg>'
 	var bitmap:=Image.new()
-	if bitmap.load_svg_from_string(svg)!=OK:
+	if bitmap.load_svg_from_string(svg, 4.0 if smooth else 1.0)!=OK:
 		push_error("Weapon art could not rasterize: "+key)
 		return null
+	if smooth:
+		# Colour transparent edge texels before filtering to avoid dark fringes.
+		# Mipmaps retain area coverage when this larger image is drawn at 1x.
+		bitmap.fix_alpha_edges()
+		bitmap.generate_mipmaps()
 	var sampler:=CanvasTexture.new()
 	sampler.diffuse_texture=ImageTexture.create_from_image(bitmap)
-	sampler.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+	sampler.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if smooth else CanvasItem.TEXTURE_FILTER_NEAREST
 	_cache[key]=sampler
+	_cache_bytes += bitmap.get_data_size()
 	return sampler
 
 static func _draw_part(canvas: CanvasItem, id: String, offset: Vector2=Vector2.ZERO) -> void:
@@ -91,4 +100,4 @@ static func draw(canvas: CanvasItem, id: String, mechanism: float=0.0, energy: f
 			"sun_lance": canvas.draw_rect(Rect2(34,-1,9,1),Color(1,.9,.59,charge))
 
 static func cache_stats() -> Dictionary:
-	return {"textures":_cache.size(),"bytes":_cache.size()*66*36*4,"maximum_textures":11}
+	return {"textures":_cache.size(),"bytes":_cache_bytes,"maximum_textures":11}
