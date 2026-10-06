@@ -5,6 +5,7 @@ const Content = preload("res://scripts/content.gd")
 const StageLayouts = preload("res://scripts/stage_layouts.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const WeaponAction = preload("res://scripts/weapon_action_motion.gd")
+const Guidance = preload("res://scripts/projectile_guidance.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 
@@ -613,6 +614,10 @@ func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind:
 		"kind": kind, "ttl": ttl, "radius": radius, "damage": damage, "owner": owner,
 		"hit_ids": [], "pierce": mini(9, base_pierce + extra_pierce), "max_pierce": mini(9, base_pierce + extra_pierce), "age": 0.0, "returning": false})
 	var projectile: Dictionary = projectiles.back()
+	if team == "player" and kind == "storm":
+		var guidance: Dictionary = Guidance.lock(position, velocity, state["enemies"], Guidance.STORM)
+		if not guidance.is_empty():
+			projectile["guidance"] = guidance
 	if sweep_origin.is_finite():
 		projectile["sweep_origin"] = sweep_origin
 	projectile.merge(_visual_data(owner), true)
@@ -621,6 +626,10 @@ func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind:
 func _step_projectiles(dt: float) -> void:
 	var projectiles: Array = state["projectiles"]
 	var kept: Array = []
+	# Build at most one ID index per step; guided shots never scan the enemy
+	# table again after launch, even when their original target disappears.
+	var guidance_enemies: Dictionary = {}
+	var guidance_index_ready: bool = false
 	for projectile_value in projectiles:
 		var projectile: Dictionary = projectile_value
 		var previous: Vector2 = projectile["pos"]
@@ -629,6 +638,19 @@ func _step_projectiles(dt: float) -> void:
 		projectile.erase("sweep_origin")
 		var velocity: Vector2 = projectile["vel"]
 		var kind: String = projectile["kind"]
+		var guidance: Dictionary = projectile.get("guidance", {})
+		if bool(guidance.get("active", false)):
+			var target_id: int = int(guidance.get("target_id", -1))
+			var guide_target: Dictionary = {}
+			if str(projectile["team"]) == "player":
+				if not guidance_index_ready:
+					for enemy: Dictionary in state["enemies"]:
+						guidance_enemies[int(enemy.id)] = enemy
+					guidance_index_ready = true
+				guide_target = guidance_enemies.get(target_id, {})
+			else:
+				guide_target = Dictionary(state["players"]).get(target_id, {})
+			velocity = Guidance.steer(projectile, guide_target, dt)
 		projectile["age"] = float(projectile.get("age", 0.0)) + dt
 		if kind == "boomerang" and float(projectile["age"]) >= 0.5:
 			if not bool(projectile.get("returning", false)):
@@ -1294,7 +1316,7 @@ func _release_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 			enemy["heal_budget"] = budget
 			if healed > 0:
 				_emit("explosion", enemy["pos"], {"radius": 260.0, "team": "enemy", "healing": true, "visual_only": true})
-			_enemy_shoot(enemy, aim, 230.0, 8.0, "energy")
+			_enemy_shoot(enemy, aim, 210.0, 8.0, "energy")
 
 
 func _cancel_enemy_attack(enemy: Dictionary) -> void:
@@ -1361,7 +1383,12 @@ func _enemy_shoot(enemy: Dictionary, aim: Vector2, speed: float, damage: float, 
 	_spawn_projectile(muzzle, direction * speed, "enemy", kind, damage * _enemy_damage_scale(), -1, 4.0, 9.0 if kind.begins_with("boss") else 6.0)
 	var metadata: Dictionary = {"enemy_id": int(enemy["id"]), "biome": str(enemy.get("biome", "")), "boss_style": str(enemy.get("boss_style", ""))}
 	if Array(state["projectiles"]).size() > before:
-		state["projectiles"].back().merge(metadata)
+		var projectile: Dictionary = state["projectiles"].back()
+		projectile.merge(metadata)
+		if kind == "energy" and str(enemy.get("kind", "")) == "conductor":
+			var guidance: Dictionary = Guidance.lock(muzzle, direction * speed, Dictionary(state["players"]).values(), Guidance.CONDUCTOR)
+			if not guidance.is_empty():
+				projectile["guidance"] = guidance
 	metadata.merge({"aim": direction, "kind": kind, "enemy": true})
 	_emit("shoot", muzzle, metadata)
 

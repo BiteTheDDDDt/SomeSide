@@ -50,7 +50,7 @@ static func weapons() -> Array:
 		_record("railgun", "穿星磁轨枪", "高能直线穿透弹：基础70伤害，间隔1.05秒；最多穿透3个敌人，射程1500。", "b69fff", "weapon", "rare"),
 		_record("flamethrower", "熔火喷流", "170范围火焰锥，每0.12秒造成8伤害，并点燃目标：每秒5伤害，持续2秒。", "7fd4a0", "weapon", "uncommon"),
 		_record("boomerang", "回旋星刃", "投出返航刃：每次命中26伤害，往返各可穿透4个目标；间隔0.65秒。", "b49af5", "weapon", "rare"),
-		_record("storm_staff", "万雷权杖", "每0.48秒发射32伤害雷球，再向两个邻敌各弹射20伤害；多目标压制。", "ffd071", "weapon", "legendary"),
+		_record("storm_staff", "万雷权杖", "每0.48秒发射32伤害雷球，有限导引前方20°、520范围内的目标，最多转向22°；再向两个邻敌各弹射20伤害。", "ffd071", "weapon", "legendary"),
 		_record("sun_lance", "恒星长矛", "每0.85秒发射120伤害光矛，最多穿透6敌；每次命中另有70范围22伤害爆裂。", "ffd071", "weapon", "legendary"),
 	]
 	var intervals: Array[float] = [0.19, 0.52, 0.60, 1.05, 0.12, 0.65, 0.48, 0.85]

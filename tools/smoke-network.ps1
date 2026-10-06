@@ -112,6 +112,7 @@ try {
             $passed = $report.advanced -eq $true -and $report.observed.deployables -eq $true -and $report.observed.effects -eq $true -and $report.observed.chrono -eq $true
             if ($Clients -eq 3) {
                 foreach ($kind in @('boomerang', 'storm', 'lance')) { $passed = $passed -and $kind -in $report.observed.projectile_kinds }
+                $passed = $passed -and $report.observed.guided_projectiles -eq $true
             }
         }
         if ($passed -and $Biomes) {

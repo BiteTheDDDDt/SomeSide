@@ -14,7 +14,7 @@ const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.18.1"
+const VERSION: String = "0.19.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
 const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "coin_drop", "equipment", "drop"]
@@ -96,7 +96,7 @@ var _map_title: Label
 var _inventory_filter: String = "owned"
 var _inventory_grid: GridContainer
 var _inventory_filters: Dictionary = {}
-var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "projectile_kinds": []}
+var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "projectile_kinds": []}
 var _biome_observed: Dictionary = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 var _biome_smoke_stage: int = 0
 var _settings_in_game: bool = false
@@ -632,7 +632,7 @@ func _begin_run(members: Array, seed_value: int) -> void:
 func _begin_local(members: Array, seed_value: int) -> void:
 	sim.start_run(members, seed_value)
 	sound.reset_game_audio()
-	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "projectile_kinds": []}
+	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "projectile_kinds": []}
 	_biome_observed = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 	_biome_smoke_stage = 0
 	if _smoke in ["host", "client"] and _options.has("smoke-advanced"):
@@ -995,6 +995,8 @@ func _observe_advanced_state(snapshot: Dictionary) -> void:
 		_advanced_observed.chrono = _advanced_observed.chrono or float(player.get("chrono_timer", 0)) > 0.0
 	for projectile in snapshot.get("projectiles", []):
 		var kind: String = str(projectile.get("kind", ""))
+		var guidance: Dictionary = projectile.get("guidance", {})
+		_advanced_observed.guided_projectiles = _advanced_observed.guided_projectiles or int(guidance.get("target_id", -1)) >= 0
 		if kind not in _advanced_observed.projectile_kinds:
 			_advanced_observed.projectile_kinds.append(kind)
 

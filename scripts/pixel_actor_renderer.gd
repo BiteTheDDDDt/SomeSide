@@ -6,6 +6,7 @@ extends RefCounted
 ## Every frame owns an explicit crop and center anchor, never an assumed grid.
 const MANIFEST_PATH: String = "res://assets/sprites/actors.json"
 const Gait = preload("res://scripts/player_gait.gd")
+const EnemyAttackArt = preload("res://scripts/enemy_attack_visual.gd")
 const MAX_ACTORS: int = 32
 const MAX_FRAMES: int = 64
 const MAX_TEXTURE_BYTES: int = 64 * 1024 * 1024
@@ -498,7 +499,10 @@ static func _draw_upper_body(canvas: Node2D, frame: Dictionary, motion: Dictiona
 	canvas.draw_set_transform(motion.draw_origin,0.0,Vector2(facing,1))
 
 static func draw_enemy(canvas: Node2D, enemy: Dictionary, clock: float) -> bool:
-	return _draw(canvas, tracked_frame_for(canvas, enemy_id(enemy), enemy, clock))
+	var frame: Dictionary = tracked_frame_for(canvas, enemy_id(enemy), enemy, clock)
+	if frame.is_empty(): return false
+	canvas.draw_texture_rect(frame.texture,EnemyAttackArt.body_rect(frame.draw_target,enemy),false,frame.tint)
+	return true
 
 static func _draw(canvas: Node2D, frame: Dictionary) -> bool:
 	if frame.is_empty():

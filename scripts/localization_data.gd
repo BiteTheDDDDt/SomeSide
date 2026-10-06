@@ -2,6 +2,12 @@ extends RefCounted
 
 ## Chinese source text is a stable display key, never a replacement pattern.
 const TEXTS: Dictionary = {
+	"%d 生命": "%d HP",
+	"挑战": "Challenge",
+	"剩余 %d": "%d left",
+	"已开启": "Opened",
+	"已锁定": "Locked",
+	"已完成": "Cleared",
 	"移动；相反方向同时按住时，后按优先": "Move; the last pressed direction takes priority",
 	"短按低跳，长按高跳；羽翼增加空跳": "Tap for a low jump, hold for height; Feathers add air jumps",
 	"返回战场": "Back to Battle",
@@ -81,6 +87,7 @@ const TEXTS: Dictionary = {
 	"170范围火焰锥，每0.12秒造成8伤害，并点燃目标：每秒5伤害，持续2秒。": "A flame cone with 170 range deals 8 damage every 0.12 seconds and burns targets for 5 damage per second for 2 seconds.",
 	"投出返航刃：每次命中26伤害，往返各可穿透4个目标；间隔0.65秒。": "Throw a returning blade every 0.65 seconds. Each hit deals 26 damage; pierces up to 4 targets on both outward and return flights.",
 	"每0.48秒发射32伤害雷球，再向两个邻敌各弹射20伤害；多目标压制。": "Fire a lightning orb every 0.48 seconds for 32 damage, then chain 20 damage each to two nearby enemies.",
+	"每0.48秒发射32伤害雷球，有限导引前方20°、520范围内的目标，最多转向22°；再向两个邻敌各弹射20伤害。": "Fire a lightning orb every 0.48 seconds for 32 damage. It gently guides toward a target within 20 degrees of your aim and 520 range, turning at most 22 degrees, then chains 20 damage each to two nearby enemies.",
 	"每0.85秒发射120伤害光矛，最多穿透6敌；每次命中另有70范围22伤害爆裂。": "Fire a 120-damage light lance every 0.85 seconds, piercing up to 6 enemies. Each hit adds a 22-damage blast in a 70 radius.",
 	"朝瞄准方向投掷：触敌、落地或0.95秒后爆炸，135范围内基础70伤害。基础冷却8秒。": "Throw toward your aim. Explodes on an enemy, on landing, or after 0.95 seconds for 70 base damage in a 135 radius. Base cooldown: 8 seconds.",
 	"向瞄准方向突袭，150范围内基础60伤害，并获得0.45秒无敌。基础冷却9秒。": "Lunge toward your aim, dealing 60 base damage in a 150 radius and gaining 0.45 seconds of invulnerability. Base cooldown: 9 seconds.",

@@ -29,6 +29,7 @@ const Appearance = preload("res://scripts/player_appearance.gd")
 const Entities = preload("res://scripts/entity_renderer.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
+const EnemyAttackArt = preload("res://scripts/enemy_attack_visual.gd")
 const Locale = preload("res://scripts/localization.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
@@ -1160,100 +1161,190 @@ func _draw_gate() -> void:
 		_key_hint(p + Vector2(0.0, -128.0), glow_color)
 
 
+const FacilityArt = preload("res://scripts/facility_art.gd")
+const FacilityContent = preload("res://scripts/content.gd")
+
+
 func _draw_chests() -> void:
 	for value: Variant in _frame.get("chests", []):
 		var chest: Dictionary = value
-		var world_p: Vector2 = chest.get("pos", Vector2.ZERO)
-		var p: Vector2 = Pixels.snap_position(self, world_to_screen(world_p) + Vector2(0.0, 7.0))
+		var p: Vector2 = Pixels.snap_position(self, world_to_screen(chest.get("pos", Vector2.ZERO)) + Vector2(0.0, 7.0))
 		if not _visible(p, 65.0):
 			continue
-		var opened: bool = chest.get("opened", false)
-		var facility: String = chest.get("type", "cache")
-		var locked: bool = chest.get("locked", false)
-		var focused: bool = _is_focused("chest", int(chest.get("id", -2)))
-		var accent: Color = GOLD
-		if facility == "blood": accent = Color("f69c9f")
-		elif facility == "combat": accent = ORANGE
-		elif facility == "equipment": accent = Color("8dc8ed")
-		elif facility == "choice": accent = TEAL
-		if opened or locked: accent = Color("526e6c")
-		if focused:
-			_focus_marker(p + Vector2(0.0, -10.0), Vector2(27.0, 31.0), accent)
-			_key_hint(p + Vector2(0.0, -58.0), accent)
-		if facility != "cache":
-			_draw_facility(p, chest, facility, accent, opened or locked)
-			continue
-		var shell: Color = Color("335152") if opened else Color("9b7850")
-		if not opened:
-			_glow(p + Vector2(0.0, -5.0), 32.0, Color(1.0, 0.63, 0.29, 0.025), 3)
-		draw_colored_polygon(PackedVector2Array([p + Vector2(-18.0, 10.0), p + Vector2(-19.0, -9.0), p + Vector2(-13.0, -15.0), p + Vector2(13.0, -15.0), p + Vector2(19.0, -9.0), p + Vector2(18.0, 10.0)]), INK)
-		draw_colored_polygon(PackedVector2Array([p + Vector2(-15.0, 7.0), p + Vector2(-16.0, -7.0), p + Vector2(15.0, -7.0), p + Vector2(15.0, 7.0)]), shell)
-		var lid_y: float = -20.0 if opened else -12.0
-		draw_colored_polygon(PackedVector2Array([p + Vector2(-16.0, lid_y + 5.0), p + Vector2(-12.0, lid_y), p + Vector2(12.0, lid_y), p + Vector2(16.0, lid_y + 5.0)]), shell.lightened(0.13))
-		draw_line(p + Vector2(-9.0, -7.0), p + Vector2(-9.0, 8.0), Color("364b42"), 3.0)
-		draw_line(p + Vector2(9.0, -7.0), p + Vector2(9.0, 8.0), Color("364b42"), 3.0)
-		draw_rect(Rect2(p + Vector2(-3.0, -5.0), Vector2(6.0, 6.0)), Color("33413a") if opened else GOLD)
+		var kind: String = str(chest.get("type", "cache"))
+		var state: String = FacilityArt.state_for(chest)
+		var depleted: bool = state in ["open", "locked"]
+		var accent: Color = Color("617a78") if depleted else FacilityArt.accent(kind)
+		_draw_facility(p, chest, kind, accent, depleted)
+		_draw_facility_label(p, chest, kind)
+		if _is_focused("chest", int(chest.get("id", -2))):
+			_focus_marker(p + Vector2(0.0, -15.0), Vector2(29.0, 30.0), accent)
+			_key_hint(p + Vector2(38.0, -30.0), accent)
 
 
 func facility_icon_rect(p: Vector2, chest: Dictionary, kind: String) -> Rect2:
 	var offset: Vector2 = Vector2(-12.0, -27.0)
 	if kind == "choice":
-		# Screen X changes with every camera movement. It must never drive the
-		# hover phase: running used to turn a slow bob into dozens of Hz.
+		# The persistent offer ID drives this gentle bob, never screen X.
 		var phase: float = fposmod(float(chest.get("id", 0)) * 2.39996323, TAU)
 		offset.y = -41.0 + sin(_clock * 2.0 + phase) * 1.5
+	elif kind == "cache": offset.y = -55.0
+	elif kind == "blood": offset.y = -74.0
+	elif kind == "combat": offset.y = -64.0
 	return Rect2(Pixels.snap_position(self, p + offset), Vector2(24.0, 24.0))
 
 
+## Pure display data: rewards and costs were fixed by the host at stage creation.
+## No rerolls, local RNG or mutation of the replicated facility record.
+func facility_label_data(chest: Dictionary) -> Dictionary:
+	var kind: String = str(chest.get("type", "cache"))
+	var state: String = FacilityArt.state_for(chest)
+	if state in ["open", "locked"]:
+		return {"name": "", "cost_text": Locale.text("已锁定" if state == "locked" else ("已完成" if kind == "combat" else "已开启")), "currency": "state", "state": state, "affordable": false}
+	var id: String = str(chest.get("item", ""))
+	var definition: Dictionary = FacilityContent.definition(id)
+	var price: int = maxi(0, int(chest.get("cost", 0)))
+	var player: Dictionary = Dictionary(_frame.get("players", {})).get(_local_id, {})
+	var cost_text: String = str(price)
+	var currency: String = "coin"
+	var affordable: bool = int(player.get("coins", 2147483647)) >= price
+	if kind == "blood":
+		currency = "hp"
+		cost_text = Locale.format("%d 生命", [price])
+		affordable = float(player.get("hp", INF)) > price
+	elif kind == "combat":
+		currency = "challenge"
+		cost_text = Locale.format("剩余 %d", [int(chest.get("remaining", 0))]) if state == "active" else Locale.text("挑战")
+		affordable = state != "active"
+	return {"name": Locale.text(str(definition.get("name", id))), "item": id, "cost_text": cost_text, "currency": currency, "state": state, "affordable": affordable}
+
+
+func _facility_label_size(chest: Dictionary) -> Vector2:
+	var info: Dictionary = facility_label_data(chest)
+	var font: Font = _font if _font != null else ThemeDB.fallback_font
+	var name_width: float = font.get_string_size(str(info.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var cost_width: float = font.get_string_size(str(info.cost_text), HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + (12.0 if info.currency == "coin" else 0.0)
+	return Vector2(ceilf(clampf(maxf(name_width, cost_width) + 16.0, 58.0, 144.0)),20.0 if info.state in ["open","locked"] else 36.0)
+
+
+func facility_label_rect(p: Vector2, chest: Dictionary, kind: String) -> Rect2:
+	var size_value: Vector2 = _facility_label_size(chest)
+	var used: bool = FacilityArt.state_for(chest) in ["open","locked"]
+	var top: float = -89.0
+	if kind == "cache": top = -102.0
+	elif kind == "blood": top = -121.0
+	elif kind == "combat": top = -111.0
+	elif kind == "equipment": top = -87.0
+	if used: top = -67.0 if kind in ["cache","blood","equipment"] else -53.0
+	var rect := Rect2(p + Vector2(-size_value.x * .5,top),size_value)
+	if kind == "choice" and int(chest.get("group",-1)) >= 0:
+		# Position the whole group before clipping. Independent per-card clamps
+		# would flatten the stagger or squeeze the outer offers at screen edges.
+		var group: Array[Dictionary] = []
+		for other: Dictionary in _frame.get("chests",[]):
+			if str(other.get("type","")) == "choice" and int(other.get("group",-2)) == int(chest.group):
+				group.append(other)
+		group.sort_custom(func(a: Dictionary,b: Dictionary) -> bool: return int(a.get("id",0)) < int(b.get("id",0)))
+		var below: bool = false
+		for index: int in range(group.size()):
+			var relative: Vector2 = Vector2(group[index].get("pos",Vector2.ZERO)) - Vector2(chest.get("pos",Vector2.ZERO))
+			if p.y + relative.y + top - (40.0 if not used and index%2==1 else 0.0) < 6.0:
+				below = true
+		var envelope := Rect2()
+		for index: int in range(group.size()):
+			var member: Dictionary = group[index]
+			var relative: Vector2 = Vector2(member.get("pos",Vector2.ZERO)) - Vector2(chest.get("pos",Vector2.ZERO))
+			var member_size: Vector2 = _facility_label_size(member)
+			var stagger: float = 40.0 if not used and index%2==1 else 0.0
+			var offset_y: float = 22.0 + stagger if below else top - stagger
+			var member_rect := Rect2(p+relative+Vector2(-member_size.x*.5,offset_y),member_size)
+			envelope = member_rect if index==0 else envelope.merge(member_rect)
+			if int(member.get("id",0)) == int(chest.get("id",0)): rect=member_rect
+		if not group.is_empty():
+			var shift := Vector2.ZERO
+			if envelope.position.x < 6.0: shift.x = 6.0-envelope.position.x
+			elif envelope.end.x > screen_size.x-6.0: shift.x = screen_size.x-6.0-envelope.end.x
+			if envelope.end.y > screen_size.y-6.0: shift.y = screen_size.y-6.0-envelope.end.y
+			rect.position += shift
+			rect.position = Pixels.snap_position(self,rect.position)
+			return rect
+	elif rect.position.y < 6.0:
+		rect.position.y = p.y + 22.0
+	rect.position.x = clampf(rect.position.x,6.0,maxf(6.0,screen_size.x-rect.size.x-6.0))
+	rect.position.y = clampf(rect.position.y,6.0,maxf(6.0,screen_size.y-rect.size.y-6.0))
+	# Platforms can be only 90px apart. A lower chest's price card must not
+	# cover a terminal on the floor above it; use deterministic local fallbacks.
+	var obstruction: float = _facility_label_obstruction(rect,p,chest)
+	if obstruction > 0.0:
+		for offset: Vector2 in [Vector2(-size_value.x*.5,22),Vector2(-size_value.x-40,-24),Vector2(40,-24)]:
+			var candidate := Rect2(p+offset,size_value)
+			candidate.position.x=clampf(candidate.position.x,6,maxf(6,screen_size.x-size_value.x-6))
+			candidate.position.y=clampf(candidate.position.y,6,maxf(6,screen_size.y-size_value.y-6))
+			var cost: float=_facility_label_obstruction(candidate,p,chest)
+			if cost < obstruction:
+				rect=candidate; obstruction=cost
+			if is_zero_approx(obstruction): break
+	rect.position = Pixels.snap_position(self,rect.position)
+	return rect
+
+
+func _facility_label_obstruction(rect: Rect2, p: Vector2, chest: Dictionary) -> float:
+	var area: float=0.0
+	for other: Dictionary in _frame.get("chests",[]):
+		if int(other.get("id",0))==int(chest.get("id",0)): continue
+		var relative: Vector2=Vector2(other.get("pos",Vector2.ZERO))-Vector2(chest.get("pos",Vector2.ZERO))
+		var body:=Rect2(p+relative+FacilityArt.BOUNDS.position,FacilityArt.BOUNDS.size)
+		if FacilityArt.state_for(other) not in ["open","locked"]:
+			body=body.merge(facility_icon_rect(p+relative,other,str(other.get("type","cache"))))
+		var intersection: Rect2=rect.intersection(body.grow(4))
+		area+=intersection.get_area()
+	return area
+
+
 func _draw_facility(p: Vector2, chest: Dictionary, kind: String, accent: Color, depleted: bool) -> void:
-	var dark: Color = Color("193840")
-	var steel: Color = Color("48605d") if not depleted else Color("293c3d")
+	draw_texture_rect(FacilityArt.texture(kind, FacilityArt.state_for(chest)), Rect2(p + FacilityArt.BOUNDS.position, FacilityArt.BOUNDS.size), false)
 	if not depleted:
-		_glow(p + Vector2(0.0, -14.0), 38.0, Color(accent, 0.028), 3)
-	draw_colored_polygon(PackedVector2Array([p + Vector2(-25.0, 10.0), p + Vector2(-20.0, 5.0), p + Vector2(20.0, 5.0), p + Vector2(25.0, 10.0)]), steel)
-	match kind:
-		"choice":
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-15.0, 7.0), p + Vector2(-12.0, -13.0), p + Vector2(12.0, -13.0), p + Vector2(15.0, 7.0)]), dark)
-			draw_line(p + Vector2(-12.0, -11.0), p + Vector2(12.0, -11.0), accent, 3.0, true)
-			draw_line(p + Vector2(-5.0, -5.0), p + Vector2(5.0, -5.0), Color(accent, 0.55), 1.5, true)
-			if not depleted:
-				var item_id: String = str(chest.get("item", ""))
-				draw_texture_rect(ItemIcons.texture(item_id, 24), facility_icon_rect(p, chest, kind), false, Color(1.0, 1.0, 1.0, 0.85))
-				draw_line(p + Vector2(-7.0, -12.0), p + Vector2(-11.0, -28.0), Color(accent, 0.16), 1.0, true)
-				draw_line(p + Vector2(7.0, -12.0), p + Vector2(11.0, -28.0), Color(accent, 0.16), 1.0, true)
-			else:
-				draw_line(p + Vector2(-7.0, -27.0), p + Vector2(7.0, -16.0), accent, 2.0, true)
-				draw_line(p + Vector2(7.0, -27.0), p + Vector2(-7.0, -16.0), accent, 2.0, true)
-		"blood":
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-18.0, 5.0), p + Vector2(-13.0, -27.0), p + Vector2(0.0, -42.0), p + Vector2(13.0, -27.0), p + Vector2(18.0, 5.0)]), dark)
-			draw_polyline(PackedVector2Array([p + Vector2(-13.0, 1.0), p + Vector2(-9.0, -25.0), p + Vector2(0.0, -36.0), p + Vector2(9.0, -25.0), p + Vector2(13.0, 1.0)]), steel, 2.5, true)
-			draw_circle(p + Vector2(0.0, -14.0), 7.0, accent, true, -1.0, true)
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-6.0, -17.0), p + Vector2(0.0, -30.0), p + Vector2(6.0, -17.0)]), accent)
-			draw_line(p + Vector2(0.0, -5.0), p + Vector2(0.0, 3.0), Color(accent, 0.6), 1.5)
-		"combat":
-			var status: String = chest.get("status", "idle")
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-21.0, 5.0), p + Vector2(-19.0, -24.0), p + Vector2(-10.0, -31.0), p + Vector2(10.0, -31.0), p + Vector2(19.0, -24.0), p + Vector2(21.0, 5.0)]), dark)
-			draw_line(p + Vector2(-17.0, -24.0), p + Vector2(-15.0, 2.0), steel, 3.0)
-			draw_line(p + Vector2(17.0, -24.0), p + Vector2(15.0, 2.0), steel, 3.0)
-			for side: float in [-1.0, 1.0]:
-				draw_line(p + Vector2(-side * 8.0, -24.0), p + Vector2(side * 8.0, -7.0), accent, 2.5, true)
-				draw_line(p + Vector2(side * 5.0, -7.0), p + Vector2(side * 10.0, -12.0), accent, 2.0, true)
-			if status == "active":
-				var pulse: float = 0.45 + sin(_clock * 5.0) * 0.2
-				draw_arc(p + Vector2(0.0, -14.0), 31.0, _clock, _clock + TAU * 0.8, 40, Color(accent, pulse), 1.5, true)
-				_world_label(p + Vector2(0.0, -42.0), str(chest.get("remaining", 0)), accent, 13)
-			elif status == "cleared":
-				draw_polyline(PackedVector2Array([p + Vector2(-7.0, -18.0), p + Vector2(-1.0, -12.0), p + Vector2(8.0, -24.0)]), TEAL, 2.5, true)
-		"equipment":
-			draw_colored_polygon(PackedVector2Array([p + Vector2(-20.0, 6.0), p + Vector2(-21.0, -27.0), p + Vector2(-15.0, -34.0), p + Vector2(15.0, -34.0), p + Vector2(21.0, -27.0), p + Vector2(20.0, 6.0)]), dark)
-			draw_rect(Rect2(p + Vector2(-14.0, -28.0), Vector2(28.0, 27.0)), Color("0b252e"))
-			draw_line(p + Vector2(-17.0, -28.0), p + Vector2(-17.0, 0.0), accent, 2.0)
-			draw_line(p + Vector2(17.0, -28.0), p + Vector2(17.0, 0.0), accent, 2.0)
-			if not depleted:
-				draw_texture_rect(ItemIcons.texture(str(chest.get("item", "grenade")), 24), facility_icon_rect(p, chest, kind), false)
-			else:
-				draw_line(p + Vector2(-10.0, -14.0), p + Vector2(10.0, -14.0), accent, 2.0)
-			draw_line(p + Vector2(-8.0, 4.0), p + Vector2(8.0, 4.0), steel, 2.0)
+		var icon_rect: Rect2 = facility_icon_rect(p, chest, kind)
+		if kind == "choice":
+			draw_line(p + Vector2(-7,-18), icon_rect.position + Vector2(2,24), Color(accent,.18),1.0,true)
+			draw_line(p + Vector2(7,-18), icon_rect.position + Vector2(22,24), Color(accent,.18),1.0,true)
+		draw_texture_rect(ItemIcons.texture(str(chest.get("item", "")),24), icon_rect, false)
+	if kind == "combat" and str(chest.get("status", "idle")) == "active":
+		var remaining: int = int(chest.get("remaining",0))
+		for index: int in range(4):
+			draw_rect(Rect2(p + Vector2(-10 + index*5,-28),Vector2(3,3)), accent if index < remaining else Color("243b43"))
+
+
+func _draw_facility_label(p: Vector2, chest: Dictionary, kind: String) -> void:
+	if _font == null: return
+	var info: Dictionary = facility_label_data(chest)
+	var rect: Rect2 = facility_label_rect(p, chest, kind)
+	var used: bool = info.state in ["open", "locked"]
+	var accent: Color = Color("617a78") if used else FacilityArt.accent(kind)
+	if not used:
+		var target: Vector2 = facility_icon_rect(p,chest,kind).get_center()
+		if rect.position.y > p.y:
+			draw_line(Vector2(rect.get_center().x,rect.position.y),p+Vector2(0,13),Color(accent,.22),1.0)
+		else:
+			draw_line(Vector2(rect.get_center().x,rect.end.y),Vector2(target.x,target.y-14),Color(accent,.22),1.0)
+	draw_rect(rect,Color("0b2028") if not used else Color(0.035,0.09,0.11,.82))
+	draw_line(rect.position,rect.position+Vector2(rect.size.x,0),Color(accent,.65),1.0)
+	if not used:
+		var font_size: int = 11
+		while font_size > 9 and _font.get_string_size(str(info.name),HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x > rect.size.x-12:
+			font_size -= 1
+		var text_width: float = _font.get_string_size(str(info.name),HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+		draw_string(_font,rect.position+Vector2((rect.size.x-text_width)*.5,14),str(info.name),HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,CREAM)
+	var tint: Color = Color("8caaa3") if used else (GOLD if info.currency=="coin" else FacilityArt.accent(kind))
+	if not used and info.currency in ["coin","hp"] and not bool(info.affordable): tint=Color("ee9a8b")
+	var cost_width: float = _font.get_string_size(str(info.cost_text),HORIZONTAL_ALIGNMENT_LEFT,-1,11).x
+	var baseline: Vector2 = rect.position+Vector2((rect.size.x-cost_width-(12.0 if info.currency=="coin" else 0.0))*.5,14.0 if used else 29.0)
+	if info.currency=="coin":
+		var center: Vector2=baseline+Vector2(4,-4)
+		draw_circle(center,4.0,tint,true,-1,true)
+		draw_line(center-Vector2(0,2),center+Vector2(0,2),Color("725139"),1.0)
+		baseline.x+=12.0
+	draw_string(_font,baseline,str(info.cost_text),HORIZONTAL_ALIGNMENT_LEFT,-1,11,tint)
 
 
 func _draw_coin_pickups() -> void:
@@ -1556,7 +1647,7 @@ func _draw_enemies() -> void:
 		var kind: String = str(enemy.get("kind", "crawler"))
 		var elite: bool = bool(enemy.get("elite", false))
 		var vel: Vector2 = enemy.get("vel", Vector2.ZERO)
-		var heading: Vector2 = enemy.get("attack_dir",vel) if float(enemy.get("telegraph",0.0))>0.0 else vel
+		var heading: Vector2 = enemy.get("attack_dir",vel) if bool(EnemyAttackArt.attack_sample(enemy).active) else vel
 		var facing: float = 1.0 if heading.x >= 0.0 else -1.0
 		var accent: Color = Color("ffd08b") if elite else Color("efa67d")
 		draw_set_transform(p,0.0,Vector2(facing,1.0))
@@ -1615,10 +1706,8 @@ func _draw_threat_overlays() -> void:
 		var progress: float = clampf(1.0-remaining/maxf(0.01,float(enemy.get("telegraph_max",0.8))),0.0,1.0)
 		var color_value: Color = Color("ffac7b")
 		var attack: String = str(enemy.get("attack_kind",""))
-		if _visible(p,100.0):
-			var warning_p: Vector2 = p+Vector2(0,Entities.enemy_bounds(enemy).position.y-13)
-			draw_colored_polygon(PackedVector2Array([warning_p+Vector2(0,-5),warning_p+Vector2(-4,3),warning_p+Vector2(4,3)]),Color(color_value,0.85))
-			draw_line(warning_p+Vector2(0,-2),warning_p+Vector2(0,0),INK,1.2,true)
+		if attack not in ["beam","prism_beam","prism_cross"] and _visible(p,100.0):
+			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,Entities.enemy_bounds(enemy).end.y,not reduced_motion and fx_scale>=.6)
 		match attack:
 			"charge", "stone_charge":
 				var reach: float = 249.4 if attack=="charge" else 266.4
@@ -1630,7 +1719,7 @@ func _draw_threat_overlays() -> void:
 					var t: float = i/12.0
 					path.append(p+direction*(112*t)+Vector2(0,-sin(t*PI)*28))
 				draw_polyline(path,Color(color_value,0.25+progress*0.45),1.3,true)
-				_draw_arrow(path[-1],direction,color_value,5.0)
+				draw_circle(path[-1],2.0,Color(color_value,.5),true,-1,true)
 			"blink":
 				var destination: Vector2 = world_to_screen(enemy.get("blink_target",enemy.get("pos",Vector2.ZERO)))
 				if _visible(destination,45):
@@ -1646,8 +1735,10 @@ func _draw_threat_overlays() -> void:
 					var ray: Vector2 = direction.rotated((index-(count-1)*0.5)*spacing)
 					var start: float = 49.0 if str(enemy.get("kind",""))=="boss" else 23.0
 					var end: float = 145.0 if count>1 else 112.0
-					_draw_dashes(p+ray*start,p+ray*end,Color(color_value,0.22+progress*0.38),1.2,12.0)
-					_draw_arrow(p+ray*end,ray,Color(color_value,0.6),4.0)
+					draw_line(p+ray*start,p+ray*end,Color(color_value,0.17+progress*0.27),1.0,true)
+					if count>1:
+						var seed: Vector2 = p+ray*(start+8.0*(1.0-progress))
+						draw_circle(seed,1.5+progress*2.0,Color(color_value,.5+progress*.35),true,-1,true)
 				if attack=="mend":
 					var linked: int=0
 					for ally: Dictionary in _frame.get("enemies",[]):
@@ -1679,13 +1770,7 @@ func _draw_dashes(start: Vector2, finish: Vector2, tint: Color, width: float, sp
 
 func _draw_warning_lane(start: Vector2, finish: Vector2, radius: float, progress: float) -> void:
 	if not Rect2(start,Vector2.ZERO).expand(finish).grow(radius).intersects(Rect2(Vector2.ZERO,screen_size)): return
-	var direction: Vector2 = (finish-start).normalized()
-	var side: Vector2 = direction.orthogonal()*radius
-	var tint: Color = Color("ff9b72")
-	draw_colored_polygon(PackedVector2Array([start-side,finish-side,finish+side,start+side]),Color(tint,0.025+progress*0.035))
-	_draw_dashes(start-side,finish-side,Color(tint,0.4+progress*0.3),1.0,16.0)
-	_draw_dashes(start+side,finish+side,Color(tint,0.4+progress*0.3),1.0,16.0)
-	for i: int in range(3): _draw_arrow(start.lerp(finish,(i+1)/3.0),direction,Color(tint,0.35+progress*0.4),8.0)
+	EnemyAttackArt.draw_lane(self,start,finish,radius,progress,not reduced_motion and fx_scale>=.6)
 
 
 func _draw_hazard(hazard: Dictionary) -> void:
@@ -1696,34 +1781,10 @@ func _draw_hazard(hazard: Dictionary) -> void:
 	var tint: Color = Color("ffa674")
 	var kind: String = str(hazard.get("kind",""))
 	if str(hazard.get("shape","circle"))=="line":
-		var direction: Vector2 = WeaponPose.normalized_aim(hazard.get("dir",Vector2.RIGHT))
-		var end: Vector2 = p+direction*clampf(float(hazard.get("length",0.0)),0.0,1200.0)
-		if not Rect2(p,Vector2.ZERO).expand(end).grow(radius+4).intersects(Rect2(Vector2.ZERO,screen_size)): return
-		var side: Vector2 = direction.orthogonal()*radius
-		draw_colored_polygon(PackedVector2Array([p-side,end-side,end+side,p+side]),Color(tint,0.11 if active else 0.035+0.025*progress))
-		# _segment_circle tests a capsule, including the radius beyond either
-		# segment endpoint. Render those half discs so leaving the flat beam
-		# end cannot look safe while the player's body still overlaps damage.
-		for cap: Dictionary in [{"center":p,"start":direction.angle()+PI*0.5},{"center":end,"start":direction.angle()-PI*0.5}]:
-			var center: Vector2 = cap.center
-			var begin: float = float(cap.start)
-			var points: PackedVector2Array = PackedVector2Array([center])
-			for index: int in range(19):
-				points.append(center+Vector2.from_angle(begin+PI*index/18.0)*radius)
-			draw_colored_polygon(points,Color(tint,0.11 if active else 0.035+0.025*progress))
-			draw_arc(center,radius,begin,begin+PI,18,Color(tint,0.9 if active else 0.45+progress*0.35),1.4 if active else 1.0,true)
-		if active:
-			draw_line(p,end,Color("7f3e49"),radius*1.25,true)
-			draw_line(p,end,Color("ff9f78"),radius*0.55,true)
-			draw_line(p,end,Color("ffe6b9"),2.0,true)
-			draw_line(p-side,end-side,Color(tint,0.9),1.4,true)
-			draw_line(p+side,end+side,Color(tint,0.9),1.4,true)
-		else:
-			_draw_dashes(p-side,end-side,Color(tint,0.45+progress*0.35),1.0,16.0)
-			_draw_dashes(p+side,end+side,Color(tint,0.45+progress*0.35),1.0,16.0)
-			draw_line(p,end,Color(tint,0.2+progress*0.3),1.0,true)
-			_draw_arrow(end,direction,Color(tint,0.8),9.0)
-			for index: int in range(1,5): _draw_arrow(p.lerp(end,index/5.0),direction,Color(tint,0.38),5.0)
+		var sampled: Dictionary = EnemyAttackArt.beam_sample(hazard,fx_scale,reduced_motion)
+		var end: Vector2 = world_to_screen(sampled.end)
+		if not Rect2(p,Vector2.ZERO).expand(end).grow(radius+32).intersects(Rect2(Vector2.ZERO,screen_size)): return
+		EnemyAttackArt.draw_beam(self,p,end,sampled)
 		return
 	if not _visible(p,radius+14): return
 	draw_circle(p,radius,Color(tint,0.09 if active else 0.035+progress*0.025),true,-1,true)
