@@ -179,12 +179,15 @@ func step(delta: float, commands: Dictionary) -> void:
 		# must not fire skills or move later players in the newly loaded arena.
 		if str(state["phase"]) != "playing" or int(state["stage"]) != stage_at_start:
 			return
+	# A warning first appears at this step's end. It must receive its entire
+	# advertised windup starting with the next step, just like its attacker.
+	var new_hazard_min_id: int = _next_id + 1
 	_step_enemies(dt)
 	_step_deployables(dt)
 	_step_effects(dt)
 	_step_proc_effects(dt)
 	_step_projectiles(dt)
-	_step_hazards(dt)
+	_step_hazards(dt, new_hazard_min_id)
 	_cleanup_enemies()
 	_step_challenges()
 	_step_coin_pickups(dt)
@@ -1357,7 +1360,7 @@ func _begin_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 			"prism": kind = "prism_beam" if cycle % 2 == 0 else "prism_cross"
 			_: kind = "spore_volley" if cycle % 2 == 0 else "spore_bloom"
 		enemy["attack_count"] = cycle + 1
-	var windup: float = float(enemy.get("windup", 0.8))
+	var windup: float = EnemyCatalog.attack_windup(kind, float(enemy.get("windup", 0.8)))
 	enemy["telegraph"] = windup
 	enemy["telegraph_max"] = windup
 	enemy["attack_kind"] = kind
@@ -1475,7 +1478,7 @@ func _spawn_hazard(enemy: Dictionary, kind: String, position: Vector2, shape: St
 	return hazard
 
 
-func _step_hazards(dt: float) -> void:
+func _step_hazards(dt: float, new_hazard_min_id: int = -1) -> void:
 	var living: Dictionary = {}
 	for enemy_value in Array(state["enemies"]):
 		var enemy: Dictionary = enemy_value
@@ -1487,6 +1490,9 @@ func _step_hazards(dt: float) -> void:
 		if not living.has(int(hazard["owner"])):
 			continue
 		if not bool(hazard["active"]):
+			if new_hazard_min_id >= 0 and int(hazard["id"]) >= new_hazard_min_id:
+				kept.append(hazard)
+				continue
 			hazard["delay"] = maxf(0.0, float(hazard["delay"]) - dt)
 			if float(hazard["delay"]) > 0.0:
 				kept.append(hazard)

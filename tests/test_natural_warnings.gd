@@ -1,6 +1,6 @@
 extends SceneTree
 
-const Fixtures = preload("res://tools/capture-attack-phases-v0202.gd")
+const Fixtures = preload("res://tools/capture-attack-phases-v0203.gd")
 const World = preload("res://scripts/world_view.gd")
 const Beam = preload("res://scripts/enemy_attack_visual.gd")
 const DT: float = 1.0 / 60.0
@@ -24,7 +24,7 @@ func _run() -> void:
 		await _locked_dodge()
 		_test_distinct_attack_phases()
 		_test_airborne_spores()
-		_test_no_auxiliary_primitives()
+		_test_travel_attacks_unchanged()
 	print("NATURAL_WARNINGS_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
 
@@ -62,15 +62,17 @@ func _real_attack(attack: String) -> void:
 	var active_samples_valid: bool = true
 	var warning_material: bool = false
 	var active_material: bool = false
+	var first_samples: int = 0
+	var first_signal: bool = true
 	var initial_healing: Dictionary = {}
 	if attack == "mend":
 		for ally: Dictionary in sim.state.enemies:
 			if int(ally.id) != int(enemy.id): initial_healing[int(ally.id)] = float(ally.hp)
-	for tick: int in range(210):
+	for tick: int in range(maxi(210, int(ceil(float(enemy.telegraph_max) / DT)) + 100)):
 		var winding: bool = str(enemy.attack_kind) == attack and float(enemy.telegraph) > 0.0
-		# Hazards begin counting down on their creation tick; the attacker's
-		# own timer advances next tick. The damage body's active flag, rather
-		# than rounded visual timer equality, is the authoritative boundary.
+		# Hazard and attacker timers now both retain the creation tick. Use
+		# the actual damage body flag, not rounded display seconds, as the
+		# authoritative boundary throughout the complete warning window.
 		var hazard_active: bool = Array(sim.state.hazards).any(func(h: Dictionary) -> bool: return bool(h.active))
 		if not winding or hazard_active: release_seen = true
 		if not release_seen and float(sim.state.players[1].hp) < initial_hp: quiet_until_release = false
@@ -87,12 +89,16 @@ func _real_attack(attack: String) -> void:
 				var size: Vector2 = data.get("material_size", data.get("size", Vector2.ZERO))
 				var valid: bool = is_finite(alpha) and size.is_finite() and size.x > 0 and size.y > 0
 				if str(hazard.shape) == "line":
-					# The compact emitter warns early; a full path should NOT be
-					# visible before the last third of the windup.
-					valid = valid and float(data.get("source_alpha", 0.0)) > 0.0
-					valid = valid and (alpha > 0.0 if bool(data.get("material_visible", false)) else alpha == 0.0)
+					valid = valid and float(data.get("source_alpha", 0.0)) >= 0.6
+					valid = valid and (bool(data.material_visible) and alpha == 1.0 if bool(hazard.active) else bool(data.warning_visible) and float(data.warning_alpha) >= 0.85 and data.warning_end == Vector2(hazard.pos) + Vector2(hazard.dir) * float(hazard.length))
 				else:
-					valid = valid and alpha > 0.0
+					valid = valid and alpha == 1.0
+					if not bool(hazard.active):
+						valid = valid and bool(data.warning_visible) and float(data.warning_alpha) >= 0.9 and data.warning_radius == hazard.radius
+						if str(data.family) == "spore_ready": valid = valid and Vector2(data.size).x >= 36.0 and not Beam.Sprites.frame_data("spore_ready", float(data.phase)).is_empty()
+				if tick < 6 and not bool(hazard.active):
+					first_samples += 1
+					first_signal = first_signal and valid
 				if bool(hazard.active): active_samples_valid = active_samples_valid and valid; active_material = true
 				else: slow_samples_valid = slow_samples_valid and valid; warning_material = true
 			for variant: Dictionary in samples:
@@ -118,6 +124,7 @@ func _real_attack(attack: String) -> void:
 	_check(unchanged and readonly, attack + ": low-FX World rendering cannot change damage, timings, RNG, or shared snapshots")
 	_check(not bad_effect, attack + ": real hostile events never reintroduce geometric explosion rings or blasts")
 	if not original_hazards.is_empty():
+		_check(first_samples >= 18 and first_signal, attack + ": the complete first 100ms warning is visible in normal, low FX, and reduced motion")
 		_check(locked, attack + ": authority origin, direction, range and radius stay locked in every material setting")
 		_check(warning_material and active_material and slow_samples_valid and active_samples_valid, attack + ": the appropriate source/area signal remains visible at low FX in both phases")
 		_check(active_seen and not damage_before_active and sim.state.hazards.is_empty() and enemy_releases > 0, attack + ": hazard activation and expiry retain their existing damage window")
@@ -135,28 +142,33 @@ func _real_attack(attack: String) -> void:
 	await process_frame
 
 func _locked_dodge() -> void:
-	for attack: String in ["beam", "mortar", "burrow"]:
+	for attack: String in ["beam", "prism_beam", "prism_cross", "mortar", "burrow", "stone_spikes", "spore_bloom"]:
 		var setup: Dictionary = Fixtures.fixture(attack, false)
 		var sim = setup.sim
+		var control = Fixtures.fixture(attack, false).sim
 		var enemy: Dictionary = setup.enemy
 		var target: Vector2 = enemy.attack_target
 		var aim: Vector2 = enemy.attack_dir
-		var locked: Dictionary = sim.state.hazards[0].duplicate(true)
+		var windup: float = float(enemy.telegraph_max)
+		var initial: Dictionary = {}
+		for hazard: Dictionary in sim.state.hazards: initial[int(hazard.id)] = hazard.duplicate(true)
 		var stable: bool = true
-		for tick: int in range(76):
-			var command: Dictionary = {"move": -1.0 if attack != "beam" else 0.0, "jump": attack == "beam" and tick == 26, "jump_held": true}
-			sim.step(DT, {1: command})
+		var active_seen: bool = false
+		var active_control: bool = false
+		var target_hp: float = float(sim.state.players[1].hp)
+		var window: int = int(ceil((windup + 0.8) / DT))
+		for tick: int in range(window):
 			for hazard: Dictionary in sim.state.hazards:
-				if int(hazard.id) == int(locked.id): stable = stable and hazard.pos == locked.pos and hazard.dir == locked.dir
-		_check(stable and enemy.attack_target == target and enemy.attack_dir == aim and sim.state.players[1].hp == 100.0, attack + ": real movement still dodges the locked attack after natural-warning changes")
-
-func _function_text(source: String, name: String) -> String:
-	var start: int = source.find("func " + name + "(")
-	if start < 0: return ""
-	var end: int = source.find("\nfunc ", start + 1)
-	var next_static: int = source.find("\nstatic func ", start + 1)
-	if next_static >= 0 and (end < 0 or next_static < end): end = next_static
-	return source.substr(start, source.length() - start if end < 0 else end - start)
+				if initial.has(int(hazard.id)):
+					var locked: Dictionary = initial[int(hazard.id)]
+					stable = stable and hazard.pos == locked.pos and hazard.dir == locked.dir
+					active_seen = active_seen or bool(hazard.active)
+			for hazard: Dictionary in control.state.hazards: active_control = active_control or bool(hazard.active)
+			sim.step(DT, {1: Fixtures.dodge_command(attack, tick, windup)})
+			control.step(DT, {})
+		_check(active_seen and active_control and sim.state.hazards.is_empty() and control.state.hazards.is_empty(), attack + ": dodge audit actually observes the damaging window and continues through expiry")
+		_check(stable and enemy.attack_target == target and enemy.attack_dir == aim and sim.state.players[1].hp == target_hp, attack + ": ordinary movement and a single jump can avoid the locked attack after a 300ms reaction delay")
+		_check(float(control.state.players[1].hp) < target_hp, attack + ": standing still in the same attack is a positive damage control")
 
 func _test_distinct_attack_phases() -> void:
 	for attack: String in ["beam", "prism_beam", "prism_cross", "mortar", "burrow", "stone_spikes", "spore_bloom"]:
@@ -177,28 +189,28 @@ func _test_distinct_attack_phases() -> void:
 				data.append(Beam.beam_sample(hazard, option[0], option[1]) if str(hazard.shape) == "line" else Natural.area_sample(hazard, option[0], option[1]))
 				aligned = aligned and var_to_bytes(hazard) == saved
 			if str(early.shape) == "line":
-				valid = valid and not bool(data[0].material_visible) and float(data[0].material_alpha) == 0.0 and float(data[0].source_alpha) >= 0.5
-				valid = valid and bool(data[1].material_visible) and float(data[1].material_alpha) > 0.0 and float(data[1].material_alpha) <= 0.3
-				valid = valid and Vector2(data[1].material_size).x <= 64.0 and Vector2(data[1].material_size).x < float(late.length) * 0.15
-				distinct = distinct and bool(data[2].material_visible) and data[2].material_family == "laser" and float(data[2].material_alpha) == 1.0
-				distinct = distinct and is_equal_approx(Vector2(data[2].material_size).x, float(active.length))
-				distinct = distinct and Vector2(data[2].material_size).y >= Vector2(data[1].material_size).y * 2.0
+				for ready: Dictionary in [data[0], data[1]]:
+					valid = valid and bool(ready.warning_visible) and float(ready.warning_alpha) >= 0.85 and not bool(ready.material_visible)
+					valid = valid and ready.warning_origin == early.pos and ready.warning_end == Vector2(early.pos) + Vector2(early.dir) * float(early.length) and ready.warning_radius == early.radius
+				distinct = distinct and not bool(data[2].warning_visible) and bool(data[2].material_visible) and data[2].material_family == "laser" and float(data[2].material_alpha) == 1.0
+				distinct = distinct and Vector2(data[2].material_size) == Vector2(float(active.length), float(active.radius) * 2.0)
 				aligned = aligned and data[0].origin == data[1].origin and data[1].origin == data[2].origin and data[0].end == data[2].end
 			else:
 				var material: String = "spore" if str(early.kind) in ["spore_mortar", "boss_spore"] else ("stone" if str(early.kind) == "stone_spike" else "earth")
 				valid = valid and data[0].family == material + "_ready" and data[1].family == material + "_ready" and data[2].family == material + "_hit"
 				valid = valid and float(data[0].phase) < float(data[1].phase) and float(data[2].phase) >= 0 and float(data[2].phase) <= 1
+				for ready: Dictionary in [data[0], data[1]]:
+					valid = valid and bool(ready.warning_visible) and float(ready.warning_alpha) >= 0.9 and ready.warning_radius == early.radius and float(ready.material_alpha) == 1.0
 				if material == "spore":
 					for ready: Dictionary in [data[0], data[1]]:
 						var seed_size: Vector2 = ready.size
-						valid = valid and is_equal_approx(seed_size.x, seed_size.y) and seed_size.x >= 18.0 and seed_size.x <= 26.0
-				distinct = distinct and Vector2(data[0].size).y <= 30.0 and Vector2(data[1].size).y <= 30.0
-				distinct = distinct and Vector2(data[2].size).y >= Vector2(data[1].size).y * 2.0 and float(data[2].material_alpha) == 1.0 and float(data[1].material_alpha) <= 0.82
+						valid = valid and is_equal_approx(seed_size.x, seed_size.y) and seed_size.x >= 36.0 and seed_size.x <= 44.0
+				distinct = distinct and Vector2(data[2].size).y >= Vector2(data[1].size).y * 2.0 and float(data[2].material_alpha) == 1.0 and not bool(data[2].warning_visible)
 				for sample: Dictionary in data:
 					if material == "spore": aligned = aligned and Vector2(sample.draw_offset) == Vector2.ZERO
 					else: aligned = aligned and is_equal_approx(Vector2(sample.draw_offset).y + Vector2(sample.size).y * 0.5, 17.0)
 		_check(valid, attack + ": early/late ready signals match the actual attack material and only active selects the hit form")
-		_check(distinct, attack + ": damage has a substantially larger opaque silhouette than harmless preparation at every FX setting")
+		_check(distinct, attack + ": the damaging sprite stays distinct from the harmless range cue at every FX setting")
 		_check(aligned, attack + ": phase selection preserves immutable origins and the correct ground or airborne anchor")
 	for attack: String in ["charge", "stone_charge", "pounce"]:
 		var setup: Dictionary = Fixtures.fixture(attack)
@@ -214,7 +226,7 @@ func _test_airborne_spores() -> void:
 		var airborne: bool = Vector2(original.pos).y < float(sim.state.floor_y) - 100.0
 		var preserved: bool = true
 		var active_seen: bool = false
-		for tick: int in range(70):
+		for tick: int in range(int(ceil((float(original.telegraph_max) + 1.0) / DT))):
 			for hazard: Dictionary in sim.state.hazards:
 				if int(hazard.id) != int(original.id): continue
 				var sample: Dictionary = Natural.area_sample(hazard, 0.0, true)
@@ -224,15 +236,24 @@ func _test_airborne_spores() -> void:
 			sim.step(DT, {})
 		_check(airborne and preserved and active_seen and sim.state.players[1].grounded, attack + ": spores stay at the locked airborne center even after their target lands")
 
-func _test_no_auxiliary_primitives() -> void:
-	# Static guard complements the actual native captures: these exact World
-	# entry points must not quietly restore lines/rings behind natural sprites.
-	var world_source: String = FileAccess.get_file_as_string("res://scripts/world_view.gd")
-	var material_source: String = FileAccess.get_file_as_string("res://scripts/natural_threats.gd")
-	var beam_source: String = FileAccess.get_file_as_string("res://scripts/enemy_attack_visual.gd")
-	for record: Array in [[world_source, "_draw_threat_overlays"], [world_source, "_draw_hazard"], [material_source, "draw_area"], [beam_source, "draw_beam"]]:
-		var body: String = _function_text(record[0], record[1])
-		var safe: bool = not body.is_empty()
-		for primitive: String in ["draw_line(", "draw_arc(", "draw_circle(", "draw_polyline(", "draw_colored_polygon(", "_draw_dashes(", "_draw_warning_lane("]:
-			if body.contains(primitive): safe = false
-		_check(safe, record[1] + ": the live path contains no auxiliary geometry drawing calls")
+func _test_travel_attacks_unchanged() -> void:
+	for record: Array in [["charge", .8, 430.0], ["stone_charge", .9, 370.0], ["pounce", .65, 320.0], ["spit", .75, 270.0], ["triple", .75, 235.0], ["spore_volley", .9, 225.0], ["mend", .85, 210.0]]:
+		var attack: String = record[0]
+		var setup: Dictionary = Fixtures.fixture(attack)
+		var sim = setup.sim
+		var enemy: Dictionary = setup.enemy
+		_check(is_equal_approx(float(enemy.telegraph_max), float(record[1])), attack + ": travel attacks retain the established windup")
+		var released: bool = false
+		var unchanged_speed: bool = false
+		for tick: int in range(int(ceil((float(enemy.telegraph_max) + .3) / DT))):
+			sim.step(DT, {})
+			if float(enemy.charge_timer) > 0:
+				released = true
+				unchanged_speed = is_equal_approx(float(enemy.charge_speed), float(record[2]))
+				break
+			for shot: Dictionary in sim.state.projectiles:
+				if str(shot.team) == "enemy":
+					released = true
+					unchanged_speed = absf(Vector2(shot.vel).length() - float(record[2])) < .01
+			if released: break
+		_check(released and unchanged_speed, attack + ": real released charge/projectile retains its established travel speed")

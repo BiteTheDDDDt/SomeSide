@@ -54,7 +54,7 @@ func _test_catalog_and_stage_pools() -> void:
 	var seen: Dictionary = {}
 	var valid: bool = Catalog.catalog().size() == 9
 	for entry in Catalog.catalog():
-		valid = valid and not seen.has(entry.id) and float(entry.windup) >= 0.55 and float(entry.windup) <= 0.9 and float(entry.cooldown) >= 2.5
+		valid = valid and not seen.has(entry.id) and float(entry.windup) >= 0.55 and float(entry.windup) <= 1.8 and float(entry.cooldown) >= 2.5
 		seen[entry.id] = true
 	_check(valid and seen.has("crawler") and seen.has("spitter") and seen.has("drone"), "Nine distinct enemies preserve the legacy IDs and provide bounded readable attack timing")
 	var unique_styles: Dictionary = {}
@@ -124,14 +124,14 @@ func _test_dodging() -> void:
 		simulation._begin_enemy_attack(enemy, simulation.state.players[1])
 		var target_before: Vector2 = enemy.attack_target
 		var direction_before: Vector2 = enemy.attack_dir
-		# A single jump lasts about 0.76 seconds: react to the 0.9-second
-		# warning after 0.3 seconds, instead of landing before release.
+		# React late enough to still be airborne during the actual damage
+		# window, then keep simulating until that entire window has expired.
 		if kind == "sentinel":
-			_advance(simulation, 18)
+			_advance(simulation, int(ceil((float(enemy.telegraph_max) - 0.45) / DT)))
 		var command: Dictionary = {"move": -1.0} if kind != "sentinel" else {"jump": true}
 		simulation.step(DT, {1: command})
-		_advance(simulation, 39 if kind == "sentinel" else 57, {1: {"move": -1.0 if kind != "sentinel" else 0.0}})
-		_check(float(simulation.state.players[1].hp) == 100.0 and enemy.attack_target == target_before and enemy.attack_dir == direction_before, kind + ": real movement during a locked warning dodges the danger")
+		_advance(simulation, int(ceil((float(enemy.telegraph) + 0.24) / DT)), {1: {"move": -1.0 if kind != "sentinel" else 0.0}})
+		_check(simulation.state.hazards.is_empty() and float(simulation.state.players[1].hp) == 100.0 and enemy.attack_target == target_before and enemy.attack_dir == direction_before, kind + ": real movement during a locked warning dodges the entire danger window")
 	var ranged = _fresh()
 	var spitter: Dictionary = _spawn(ranged, "spitter")
 	ranged._begin_enemy_attack(spitter, ranged.state.players[1])
@@ -148,7 +148,7 @@ func _test_dodging() -> void:
 		unit.vel = Vector2(-90, -180)
 		beam._begin_enemy_attack(unit, beam.state.players[1])
 		var fixed_origin: Vector2 = unit.pos
-		_advance(beam, 60)
+		_advance(beam, int(ceil((float(unit.telegraph_max) + 0.15) / DT)))
 		_check(unit.pos == fixed_origin, "Ray attacker stage %d holds its exact launch position throughout warning and active frames" % stage)
 	var falling = _fresh()
 	var grounded_ray: Dictionary = _spawn(falling, "sentinel")
@@ -205,7 +205,7 @@ func _test_lifecycle_and_snapshot() -> void:
 	client.state.hazards[0].hit_ids.append(99)
 	client.state.enemies[0].attack_target += Vector2.ONE
 	_check(simulation.state.hazards[0].hit_ids.is_empty() and simulation.state.enemies[0].attack_target != client.state.enemies[0].attack_target, "Cooperative snapshots independently copy warnings and danger hit records")
-	_advance(simulation, 62)
+	_advance(simulation, int(ceil((float(enemy.telegraph_max) + 0.15) / DT)))
 	_check(float(simulation.state.players[1].hp) == float(simulation.state.players[2].hp) and float(simulation.state.players[1].hp) < 100.0, "An active ray damages each exposed teammate once")
 	var cancelled = _fresh()
 	var moth: Dictionary = _spawn(cancelled, "spore_moth")

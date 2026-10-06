@@ -27,24 +27,29 @@ func _run() -> void:
 		enemy.attack_cd=2.70
 		_check(Art.body_rect(original,enemy)==original,attack+": recovery returns exactly to the original sprite rectangle")
 	_test_beam_phases()
+	_test_beam_capsule()
 	_test_source_materials()
 	await _real_locked_attack()
 	print("ENEMY_ATTACK_VISUALS_TEST_RESULT passed=",passed," failed=",failed)
 	quit(0 if failed==0 else 1)
 
 func _test_beam_phases() -> void:
-	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":.36,"telegraph_max":.9,"active":false,"ttl":.22}
+	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":1.5,"telegraph_max":1.5,"active":false,"ttl":.22}
 	var normal: Dictionary = Art.beam_sample(pending)
-	_check(not bool(normal.material_visible) and is_zero_approx(normal.material_alpha),"Early windup does not fill safe ground with a laser-shaped cloud")
-	_check(normal.source_family=="emitter" and normal.source_size.x<=26 and normal.source_alpha>=.6,"Early windup remains visible at a compact charging emitter")
+	_check(normal.warning_visible and normal.warning_alpha>=.85 and normal.warning_fill_alpha>=.1,"The first warning frame already shows a high-contrast axis and danger width")
+	_check(normal.warning_origin==normal.origin and normal.warning_end==normal.end and normal.warning_radius==normal.radius,"Warning length and width exactly match the authority-locked beam geometry")
+	_check(not normal.material_visible and normal.material_alpha==0.0 and normal.source_family=="emitter","Preparation uses a readable amber marker and emitter, without showing the damaging purple beam")
+	for progress: float in [0.0,.1,.35,.6,.9,.999]:
+		pending.delay=(1.0-progress)*1.5
+		var phase: Dictionary=Art.beam_sample(pending,0.0,true)
+		_check(phase.warning_visible and phase.warning_alpha>=.85 and phase.warning_fill_alpha>=.1 and not phase.material_visible,"No part of a low-FX windup can hide its warning before the beam fires")
+		_check(phase.warning_origin==normal.origin and phase.warning_end==normal.end and phase.warning_radius==normal.radius,"Early and late preparation preserve the entire locked footprint")
 	pending.delay=.09
 	var late: Dictionary = Art.beam_sample(pending)
-	_check(late.material_visible and late.material_alpha>0 and late.material_alpha<=.24,"Only late windup reveals a restrained tongue of energy at the locked muzzle")
-	_check(late.material_family=="laser" and late.material_size.x<=64.0 and late.material_size.y==late.radius and (late.preview_end-late.origin).normalized().is_equal_approx(late.direction),"The late warning is a short directional muzzle tongue, never a full aiming ray")
 	for settings: Array in [[0.0,false],[.5,false],[1.0,true],[2.0,false]]:
 		var sample: Dictionary = Art.beam_sample(pending,settings[0],settings[1])
-		_check(sample.origin==late.origin and sample.end==late.end and sample.radius==late.radius and sample.material_size==late.material_size and sample.material_alpha==late.material_alpha and sample.source_alpha==late.source_alpha,"FX settings preserve locked geometry and both charging cues")
-		_check(not Art.Sprites.frame_data(sample.material_family,sample.material_phase).is_empty() and not Art.Sprites.frame_data(sample.source_family,sample.source_phase).is_empty(),"Low FX has loaded frames for the late laser and its compact emitter")
+		_check(sample.warning_origin==late.warning_origin and sample.warning_end==late.warning_end and sample.warning_radius==late.warning_radius and sample.warning_alpha==late.warning_alpha and sample.warning_fill_alpha==late.warning_fill_alpha,"FX settings cannot dim, shorten or narrow the essential warning")
+		_check(not Art.Sprites.frame_data(sample.source_family,sample.source_phase).is_empty(),"The optional compact emitter has a loaded authored frame")
 	var saved_pending: PackedByteArray = var_to_bytes(pending)
 	_check(Art.beam_sample(pending)==Art.beam_sample(pending) and var_to_bytes(pending)==saved_pending,"Identical remote or paused snapshots produce identical samples without history")
 	pending.active=true
@@ -53,14 +58,30 @@ func _test_beam_phases() -> void:
 	pending.ttl=.001
 	var last: Dictionary = Art.beam_sample(pending)
 	_check(first.material_visible and last.material_visible and first.material_alpha==1.0 and last.material_alpha==1.0,"Actual damage keeps an opaque laser from the first to the final active instant")
+	_check(not first.warning_visible and not last.warning_visible and first.warning_alpha==0.0 and last.warning_fill_alpha==0.0,"The amber warning disappears exactly when the opaque damaging beam becomes active")
 	_check(first.material_size==Vector2(720,24) and first.material_size==last.material_size,"Live damage never shrinks or fades its visible footprint before authority expiry")
-	_check(first.material_size.y>=late.material_size.y*2 and first.material_size.x>late.material_size.x*10 and first.material_alpha>late.material_alpha*4,"Active damage becomes a long, thick opaque beam instead of compact harmless muzzle energy")
-	_check(first.material_family==late.material_family and first.source_family==late.source_family,"Windup and firing share the same emitter and laser material")
+	_check(first.origin==normal.warning_origin and first.end==normal.warning_end and first.radius==normal.warning_radius,"The actual laser occupies the same full footprint promised by its warning")
 	_check(Art.Sprites.frame_index(first.material_family,first.material_phase)<Art.Sprites.frame_index(last.material_family,last.material_phase),"The fired laser advances through authored sustaining frames")
 	for ttl: float in [.22,.17,.11,.05,.001]:
 		pending.ttl=ttl
 		var active: Dictionary=Art.beam_sample(pending,0.0,true)
-		_check(active.material_alpha==1.0 and active.material_size==first.material_size and active.source_alpha==1.0,"Each live phase remains fully readable even with all optional effects disabled")
+		_check(active.material_alpha==1.0 and active.material_size==first.material_size and active.source_alpha==1.0 and not active.warning_visible,"Every live phase shows only the complete damaging beam even at the lowest FX setting")
+
+func _test_beam_capsule() -> void:
+	var sim=Simulation.new()
+	for direction: Vector2 in [Vector2.RIGHT,Vector2.LEFT,Vector2(1,-.4).normalized(),Vector2.UP]:
+		var start:=Vector2(100,250)
+		var finish: Vector2=start+direction*720.0
+		var radius: float=12.0
+		var capsule: PackedVector2Array=Art.warning_capsule(start,finish,radius)
+		var perpendicular: Vector2=direction.orthogonal()
+		_check(Geometry2D.is_point_in_polygon(start-direction*11.8,capsule) and Geometry2D.is_point_in_polygon(finish+direction*11.8,capsule),"Both endpoint caps visibly fill the true beam radius in every direction")
+		_check(not Geometry2D.is_point_in_polygon(start-direction*12.2,capsule) and not Geometry2D.is_point_in_polygon(finish+direction*12.2,capsule),"Caps do not advertise a radius larger than the actual segment-circle hazard")
+		_check(Geometry2D.is_point_in_polygon(start.lerp(finish,.5)+perpendicular*11.8,capsule) and not Geometry2D.is_point_in_polygon(start.lerp(finish,.5)+perpendicular*12.2,capsule),"Adding end caps preserves the exact straight-side width")
+		var player_center: Vector2=finish+direction*25.0
+		var player_near_edge: Vector2=player_center-direction*15.0
+		_check(sim._segment_circle(start,finish,player_center,radius+15.0)>=0.0 and Geometry2D.is_point_in_polygon(player_near_edge,capsule),"A player hit 25px beyond the endpoint visibly overlaps the filled cap with their 15px body")
+		_check(sim._segment_circle(start,finish,finish+direction*28.0,radius+15.0)<0.0 and not Geometry2D.is_point_in_polygon(finish+direction*13.0,capsule),"A player fully beyond the capsule neither overlaps its fill nor takes endpoint damage")
 
 func _test_source_materials() -> void:
 	for kind: String in ["charge","stone_charge","pounce"]:
@@ -107,13 +128,21 @@ func _real_locked_attack() -> void:
 	var readonly: bool=true
 	var active_seen: bool=false
 	var samples: int=0
-	for tick: int in range(78):
+	var warning_frames: int=0
+	var warning_continuous: bool=true
+	var ticks: int=ceili((float(hazard.telegraph_max)+Art.ACTIVE_LIFETIME+.35)*60.0)
+	for tick: int in range(ticks):
 		sim.step(1.0/60.0,{})
 		for live: Dictionary in sim.state.hazards:
 			if int(live.id)!=int(hazard.id): continue
 			var sample: Dictionary=Art.beam_sample(live,0.0,true)
 			geometry_locked=geometry_locked and sample.origin==locked.origin and sample.end==locked.end and sample.radius==locked.radius and sample.direction==locked.direction
 			active_seen=active_seen or bool(sample.active)
+			if not bool(sample.active):
+				warning_frames+=1
+				warning_continuous=warning_continuous and sample.warning_visible and sample.warning_alpha>=.85 and sample.warning_end==locked.end
+			else:
+				warning_continuous=warning_continuous and not sample.warning_visible and sample.material_visible
 			samples+=1
 		var frame: Dictionary=sim.get_snapshot()
 		var before: PackedByteArray=var_to_bytes(frame)
@@ -122,7 +151,8 @@ func _real_locked_attack() -> void:
 		world.queue_redraw()
 		if tick%8==0: await process_frame
 		readonly=readonly and var_to_bytes(frame)==before
-	_check(samples>50 and active_seen,"A real sentinel progresses from warning into an active release")
+	_check(samples>50 and active_seen,"A real sentinel progresses through its full windup into an active release")
+	_check(warning_continuous and warning_frames>=int(float(hazard.telegraph_max)*60.0)-2,"Every real windup frame shows the full warning, then only the damaging laser")
 	_check(geometry_locked,"Dodging across a real sentinel cannot retarget either charge or fired-beam geometry")
 	_check(readonly,"The real WorldView preparation and release path leaves snapshots immutable")
 	_check(sim.state.hazards.is_empty(),"The beam visual disappears when the authority expires its hazard")

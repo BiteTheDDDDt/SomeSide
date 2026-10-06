@@ -42,20 +42,17 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 	var active: bool = bool(hazard.get("active",false))
 	var progress: float = clampf(1.0-float(hazard.get("delay",0.0))/maxf(.01,float(hazard.get("telegraph_max",.8))),0,1)
 	var release: float = clampf(1.0-float(hazard.get("ttl",ACTIVE_LIFETIME))/ACTIVE_LIFETIME,0,1) if active else 0.0
-	# The emitter gathers energy, then grows a short tongue at its muzzle.
-	# It never draws an aiming ray across safe ground before the actual shot.
-	# Live hazards keep a full-width opaque core until authority removes them;
-	# the four firing frames sustain the beam, they never depict a fading blast.
-	var late: float = smoothstep(.65,1.0,progress)
-	var preview_length: float = 24.0+40.0*late
-	var material_length: float = length if active else preview_length
+	# Warning geometry is visible from the first replicated windup frame.
+	# Its amber outlined footprint is intentionally distinct from the opaque
+	# purple laser that exists only while the authority marks damage active.
 	return {"origin":position,"end":position+direction*length,"direction":direction,"radius":radius,"active":active,"progress":progress,"release":release,
+		"warning_visible":not active,"warning_origin":position,"warning_end":position+direction*length,"warning_radius":radius,
+		"warning_alpha":0.0 if active else .86+.14*progress,
+		"warning_fill_alpha":0.0 if active else .10+.08*progress,
 		"material_family":"laser","material_phase":release if active else 0.0,
-		"material_visible":active or late>0.0,
-		"material_size":Vector2(material_length,radius*(2.0 if active else 1.0)),
-		"material_center":position+direction*material_length*.5,
-		"preview_end":position+direction*preview_length,
-		"material_alpha":1.0 if active else .24*late,
+		"material_visible":active,"material_size":Vector2(length,radius*2.0),
+		"material_center":position+direction*length*.5,
+		"material_alpha":1.0 if active else 0.0,
 		"sprite_family":"laser","sprite_phase":release if active else 0.0,
 		"source_family":"emitter","source_phase":1.0 if active else progress,
 		"source_size":Vector2.ONE*(26.0 if active else 12.0+12.0*progress),
@@ -94,8 +91,40 @@ static func draw_preparation(canvas: CanvasItem, enemy: Dictionary, center: Vect
 	if sample.is_empty(): return
 	Sprites.draw_oriented(canvas,sample.family,sample.origin,sample.size,sample.angle,sample.phase,sample.tint)
 
-static func draw_beam(canvas: CanvasItem, start: Vector2, _finish: Vector2, sample: Dictionary) -> void:
+static func warning_capsule(start: Vector2, finish: Vector2, radius: float) -> PackedVector2Array:
+	var angle: float = Pose.normalized_aim(finish-start).angle()
+	var points := PackedVector2Array()
+	# Sample the same two semicircles used by the outline, including endpoints.
+	# The intervening polygon edges are the straight sides of the capsule.
+	for cap: Dictionary in [{"center":finish,"angle":angle-PI*.5},{"center":start,"angle":angle+PI*.5}]:
+		for step: int in range(25):
+			points.append(Vector2(cap.center)+Vector2.from_angle(float(cap.angle)+PI*float(step)/24.0)*radius)
+	return points
+
+static func draw_beam_warning(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
+	if not bool(sample.warning_visible): return
+	var perpendicular: Vector2 = Vector2(sample.direction).orthogonal()*float(sample.warning_radius)
+	var amber := Color("ffcb70")
+	var outline := Color("071219")
+	var foreground: Color = Color(amber,float(sample.warning_alpha))
+	canvas.draw_colored_polygon(warning_capsule(start,finish,float(sample.warning_radius)),Color(amber,float(sample.warning_fill_alpha)))
+	# The dark under-stroke separates these cues from both pale rock and dark
+	# foliage. The rounded ends are part of the real segment-circle hit shape;
+	# both fill and outline must include them, not just the center rectangle.
+	canvas.draw_line(start,finish,outline,4.5,true)
+	canvas.draw_line(start,finish,foreground,1.7,true)
+	for side: float in [-1.0,1.0]:
+		var offset: Vector2 = perpendicular*side
+		canvas.draw_line(start+offset,finish+offset,outline,2.8,true)
+		canvas.draw_line(start+offset,finish+offset,Color(amber,float(sample.warning_alpha)*.8),.9,true)
+	var angle: float = Vector2(sample.direction).angle()
+	for cap: Dictionary in [{"center":start,"angle":angle+PI*.5},{"center":finish,"angle":angle-PI*.5}]:
+		canvas.draw_arc(cap.center,float(sample.warning_radius),float(cap.angle),float(cap.angle)+PI,25,outline,2.8,true)
+		canvas.draw_arc(cap.center,float(sample.warning_radius),float(cap.angle),float(cap.angle)+PI,25,Color(amber,float(sample.warning_alpha)*.8),.9,true)
+
+static func draw_beam(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
 	var direction: Vector2 = sample.direction
+	draw_beam_warning(canvas,start,finish,sample)
 	if bool(sample.material_visible):
 		Sprites.draw_oriented(canvas,sample.material_family,start+direction*Vector2(sample.material_size).x*.5,sample.material_size,direction.angle(),sample.material_phase,Color(1,1,1,sample.material_alpha))
 	draw_source(canvas,start,direction,1.0 if bool(sample.active) else float(sample.progress),bool(sample.detail),bool(sample.active),float(sample.release))

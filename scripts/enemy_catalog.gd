@@ -16,7 +16,18 @@ static func catalog() -> Array:
 
 static func _entry(id: String, title: String, biome: String, attack: String, hp: float, radius: float, speed: float, reach: float, windup: float, cooldown: float, flying: bool, color: String) -> Dictionary:
 	return {"id": id, "name": title, "biome": biome, "attack_kind": attack, "health": hp, "radius": radius,
-		"speed": speed, "range": reach, "windup": windup, "cooldown": cooldown, "flying": flying, "color": Color(color)}
+		"speed": speed, "range": reach, "windup": attack_windup(attack, windup), "cooldown": cooldown, "flying": flying, "color": Color(color)}
+
+static func attack_windup(attack: String, fallback: float = 0.9) -> float:
+	# Only instant area/ray attacks need the longer reaction window. Bosses
+	# choose their actual pattern first, so their charges and volleys retain
+	# the original cadence. Neither difficulty nor elite status shortens this.
+	match attack:
+		"beam", "prism_beam", "burrow": return 1.5
+		"prism_cross": return 1.8
+		"stone_spikes", "spore_bloom": return 1.6
+		"mortar": return 1.4
+		_: return fallback
 
 static func definition(id: String) -> Dictionary:
 	for record in catalog():

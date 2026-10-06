@@ -18,18 +18,21 @@ static func area_sample(hazard: Dictionary, _fx_scale: float = 1.0, _reduced_mot
 	if organic and not active:
 		# A compact sealed pod promises a later burst. Stretching it across the
 		# future radius would turn the seed into an unrelated flat cloud.
-		size_value = Vector2.ONE * (18.0 + progress * 8.0)
+		size_value = Vector2.ONE * (36.0 + progress * 8.0)
 	elif not organic:
 		# Burrow/spikes are authored 17px above their support surface. Their
 		# warning is a shallow disturbance there, and the eruption reaches the
 		# top of the actual danger area. Airborne spores retain their true Y.
-		size_value.y = radius + 17.0 if active else 14.0
+		size_value.y = radius + 17.0 if active else 22.0
 		offset.y = 17.0 - size_value.y * 0.5
 	return {"origin": hazard.get("pos", Vector2.ZERO), "radius": radius,
 		"active": active, "progress": progress, "phase": release if active else progress,
-		"material_alpha": 1.0 if active else 0.64 + progress * 0.18,
+		"material_alpha": 1.0,
 		"size": size_value, "draw_offset": offset, "family": area_family(kind, active),
-		"color": material_color if active else material_color.darkened(0.2),
+		"color": material_color,
+		"warning_visible": not active, "warning_origin": hazard.get("pos", Vector2.ZERO),
+		"warning_radius": radius, "warning_alpha": 0.9 + progress * 0.1,
+		"warning_fill_alpha": 0.065, "warning_progress": progress,
 		"release": release}
 
 static func area_family(kind: String, active: bool) -> String:
@@ -40,6 +43,22 @@ static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary)
 	var tint: Color = sample.color
 	tint.a = float(sample.material_alpha)
 	var center: Vector2 = position + Vector2(sample.draw_offset)
+	if bool(sample.warning_visible):
+		# A continuous dark-backed amber boundary gives the player useful
+		# space/time information even when the terrain sprite blends in.
+		var radius: float = float(sample.warning_radius)
+		var warning: Color = Color("ffcb70")
+		warning.a = float(sample.warning_alpha)
+		canvas.draw_circle(position, radius, Color(warning, float(sample.warning_fill_alpha)), true, -1, true)
+		canvas.draw_arc(position, radius, 0, TAU, 48, Color("071219"), 5.0, true)
+		canvas.draw_arc(position, radius, 0, TAU, 48, warning, 2.0, true)
+		var progress: float = float(sample.warning_progress)
+		if progress > 0.001:
+			canvas.draw_arc(position, radius - 4.0, -PI * 0.5, -PI * 0.5 + TAU * progress, 48, Color("fff0b1"), 1.6, true)
+		if str(sample.family) == "spore_ready":
+			# The seed can coincide with the player's torso. A compact dark
+			# backing and full-opacity seed keep its first frame recognizable.
+			canvas.draw_circle(center, Vector2(sample.size).x * 0.47, Color(0.025, 0.055, 0.065, 0.8), true, -1, true)
 	# Every active frame remains solid. There is no generic blast or lingering
 	# damaging-looking cloud after the authority removes this hazard.
 	Sprites.draw_family(canvas, str(sample.family), Rect2(center - Vector2(sample.size) * 0.5, sample.size), float(sample.phase), tint)
