@@ -4,10 +4,11 @@ extends RefCounted
 ## Authored transparent animation sheets. Regions and anchors are fixed data;
 ## drawing allocates no textures and never changes the caller's transform.
 const MANIFEST_PATH: String = "res://assets/fx/v020/manifest.json"
-const MANIFEST_PATHS: Array[String] = [MANIFEST_PATH, "res://assets/fx/v0201/manifest.json"]
+const MANIFEST_PATHS: Array[String] = [MANIFEST_PATH, "res://assets/fx/v0202/manifest.json"]
 const MAX_BYTES: int = 32 * 1024 * 1024
 static var _families: Dictionary = {}
 static var _textures: Dictionary = {}
+static var _sources: Dictionary = {}
 static var _loaded: bool = false
 static var _bytes: int = 0
 
@@ -19,14 +20,19 @@ static func prepare() -> void:
 		if parsed is Dictionary: _families.merge(parsed.get("families", {}))
 	for family: String in _families:
 		var info: Dictionary = _families[family]
-		var texture: Texture2D = load(str(info.path)) as Texture2D
+		var source_path: String = str(info.path)
+		if _sources.has(source_path):
+			_textures[family] = _sources[source_path]
+			continue
+		var texture: Texture2D = load(source_path) as Texture2D
 		if texture == null: continue
 		var memory: int = texture.get_width() * texture.get_height() * 4
 		if _bytes + memory > MAX_BYTES: continue
 		var sampled := CanvasTexture.new()
 		sampled.diffuse_texture = texture
-		sampled.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sampled.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if info.get("filter", "linear") == "nearest" else CanvasItem.TEXTURE_FILTER_LINEAR
 		_textures[family] = sampled
+		_sources[source_path] = sampled
 		_bytes += memory
 
 static func frame_index(family: String, progress: float) -> int:
@@ -41,7 +47,7 @@ static func frame_data(family: String, progress: float) -> Dictionary:
 	var frame: Dictionary = info.frames[index]
 	var source: Array = frame.region
 	var source_size: Array = info.source_size
-	var reference: Array = info.reference
+	var reference: Array = frame.get("reference", info.reference)
 	var anchor: Array = frame.anchor
 	return {"texture": _textures[family], "index": index,
 		"region": Rect2(source[0], source[1], source[2], source[3]),
@@ -68,4 +74,4 @@ static func draw_oriented(canvas: CanvasItem, family: String, origin: Vector2, s
 
 static func cache_stats() -> Dictionary:
 	prepare()
-	return {"families": _families.size(), "textures": _textures.size(), "bytes": _bytes, "max_bytes": MAX_BYTES}
+	return {"families": _textures.size(), "textures": _sources.size(), "bytes": _bytes, "max_bytes": MAX_BYTES}

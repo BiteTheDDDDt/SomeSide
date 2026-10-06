@@ -1,6 +1,6 @@
 extends SceneTree
 
-const Fixtures = preload("res://tools/capture-natural-warnings-v0201.gd")
+const Fixtures = preload("res://tools/capture-attack-phases-v0202.gd")
 const World = preload("res://scripts/world_view.gd")
 const Beam = preload("res://scripts/enemy_attack_visual.gd")
 const DT: float = 1.0 / 60.0
@@ -22,6 +22,8 @@ func _run() -> void:
 		for attack: String in Fixtures.CASES:
 			await _real_attack(attack)
 		await _locked_dodge()
+		_test_distinct_attack_phases()
+		_test_airborne_spores()
 		_test_no_auxiliary_primitives()
 	print("NATURAL_WARNINGS_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
@@ -83,7 +85,14 @@ func _real_attack(attack: String) -> void:
 				samples.append(data)
 				var alpha: float = float(data.get("material_alpha", 0.0))
 				var size: Vector2 = data.get("material_size", data.get("size", Vector2.ZERO))
-				var valid: bool = alpha > 0.0 and is_finite(alpha) and size.is_finite() and size.x > 0 and size.y > 0
+				var valid: bool = is_finite(alpha) and size.is_finite() and size.x > 0 and size.y > 0
+				if str(hazard.shape) == "line":
+					# The compact emitter warns early; a full path should NOT be
+					# visible before the last third of the windup.
+					valid = valid and float(data.get("source_alpha", 0.0)) > 0.0
+					valid = valid and (alpha > 0.0 if bool(data.get("material_visible", false)) else alpha == 0.0)
+				else:
+					valid = valid and alpha > 0.0
 				if bool(hazard.active): active_samples_valid = active_samples_valid and valid; active_material = true
 				else: slow_samples_valid = slow_samples_valid and valid; warning_material = true
 			for variant: Dictionary in samples:
@@ -110,7 +119,7 @@ func _real_attack(attack: String) -> void:
 	_check(not bad_effect, attack + ": real hostile events never reintroduce geometric explosion rings or blasts")
 	if not original_hazards.is_empty():
 		_check(locked, attack + ": authority origin, direction, range and radius stay locked in every material setting")
-		_check(warning_material and active_material and slow_samples_valid and active_samples_valid, attack + ": both windup and damaging phases retain visible material even with FX disabled")
+		_check(warning_material and active_material and slow_samples_valid and active_samples_valid, attack + ": the appropriate source/area signal remains visible at low FX in both phases")
 		_check(active_seen and not damage_before_active and sim.state.hazards.is_empty() and enemy_releases > 0, attack + ": hazard activation and expiry retain their existing damage window")
 	if attack == "blink":
 		_check(str(enemy.attack_kind) == "salvo" and int(enemy.attack_count) == 0, "Blink still transitions into its separately warned salvo, without a fabricated hazard")
@@ -149,15 +158,81 @@ func _function_text(source: String, name: String) -> String:
 	if next_static >= 0 and (end < 0 or next_static < end): end = next_static
 	return source.substr(start, source.length() - start if end < 0 else end - start)
 
+func _test_distinct_attack_phases() -> void:
+	for attack: String in ["beam", "prism_beam", "prism_cross", "mortar", "burrow", "stone_spikes", "spore_bloom"]:
+		var history: Dictionary = Fixtures.phase_samples(attack)
+		var states: Array = []
+		for index: int in history.selected: states.append(history.history[index].state)
+		var early: Dictionary = states[0].hazards[0]
+		var late: Dictionary = states[1].hazards[0]
+		var active: Dictionary = states[2].hazards[0]
+		_check(not early.active and not late.active and active.active and float(active.ttl) > 0.0, attack + ": photography uses real hazard activation, not an attacker animation timer")
+		var valid: bool = true
+		var distinct: bool = true
+		var aligned: bool = true
+		for option: Array in [[1.0, false], [0.0, false], [0.0, true]]:
+			var data: Array = []
+			for hazard: Dictionary in [early, late, active]:
+				var saved: PackedByteArray = var_to_bytes(hazard)
+				data.append(Beam.beam_sample(hazard, option[0], option[1]) if str(hazard.shape) == "line" else Natural.area_sample(hazard, option[0], option[1]))
+				aligned = aligned and var_to_bytes(hazard) == saved
+			if str(early.shape) == "line":
+				valid = valid and not bool(data[0].material_visible) and float(data[0].material_alpha) == 0.0 and float(data[0].source_alpha) >= 0.5
+				valid = valid and bool(data[1].material_visible) and float(data[1].material_alpha) > 0.0 and float(data[1].material_alpha) <= 0.3
+				valid = valid and Vector2(data[1].material_size).x <= 64.0 and Vector2(data[1].material_size).x < float(late.length) * 0.15
+				distinct = distinct and bool(data[2].material_visible) and data[2].material_family == "laser" and float(data[2].material_alpha) == 1.0
+				distinct = distinct and is_equal_approx(Vector2(data[2].material_size).x, float(active.length))
+				distinct = distinct and Vector2(data[2].material_size).y >= Vector2(data[1].material_size).y * 2.0
+				aligned = aligned and data[0].origin == data[1].origin and data[1].origin == data[2].origin and data[0].end == data[2].end
+			else:
+				var material: String = "spore" if str(early.kind) in ["spore_mortar", "boss_spore"] else ("stone" if str(early.kind) == "stone_spike" else "earth")
+				valid = valid and data[0].family == material + "_ready" and data[1].family == material + "_ready" and data[2].family == material + "_hit"
+				valid = valid and float(data[0].phase) < float(data[1].phase) and float(data[2].phase) >= 0 and float(data[2].phase) <= 1
+				if material == "spore":
+					for ready: Dictionary in [data[0], data[1]]:
+						var seed_size: Vector2 = ready.size
+						valid = valid and is_equal_approx(seed_size.x, seed_size.y) and seed_size.x >= 18.0 and seed_size.x <= 26.0
+				distinct = distinct and Vector2(data[0].size).y <= 30.0 and Vector2(data[1].size).y <= 30.0
+				distinct = distinct and Vector2(data[2].size).y >= Vector2(data[1].size).y * 2.0 and float(data[2].material_alpha) == 1.0 and float(data[1].material_alpha) <= 0.82
+				for sample: Dictionary in data:
+					if material == "spore": aligned = aligned and Vector2(sample.draw_offset) == Vector2.ZERO
+					else: aligned = aligned and is_equal_approx(Vector2(sample.draw_offset).y + Vector2(sample.size).y * 0.5, 17.0)
+		_check(valid, attack + ": early/late ready signals match the actual attack material and only active selects the hit form")
+		_check(distinct, attack + ": damage has a substantially larger opaque silhouette than harmless preparation at every FX setting")
+		_check(aligned, attack + ": phase selection preserves immutable origins and the correct ground or airborne anchor")
+	for attack: String in ["charge", "stone_charge", "pounce"]:
+		var setup: Dictionary = Fixtures.fixture(attack)
+		var enemy: Dictionary = setup.enemy
+		var local: Dictionary = Beam.preparation_sample(enemy, Vector2.ZERO, Vector2.RIGHT, 0.82, 17.0)
+		_check(Vector2(local.size).x <= 55.0 and Vector2(local.origin).length() < 32.0 and local.family == "earth_ready", attack + ": preparation stays under the body instead of drawing a future charge runway")
+
+func _test_airborne_spores() -> void:
+	for attack: String in ["airborne_mortar", "airborne_spore_bloom"]:
+		var setup: Dictionary = Fixtures.fixture(attack)
+		var sim = setup.sim
+		var original: Dictionary = sim.state.hazards[0].duplicate(true)
+		var airborne: bool = Vector2(original.pos).y < float(sim.state.floor_y) - 100.0
+		var preserved: bool = true
+		var active_seen: bool = false
+		for tick: int in range(70):
+			for hazard: Dictionary in sim.state.hazards:
+				if int(hazard.id) != int(original.id): continue
+				var sample: Dictionary = Natural.area_sample(hazard, 0.0, true)
+				preserved = preserved and hazard.pos == original.pos and sample.origin == original.pos and sample.draw_offset == Vector2.ZERO
+				preserved = preserved and sample.family == ("spore_hit" if hazard.active else "spore_ready")
+				active_seen = active_seen or bool(hazard.active)
+			sim.step(DT, {})
+		_check(airborne and preserved and active_seen and sim.state.players[1].grounded, attack + ": spores stay at the locked airborne center even after their target lands")
+
 func _test_no_auxiliary_primitives() -> void:
 	# Static guard complements the actual native captures: these exact World
 	# entry points must not quietly restore lines/rings behind natural sprites.
 	var world_source: String = FileAccess.get_file_as_string("res://scripts/world_view.gd")
 	var material_source: String = FileAccess.get_file_as_string("res://scripts/natural_threats.gd")
 	var beam_source: String = FileAccess.get_file_as_string("res://scripts/enemy_attack_visual.gd")
-	for record: Array in [[world_source, "_draw_threat_overlays"], [world_source, "_draw_hazard"], [material_source, "draw_area"], [beam_source, "draw_beam"], [beam_source, "draw_lane"]]:
+	for record: Array in [[world_source, "_draw_threat_overlays"], [world_source, "_draw_hazard"], [material_source, "draw_area"], [beam_source, "draw_beam"]]:
 		var body: String = _function_text(record[0], record[1])
 		var safe: bool = not body.is_empty()
-		for primitive: String in ["draw_line(", "draw_arc(", "draw_circle(", "draw_polyline(", "draw_colored_polygon(", "_draw_dashes("]:
+		for primitive: String in ["draw_line(", "draw_arc(", "draw_circle(", "draw_polyline(", "draw_colored_polygon(", "_draw_dashes(", "_draw_warning_lane("]:
 			if body.contains(primitive): safe = false
 		_check(safe, record[1] + ": the live path contains no auxiliary geometry drawing calls")

@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Art = preload("res://scripts/enemy_attack_visual.gd")
+const Projectiles = preload("res://scripts/projectile_renderer.gd")
 const Simulation = preload("res://scripts/simulation.gd")
 const World = preload("res://scripts/world_view.gd")
 var passed: int = 0
@@ -25,31 +26,62 @@ func _run() -> void:
 		_check(full.position.distance_to(release.position)<.02 and full.size.distance_to(release.size)<.02,attack+": release begins at the prepared body pose without popping")
 		enemy.attack_cd=2.70
 		_check(Art.body_rect(original,enemy)==original,attack+": recovery returns exactly to the original sprite rectangle")
-	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":.36,"telegraph_max":.9,"active":false,"ttl":.22}
-	var normal: Dictionary = Art.beam_sample(pending)
-	_check(normal.sprite_family=="ion_stream" and is_equal_approx(float(normal.sprite_phase),.6),"The replicated windup timer selects the wide ionized-vapor sequence")
-	for settings: Array in [[0.0,false],[.5,false],[1.0,true],[2.0,false]]:
-		var sample: Dictionary = Art.beam_sample(pending,settings[0],settings[1])
-		_check(sample.origin==normal.origin and sample.end==normal.end and sample.radius==normal.radius and sample.material_size==normal.material_size and sample.material_alpha==normal.material_alpha,"FX settings preserve the locked extent and visibility of the warning material")
-		_check(not Art.Sprites.frame_data(sample.material_family,sample.material_phase).is_empty() and float(sample.material_alpha)>=.35,"Low FX still selects a loaded visible painted warning frame")
-	var saved_pending: PackedByteArray = var_to_bytes(pending)
-	_check(Art.beam_sample(pending)==Art.beam_sample(pending) and var_to_bytes(pending)==saved_pending,"Identical remote or paused snapshots produce identical charge samples without history")
-	pending.active=true
-	var first: Dictionary = Art.beam_sample(pending)
-	pending.ttl=.001
-	var last: Dictionary = Art.beam_sample(pending)
-	_check(first.sprite_family=="beam" and first.sprite_phase<last.sprite_phase,"Active beam lifetime advances the actual textured release frames")
-	_check(Art.Sprites.frame_index(first.sprite_family,first.sprite_phase)<Art.Sprites.frame_index(last.sprite_family,last.sprite_phase),"The fired textured beam advances through its authored decay frames")
-	_check(first.material_size==last.material_size and first.material_alpha==last.material_alpha and first.radius==last.radius,"Residual ionized vapor remains across the full live hazard until authority expiry")
-	var lane: Array[Dictionary]=Art.lane_sample(Vector2.ZERO,Vector2(249.4,0),25.0,.6)
-	_check(lane.size()==3 and lane[0].size!=lane[1].size and lane[1].size!=lane[2].size,"Charge warnings use three unequal overlapping dust volumes")
-	_check(lane[0].origin.distance_to(lane[1].origin)!=lane[1].origin.distance_to(lane[2].origin),"Dust disturbance has natural nonuniform spacing rather than repeated markers")
-	_check(lane==Art.lane_sample(Vector2.ZERO,Vector2(249.4,0),25.0,.6),"Paused charge warnings retain their exact material phase and position")
-	var left_lane: Array[Dictionary]=Art.lane_sample(Vector2.ZERO,Vector2(-249.4,0),25.0,.6)
-	_check(left_lane[0].origin.x<0 and left_lane[0].origin.y==lane[0].origin.y and left_lane[0].angle==0.0,"Leftward charge dust stays grounded instead of rotating its cloud upside down")
+	_test_beam_phases()
+	_test_source_materials()
 	await _real_locked_attack()
 	print("ENEMY_ATTACK_VISUALS_TEST_RESULT passed=",passed," failed=",failed)
 	quit(0 if failed==0 else 1)
+
+func _test_beam_phases() -> void:
+	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":.36,"telegraph_max":.9,"active":false,"ttl":.22}
+	var normal: Dictionary = Art.beam_sample(pending)
+	_check(not bool(normal.material_visible) and is_zero_approx(normal.material_alpha),"Early windup does not fill safe ground with a laser-shaped cloud")
+	_check(normal.source_family=="emitter" and normal.source_size.x<=26 and normal.source_alpha>=.6,"Early windup remains visible at a compact charging emitter")
+	pending.delay=.09
+	var late: Dictionary = Art.beam_sample(pending)
+	_check(late.material_visible and late.material_alpha>0 and late.material_alpha<=.24,"Only late windup reveals a restrained tongue of energy at the locked muzzle")
+	_check(late.material_family=="laser" and late.material_size.x<=64.0 and late.material_size.y==late.radius and (late.preview_end-late.origin).normalized().is_equal_approx(late.direction),"The late warning is a short directional muzzle tongue, never a full aiming ray")
+	for settings: Array in [[0.0,false],[.5,false],[1.0,true],[2.0,false]]:
+		var sample: Dictionary = Art.beam_sample(pending,settings[0],settings[1])
+		_check(sample.origin==late.origin and sample.end==late.end and sample.radius==late.radius and sample.material_size==late.material_size and sample.material_alpha==late.material_alpha and sample.source_alpha==late.source_alpha,"FX settings preserve locked geometry and both charging cues")
+		_check(not Art.Sprites.frame_data(sample.material_family,sample.material_phase).is_empty() and not Art.Sprites.frame_data(sample.source_family,sample.source_phase).is_empty(),"Low FX has loaded frames for the late laser and its compact emitter")
+	var saved_pending: PackedByteArray = var_to_bytes(pending)
+	_check(Art.beam_sample(pending)==Art.beam_sample(pending) and var_to_bytes(pending)==saved_pending,"Identical remote or paused snapshots produce identical samples without history")
+	pending.active=true
+	pending.delay=0.0
+	var first: Dictionary = Art.beam_sample(pending)
+	pending.ttl=.001
+	var last: Dictionary = Art.beam_sample(pending)
+	_check(first.material_visible and last.material_visible and first.material_alpha==1.0 and last.material_alpha==1.0,"Actual damage keeps an opaque laser from the first to the final active instant")
+	_check(first.material_size==Vector2(720,24) and first.material_size==last.material_size,"Live damage never shrinks or fades its visible footprint before authority expiry")
+	_check(first.material_size.y>=late.material_size.y*2 and first.material_size.x>late.material_size.x*10 and first.material_alpha>late.material_alpha*4,"Active damage becomes a long, thick opaque beam instead of compact harmless muzzle energy")
+	_check(first.material_family==late.material_family and first.source_family==late.source_family,"Windup and firing share the same emitter and laser material")
+	_check(Art.Sprites.frame_index(first.material_family,first.material_phase)<Art.Sprites.frame_index(last.material_family,last.material_phase),"The fired laser advances through authored sustaining frames")
+	for ttl: float in [.22,.17,.11,.05,.001]:
+		pending.ttl=ttl
+		var active: Dictionary=Art.beam_sample(pending,0.0,true)
+		_check(active.material_alpha==1.0 and active.material_size==first.material_size and active.source_alpha==1.0,"Each live phase remains fully readable even with all optional effects disabled")
+
+func _test_source_materials() -> void:
+	for kind: String in ["charge","stone_charge","pounce"]:
+		var actor: Dictionary={"attack_kind":kind,"radius":23.0}
+		var before: PackedByteArray=var_to_bytes(actor)
+		var right: Dictionary=Art.preparation_sample(actor,Vector2(100,200),Vector2.RIGHT,.8,17)
+		var left: Dictionary=Art.preparation_sample(actor,Vector2(100,200),Vector2.LEFT,.8,17)
+		_check(right.origin==left.origin and right.origin.distance_to(Vector2(100,217))<=4 and right.size.x<=52,"A "+kind+" only disturbs the ground directly beneath its braced feet")
+		_check(right==Art.preparation_sample(actor,Vector2(100,200),Vector2.RIGHT,.8,17) and var_to_bytes(actor)==before,kind+" preparation is stable while paused and cannot change the attack")
+	for kind: String in ["mortar","burrow","stone_spikes","spore_bloom","blink"]:
+		_check(Art.preparation_sample({"attack_kind":kind},Vector2.ZERO,Vector2.RIGHT,.9,17).is_empty(),kind+" does not display an unrelated muzzle flash alongside its own destination material")
+	for pair: Array in [["spit","spit"],["mend","energy"]]:
+		var bud: Dictionary=Art.preparation_sample({"attack_kind":pair[0],"radius":23.0},Vector2.ZERO,Vector2.RIGHT,.95,17)
+		var bullet: Dictionary=Projectiles.enemy_sample(pair[1],6.0,.1)
+		_check(bud.family==bullet.family and bud.tint.a<bullet.tint.a and bud.size.x<bullet.size.x and bud.origin==Vector2(26,0),"The "+pair[0]+" source forms a smaller, dimmer copy of the actual harmful ammunition")
+	_check(Projectiles.enemy_sample("spit",6,.2).family=="spore_shot" and Projectiles.enemy_sample("crystal",6,.2).family=="crystal_shot","Organic and crystal enemies shoot distinct authored materials")
+	_check(Projectiles.enemy_sample("energy",6,.2).family=="crystal_shot","A conductor's harmful guided projectile is coral ammunition, distinct from mint healing")
+	for kind: String in ["spit","crystal","pulse","energy","boss_spore_orb"]:
+		for age: float in [0.0,.1,.3,1.25]:
+			var sample: Dictionary=Projectiles.enemy_sample(kind,6,age)
+			_check(sample.tint.a==1.0 and sample.size.y>=12.0 and not Art.Sprites.frame_data(sample.family,sample.phase).is_empty(),kind+" retains its opaque body throughout travel")
 
 func _real_locked_attack() -> void:
 	var sim = Simulation.new()

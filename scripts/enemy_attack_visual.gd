@@ -42,65 +42,60 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 	var active: bool = bool(hazard.get("active",false))
 	var progress: float = clampf(1.0-float(hazard.get("delay",0.0))/maxf(.01,float(hazard.get("telegraph_max",.8))),0,1)
 	var release: float = clampf(1.0-float(hazard.get("ttl",ACTIVE_LIFETIME))/ACTIVE_LIFETIME,0,1) if active else 0.0
-	# This broad painted volume carries the warning; FX quality never changes
-	# its reach, thickness, alpha or locked direction. No geometric overlay.
+	# The emitter gathers energy, then grows a short tongue at its muzzle.
+	# It never draws an aiming ray across safe ground before the actual shot.
+	# Live hazards keep a full-width opaque core until authority removes them;
+	# the four firing frames sustain the beam, they never depict a fading blast.
+	var late: float = smoothstep(.65,1.0,progress)
+	var preview_length: float = 24.0+40.0*late
+	var material_length: float = length if active else preview_length
 	return {"origin":position,"end":position+direction*length,"direction":direction,"radius":radius,"active":active,"progress":progress,"release":release,
-		"material_family":"ion_stream","material_phase":1.0 if active else progress,
-		"material_size":Vector2(length+radius*2.0,radius*2.4),
-		"material_alpha":.52 if active else .36+.34*progress,
-		"sprite_family":"beam" if active else "ion_stream","sprite_phase":release if active else progress,
+		"material_family":"laser","material_phase":release if active else 0.0,
+		"material_visible":active or late>0.0,
+		"material_size":Vector2(material_length,radius*(2.0 if active else 1.0)),
+		"material_center":position+direction*material_length*.5,
+		"preview_end":position+direction*preview_length,
+		"material_alpha":1.0 if active else .24*late,
+		"sprite_family":"laser","sprite_phase":release if active else 0.0,
+		"source_family":"emitter","source_phase":1.0 if active else progress,
+		"source_size":Vector2.ONE*(26.0 if active else 12.0+12.0*progress),
+		"source_alpha":1.0 if active else .6+.3*progress,
 		"detail":not reduced_motion and fx_scale>=.6}
 
-static func draw_source(canvas: CanvasItem, origin: Vector2, direction: Vector2, progress: float, detail: bool, active: bool = false, release: float = 0.0) -> void:
-	# The visible action is an authored eight-frame painted sequence. Even the
-	# low-FX path keeps the emitter sprite; optional wisps are in the same atlas.
-	var family: String = "burst" if active else "charge"
-	var phase: float = clampf(release,0,1) if active else clampf(progress,0,1)
-	var extent: float = 48.0 if active else 37.0 + 11.0 * progress
-	if not detail: extent *= .9
-	Sprites.draw_oriented(canvas,family,origin,Vector2.ONE*extent,direction.angle(),phase,Color(1,1,1,.92 if active else .68+.32*progress))
+static func draw_source(canvas: CanvasItem, origin: Vector2, direction: Vector2, progress: float, _detail: bool, active: bool = false, _release: float = 0.0) -> void:
+	var phase: float = 1.0 if active else clampf(progress,0,1)
+	var extent: float = 26.0 if active else 12.0+12.0*phase
+	Sprites.draw_oriented(canvas,"emitter",origin,Vector2.ONE*extent,direction.angle(),phase,Color(1,1,1,1.0 if active else .6+.3*phase))
 
-static func draw_preparation(canvas: CanvasItem, enemy: Dictionary, center: Vector2, direction: Vector2, progress: float, foot: float, detail: bool) -> void:
+static func preparation_sample(enemy: Dictionary, center: Vector2, direction: Vector2, progress: float, foot: float) -> Dictionary:
 	var kind: String = str(enemy.get("attack_kind",""))
+	var phase: float = clampf(progress,0,1)
 	if kind in ["charge","stone_charge","pounce"]:
-		var extent: float = 63.0 if kind=="stone_charge" else 40.0
-		# A low, dusty burst compresses under the feet, with the sprite's own
-		# billowing texture replacing the old stroked grit and circles.
-		Sprites.draw_family(canvas,"burst",Rect2(center+Vector2(-extent*.5,foot-extent*.34),Vector2(extent,extent*.45)),.5+progress*.38,Color(.75,.70,.61,.35+.4*progress))
-		return
-	var origin: Vector2 = center+direction*float(enemy.get("radius",23.0))*.65
-	if kind in ["spit","mortar","spore_volley","spore_bloom"]:
-		var extent: float = 24.0+14.0*progress
-		Sprites.draw_oriented(canvas,"burst",origin,Vector2.ONE*extent,direction.angle(),progress*.4,Color(.82,1.0,.68,.75+progress*.25))
-		return
-	draw_source(canvas,origin,direction,progress,detail)
+		var width: float = 52.0 if kind=="stone_charge" else 30.0
+		# Clods collect directly under braced feet. They do not paint a runway
+		# across safe ground or pretend the charge has already happened.
+		return {"family":"earth_ready","origin":center+Vector2(0,foot-3.0),
+			"size":Vector2(width,10.0 if kind=="stone_charge" else 7.0),
+			"angle":0.0,"phase":phase,"tint":Color(.78,.78,.78,.48+.2*phase)}
+	if kind in ["spit","mend"]:
+		var extent: float = 7.0+6.0*phase
+		var origin: Vector2 = center+direction*(float(enemy.get("radius",19.0))+3.0)
+		# The seed/crystal forming at the muzzle becomes the actual ammunition.
+		# A conductor's harmful crystal remains coral; its healing uses mint.
+		return {"family":"spore_shot" if kind=="spit" else "crystal_shot","origin":origin,
+			"size":Vector2.ONE*extent,"angle":direction.angle(),"phase":phase,
+			"tint":Color(.72,.72,.72,.7+.15*phase)}
+	# Terrain attacks telegraph at their destination, blink uses paired rifts,
+	# and spread attacks expose individual ammunition at each firing port.
+	return {}
 
-static func draw_beam(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
+static func draw_preparation(canvas: CanvasItem, enemy: Dictionary, center: Vector2, direction: Vector2, progress: float, foot: float, _detail: bool) -> void:
+	var sample: Dictionary = preparation_sample(enemy,center,direction,progress,foot)
+	if sample.is_empty(): return
+	Sprites.draw_oriented(canvas,sample.family,sample.origin,sample.size,sample.angle,sample.phase,sample.tint)
+
+static func draw_beam(canvas: CanvasItem, start: Vector2, _finish: Vector2, sample: Dictionary) -> void:
 	var direction: Vector2 = sample.direction
-	# Transparent painted vapor covers the entire locked path. Its internal
-	# ribbons gather into the firing sequence without lines, circles or caps.
-	Sprites.draw_oriented(canvas,sample.material_family,start.lerp(finish,.5),sample.material_size,direction.angle(),sample.material_phase,Color(1,1,1,sample.material_alpha))
-	if bool(sample.active):
-		Sprites.draw_oriented(canvas,"beam",start.lerp(finish,.5),Vector2(start.distance_to(finish),float(sample.radius)*2.15),direction.angle(),sample.release,Color.WHITE)
+	if bool(sample.material_visible):
+		Sprites.draw_oriented(canvas,sample.material_family,start+direction*Vector2(sample.material_size).x*.5,sample.material_size,direction.angle(),sample.material_phase,Color(1,1,1,sample.material_alpha))
 	draw_source(canvas,start,direction,1.0 if bool(sample.active) else float(sample.progress),bool(sample.detail),bool(sample.active),float(sample.release))
-
-static func lane_sample(start: Vector2, finish: Vector2, radius: float, progress: float) -> Array[Dictionary]:
-	var direction: Vector2 = (finish-start).normalized()
-	var length: float = start.distance_to(finish)
-	var stamps: Array[Dictionary] = []
-	# Three overlapping unequal volumes read as disturbed earth, not repeated
-	# markers. Both placement and phase are deterministic in a paused snapshot.
-	var centers: Array[float] = [.12,.43,.79]
-	var widths: Array[float] = [.38,.48,.42]
-	var heights: Array[float] = [.62,.80,.52]
-	for index: int in range(3):
-		stamps.append({"family":"dust_cloud",
-			"origin":start+direction*(length*centers[index])+Vector2(0,-radius*heights[index]*.25),
-			"size":Vector2(length*widths[index],maxf(12.0,radius*heights[index])),
-			"angle":0.0,"phase":fposmod(progress*.65+index*.27,1.0),
-			"alpha":.38+progress*.28})
-	return stamps
-
-static func draw_lane(canvas: CanvasItem, start: Vector2, finish: Vector2, radius: float, progress: float, _detail: bool) -> void:
-	for stamp: Dictionary in lane_sample(start,finish,radius,progress):
-		Sprites.draw_oriented(canvas,stamp.family,stamp.origin,stamp.size,stamp.angle,stamp.phase,Color(.88,.77,.60,stamp.alpha))

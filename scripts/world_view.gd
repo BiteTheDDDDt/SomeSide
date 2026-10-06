@@ -762,9 +762,8 @@ func push_events(events: Array) -> void:
 			"shoot":
 				var enemy_shot: bool = event.get("enemy", false)
 				if enemy_shot:
-					_add_effect({"kind":"hostile_natural", "family":"burst", "pos":position_value,
-						"size":Vector2(31, 25), "angle":direction.angle(), "color":Color.WHITE, "age":0.0, "life":0.18})
-					_burst(position_value,Color("efc693"),3,75.0,0.22,direction,0.5,"ember")
+					# The solid projectile leaves its matching prepared ammunition.
+					# A second stationary flash looks like another damaging object.
 					continue
 				var weapon: String = str(event.get("weapon", event.get("kind", "bullet")))
 				var shot_color: Color = Color("f4a08b") if enemy_shot else (Color("a6dfff") if str(event.get("kind", "")) in ["rail", "railgun"] else GOLD)
@@ -808,10 +807,9 @@ func push_events(events: Array) -> void:
 					# Hazards already animate their release from the snapshot. Never
 					# send hostile events through the player's ring/blast path.
 					if repair or not bool(event.get("visual_only",false)):
-						var extent: float = 54.0 if repair else clampf(float(event.get("radius",48.0))*1.9,32.0,300.0)
-						_add_effect({"kind":"hostile_natural", "family":"charge" if repair else "burst", "pos":position_value,
-							"size":Vector2.ONE*extent, "color":Color(0.95,1,0.72) if repair else Color.WHITE, "age":0.0, "life":0.45})
-					_burst(position_value,Color("dcc590"),5,55.0,0.4,Vector2.UP,PI,"ember" if repair else "fragment")
+						var extent: float = 22.0 if repair else clampf(float(event.get("radius",48.0))*2.0,32.0,300.0)
+						_add_effect({"kind":"hostile_natural", "family":"repair" if repair else NaturalThreats.area_family(str(event.get("kind","")),true), "pos":position_value,
+							"size":Vector2.ONE*extent, "color":Color.WHITE, "age":0.0, "life":0.18 if repair else 0.1})
 					continue
 				var healing: bool = event.get("healing", false)
 				var shielding: bool = event.get("shield", false)
@@ -856,8 +854,11 @@ func push_events(events: Array) -> void:
 			"dash":
 				if bool(event.get("enemy",false)):
 					var burrowing: bool = str(event.get("kind","")) == "burrow"
-					_add_effect({"kind":"hostile_natural", "family":"dust_cloud" if burrowing else "charge", "pos":position_value,
-						"size":Vector2(76,62) if burrowing else Vector2(42,70), "color":Color.WHITE, "age":0.0, "life":0.36})
+					# Burrowing already has an authority-timed eruption; do not
+					# add a second effect that outlives its damage window.
+					if not burrowing:
+						_add_effect({"kind":"hostile_natural", "family":"rift", "pos":position_value,
+							"size":Vector2(22,44), "color":Color.WHITE, "age":0.0, "life":0.14})
 					continue
 				var rushing: bool = str(event.get("ability", "")) == "shoulder_rush"
 				var dash_color: Color = GOLD if rushing else (Color("eea27c") if bool(event.get("enemy",false)) else TEAL)
@@ -1746,10 +1747,6 @@ func _draw_threat_overlays() -> void:
 		if attack not in ["beam","prism_beam","prism_cross"] and _visible(p,100.0):
 			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,Entities.enemy_bounds(enemy).end.y,detail)
 		match attack:
-			"charge", "stone_charge":
-				var reach: float = 249.4 if attack=="charge" else 266.4
-				var feet: Vector2 = p+Vector2(0,Entities.enemy_bounds(enemy).end.y)
-				_draw_warning_lane(feet,feet+direction*reach,25.0 if attack=="charge" else 43.0,progress)
 			"blink":
 				var destination: Vector2 = world_to_screen(enemy.get("blink_target",enemy.get("pos",Vector2.ZERO)))
 				if _visible(destination,45) or _visible(p,45):
@@ -1760,11 +1757,12 @@ func _draw_threat_overlays() -> void:
 				for index: int in range(count):
 					var spacing: float = 0.21 if attack=="spore_volley" else 0.2
 					var ray: Vector2 = direction.rotated((index-(count-1)*0.5)*spacing)
-					var start: float = 49.0 if str(enemy.get("kind",""))=="boss" else 23.0
+					var start: float = float(enemy.get("radius",19.0))+3.0
 					if count>1:
 						# Charged spores/ports form at the mouth; no future path is drawn.
-						var seed: Vector2 = p+ray*(start+4.0*progress)
-						EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(seed-Vector2(9,9),Vector2(18,18)),progress,Color(1,1,1,.65+progress*.25))
+						var seed: Vector2 = p+ray*start
+						var extent: float = 7.0+6.0*progress
+						EnemyAttackArt.Sprites.draw_oriented(self,"spore_shot" if attack=="spore_volley" else "crystal_shot",seed,Vector2.ONE*extent,ray.angle(),progress,Color(.72,.72,.72,.8))
 				if attack=="mend":
 					var linked: int=0
 					for ally: Dictionary in _frame.get("enemies",[]):
@@ -1774,11 +1772,6 @@ func _draw_threat_overlays() -> void:
 						NaturalThreats.draw_mending(self,p,end,progress,detail)
 						linked+=1
 						if linked>=3: break
-
-
-func _draw_warning_lane(start: Vector2, finish: Vector2, radius: float, progress: float) -> void:
-	if not Rect2(start,Vector2.ZERO).expand(finish).grow(radius).intersects(Rect2(Vector2.ZERO,screen_size)): return
-	EnemyAttackArt.draw_lane(self,start,finish,radius,progress,not reduced_motion and fx_scale>=.6)
 
 
 func _draw_hazard(hazard: Dictionary) -> void:

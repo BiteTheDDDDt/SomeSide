@@ -1,8 +1,8 @@
 class_name SideProjectileRenderer
 extends RefCounted
 
-## A white, tapered core identifies friendly fire. Hostile ammunition uses a
-## closed warm shell around a dark centre, so allegiance also reads in shape.
+## Friendly fire keeps a white tapered core. Hostile ammunition is a compact,
+## opaque spore or coral shard, matching the material forming at its source.
 const Atlas = preload("res://scripts/sprite_atlas.gd")
 const AttackFx = preload("res://scripts/attack_fx_sprites.gd")
 const CACHE_META: StringName = &"someside_projectile_atlas"
@@ -120,13 +120,17 @@ static func _friendly(c: Node2D, kind: String, radius: float, strength: float, t
 	elif strength>=1.7:
 		c.draw_line(Vector2(-length*0.8,-3),Vector2(-length*0.2,-2),Color(tint,0.45),0.8,true)
 
-static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
-	var r: float = maxf(4.0, radius)
+static func enemy_sample(kind: String, radius: float, age: float) -> Dictionary:
+	var r: float = maxf(4.0,radius)
 	var organic: bool = kind in ["spit","spore","acid","poison","boss_spore_orb","boss_orb"]
-	var sprite_family: String = "burst" if organic else "charge"
-	var phase: float = .25 + fposmod(clock*1.8,1.0)*.35 if organic else .5 + fposmod(clock*2.0,1.0)*.49
-	var size_value: Vector2 = Vector2(r*3.2,r*3.0)
-	if AttackFx.draw_oriented(c,sprite_family,Vector2.ZERO,size_value,0.0,phase,Color(1.0,.88,.74)):
+	return {"family":"spore_shot" if organic else "crystal_shot",
+		"size":Vector2(r*2.35,r*2.2) if organic else Vector2(r*2.7,r*2.1),
+		"phase":fposmod(maxf(0.0,age)*5.0,1.0),"tint":Color.WHITE}
+
+static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
+	var r: float = maxf(4.0,radius)
+	var sample: Dictionary = enemy_sample(kind,radius,clock)
+	if AttackFx.draw_oriented(c,sample.family,Vector2.ZERO,sample.size,0.0,sample.phase,sample.tint):
 		return
 	var cached: Dictionary = Atlas.cache(c, CACHE_META)
 	if not cached.is_empty() and is_equal_approx(r, roundf(r)) and r >= 4.0 and r <= 12.0:

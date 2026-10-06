@@ -1,8 +1,8 @@
 class_name SideNaturalThreats
 extends RefCounted
 
-## Diegetic warnings: sprites occupy the locked attack area, without a diagram
-## of its collision shape. Replicated timers keep remote/paused frames stable.
+## Ready and damaging states have different silhouettes, not just different
+## opacity. All placement and phase come from the authoritative snapshot.
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
 
 static func area_sample(hazard: Dictionary, _fx_scale: float = 1.0, _reduced_motion: bool = false) -> Dictionary:
@@ -10,38 +10,55 @@ static func area_sample(hazard: Dictionary, _fx_scale: float = 1.0, _reduced_mot
 	var radius: float = clampf(float(hazard.get("radius", 30.0)), 1.0, 400.0)
 	var progress: float = clampf(1.0 - float(hazard.get("delay", 0.0)) / maxf(0.01, float(hazard.get("telegraph_max", 0.8))), 0.0, 1.0)
 	var release: float = clampf(1.0 - float(hazard.get("ttl", 0.22)) / 0.22, 0.0, 1.0)
-	var organic: bool = str(hazard.get("kind", "")) in ["spore_mortar", "boss_spore", "spore_bloom", "spore_pool"]
+	var kind: String = str(hazard.get("kind", ""))
+	var organic: bool = kind in ["spore_mortar", "boss_spore", "spore_bloom", "spore_pool"]
+	var material_color: Color = Color(1.0, 0.84, 0.55) if kind == "stone_spike" else Color.WHITE
+	var size_value: Vector2 = Vector2(radius * 2.0, radius * 2.0 if active else 24.0)
+	var offset: Vector2 = Vector2.ZERO
+	if organic and not active:
+		# A compact sealed pod promises a later burst. Stretching it across the
+		# future radius would turn the seed into an unrelated flat cloud.
+		size_value = Vector2.ONE * (18.0 + progress * 8.0)
+	elif not organic:
+		# Burrow/spikes are authored 17px above their support surface. Their
+		# warning is a shallow disturbance there, and the eruption reaches the
+		# top of the actual danger area. Airborne spores retain their true Y.
+		size_value.y = radius + 17.0 if active else 14.0
+		offset.y = 17.0 - size_value.y * 0.5
 	return {"origin": hazard.get("pos", Vector2.ZERO), "radius": radius,
-		"active": active, "progress": progress, "phase": 0.25 + (release if active else progress) * 0.7,
-		"material_alpha": 0.88 if active else 0.58 + progress * 0.28,
-		"size": Vector2.ONE * radius * 2.2, "family": "dust_cloud",
-		"color": Color(0.86, 1.0, 0.58) if organic else Color(1.0, 0.82, 0.64),
+		"active": active, "progress": progress, "phase": release if active else progress,
+		"material_alpha": 1.0 if active else 0.64 + progress * 0.18,
+		"size": size_value, "draw_offset": offset, "family": area_family(kind, active),
+		"color": material_color if active else material_color.darkened(0.2),
 		"release": release}
+
+static func area_family(kind: String, active: bool) -> String:
+	var material: String = "spore" if kind in ["spore_mortar", "boss_spore", "spore_bloom", "spore_pool"] else ("stone" if kind == "stone_spike" else "earth")
+	return material + ("_hit" if active else "_ready")
 
 static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary) -> void:
 	var tint: Color = sample.color
 	tint.a = float(sample.material_alpha)
-	Sprites.draw_family(canvas, str(sample.family), Rect2(position - Vector2(sample.size) * 0.5, sample.size), float(sample.phase), tint)
-	# The whole disturbed patch is present from the first warning frame; its
-	# texture grows denser rather than painting a growing circle around it.
-	if bool(sample.active):
-		Sprites.draw_family(canvas, "burst", Rect2(position - Vector2(sample.size) * 0.45, Vector2(sample.size) * 0.9), float(sample.release), Color(1, 0.93, 0.8, 0.9))
+	var center: Vector2 = position + Vector2(sample.draw_offset)
+	# Every active frame remains solid. There is no generic blast or lingering
+	# damaging-looking cloud after the authority removes this hazard.
+	Sprites.draw_family(canvas, str(sample.family), Rect2(center - Vector2(sample.size) * 0.5, sample.size), float(sample.phase), tint)
 
 static func draw_blink(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float) -> void:
 	# Paired vertical tears imply a transition without drawing the path between.
-	var size_value: Vector2 = Vector2(38.0 + progress * 14.0, 64.0)
-	Sprites.draw_family(canvas, "charge", Rect2(destination - size_value * 0.5, size_value), progress, Color(1, 0.82, 0.75, 0.65 + progress * 0.3))
-	Sprites.draw_family(canvas, "charge", Rect2(source - Vector2(17, 27), Vector2(34, 54)), progress, Color(1, 0.82, 0.75, 0.3 + progress * 0.35))
+	var size_value: Vector2 = Vector2(12.0 + progress * 8.0, 42.0)
+	Sprites.draw_family(canvas, "rift", Rect2(destination - size_value * 0.5, size_value), progress, Color(1, 1, 1, 0.5 + progress * 0.3))
+	Sprites.draw_family(canvas, "rift", Rect2(source - Vector2(7, 18), Vector2(14, 36)), progress, Color(1, 1, 1, 0.3 + progress * 0.35))
 
 static func draw_mending(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float, detail: bool) -> void:
 	var direction: Vector2 = (destination - source).normalized()
 	# Sparse, curved motes travel to the actual recipient. They have no tether,
 	# evenly-spaced dots, endpoint reticle, or extra target selection on clients.
-	var seeds: Array = [0.04, 0.31, 0.77] if detail else [0.31]
+	var seeds: Array = [0.12, 0.69] if detail else [0.31]
 	for index: int in range(seeds.size()):
 		var t: float = fposmod(progress * 1.55 + seeds[index], 1.0)
 		var bend: float = (18.0 if index % 2 == 0 else -14.0) * sin(t * PI)
 		var point: Vector2 = source.lerp(destination, t) + direction.orthogonal() * bend
-		var size_value: float = 10.0 + sin(t * PI) * 5.0
-		Sprites.draw_family(canvas, "charge", Rect2(point - Vector2.ONE * size_value * 0.5, Vector2.ONE * size_value), 0.6 + t * 0.35, Color(0.95, 1, 0.72, 0.85))
-	Sprites.draw_family(canvas, "charge", Rect2(destination - Vector2(19, 25), Vector2(38, 50)), progress, Color(0.95, 1, 0.72, 0.75))
+		var size_value: float = 6.0 + sin(t * PI) * 3.0
+		Sprites.draw_family(canvas, "repair", Rect2(point - Vector2.ONE * size_value * 0.5, Vector2.ONE * size_value), t, Color(1, 1, 1, 0.68))
+	Sprites.draw_family(canvas, "repair", Rect2(destination - Vector2(6, 9), Vector2(12, 18)), progress, Color(1, 1, 1, 0.5))

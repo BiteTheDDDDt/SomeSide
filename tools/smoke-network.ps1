@@ -105,7 +105,7 @@ try {
             $report = Get-Content -LiteralPath $case.Report -Raw | ConvertFrom-Json
         }
         $passed = $null -ne $report -and $report.passed -eq $true -and $case.Process.ExitCode -eq 0
-        if ($passed) { $passed = $report.attack_fx.textures -eq 8 -and $report.attack_fx.bytes -le $report.attack_fx.max_bytes }
+        if ($passed) { $passed = $report.attack_fx.textures -eq 8 -and $report.attack_fx.families -eq 18 -and $report.attack_fx.bytes -le $report.attack_fx.max_bytes }
         if ($passed -and $case.Role -eq 'host') { $passed = $report.max_players -ge ($Clients + 1) -and $report.inputs -gt 10 }
         if ($passed -and $case.Role -eq 'client') { $passed = $report.snapshots -gt 10 }
         if ($passed -and $FinishAfter -gt 0) { $passed = $report.phase -eq 'lost' -and $report.screen -eq 'results' }

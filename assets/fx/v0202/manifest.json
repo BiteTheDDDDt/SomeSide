@@ -1,0 +1,837 @@
+{
+  "version": 2,
+  "families": {
+    "spore_ready": {
+      "path": "res://assets/fx/v0202/terrain-v2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        119,
+        114
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            0,
+            314,
+            219
+          ],
+          "anchor": [
+            161.5,
+            161.0
+          ]
+        },
+        {
+          "region": [
+            314,
+            0,
+            313,
+            219
+          ],
+          "anchor": [
+            154.5,
+            155.5
+          ]
+        },
+        {
+          "region": [
+            627,
+            0,
+            313,
+            219
+          ],
+          "anchor": [
+            153.5,
+            151.5
+          ]
+        },
+        {
+          "region": [
+            940,
+            0,
+            314,
+            219
+          ],
+          "anchor": [
+            153.5,
+            140.0
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "spore_hit": {
+      "path": "res://assets/fx/v0202/terrain-v2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        269,
+        257
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            219,
+            314,
+            284
+          ],
+          "anchor": [
+            161.5,
+            166.5
+          ],
+          "reference": [
+            225,
+            193
+          ]
+        },
+        {
+          "region": [
+            314,
+            219,
+            313,
+            284
+          ],
+          "anchor": [
+            163.0,
+            158.5
+          ],
+          "reference": [
+            246,
+            247
+          ]
+        },
+        {
+          "region": [
+            627,
+            219,
+            313,
+            284
+          ],
+          "anchor": [
+            152.5,
+            140.5
+          ],
+          "reference": [
+            241,
+            257
+          ]
+        },
+        {
+          "region": [
+            940,
+            219,
+            314,
+            284
+          ],
+          "anchor": [
+            163.5,
+            145.5
+          ],
+          "reference": [
+            269,
+            241
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "stone_ready": {
+      "path": "res://assets/fx/v0202/terrain-v2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        243,
+        89
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            503,
+            314,
+            103
+          ],
+          "anchor": [
+            154.0,
+            46.5
+          ]
+        },
+        {
+          "region": [
+            314,
+            503,
+            313,
+            103
+          ],
+          "anchor": [
+            153.0,
+            46.5
+          ]
+        },
+        {
+          "region": [
+            627,
+            503,
+            313,
+            103
+          ],
+          "anchor": [
+            159.0,
+            46.5
+          ]
+        },
+        {
+          "region": [
+            940,
+            503,
+            314,
+            103
+          ],
+          "anchor": [
+            167.5,
+            47.5
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "stone_hit": {
+      "path": "res://assets/fx/v0202/terrain-v2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        262,
+        236
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            606,
+            314,
+            277
+          ],
+          "anchor": [
+            155.0,
+            154.0
+          ],
+          "reference": [
+            232,
+            184
+          ]
+        },
+        {
+          "region": [
+            314,
+            606,
+            313,
+            277
+          ],
+          "anchor": [
+            158.0,
+            146.5
+          ],
+          "reference": [
+            252,
+            207
+          ]
+        },
+        {
+          "region": [
+            627,
+            606,
+            313,
+            277
+          ],
+          "anchor": [
+            155.5,
+            132.0
+          ],
+          "reference": [
+            257,
+            236
+          ]
+        },
+        {
+          "region": [
+            940,
+            606,
+            314,
+            277
+          ],
+          "anchor": [
+            162.0,
+            148.5
+          ],
+          "reference": [
+            262,
+            203
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "earth_ready": {
+      "path": "res://assets/fx/v0202/terrain-v2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        230,
+        99
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            883,
+            314,
+            134
+          ],
+          "anchor": [
+            160.0,
+            78.5
+          ]
+        },
+        {
+          "region": [
+            314,
+            883,
+            313,
+            134
+          ],
+          "anchor": [
+            158.0,
+            73.5
+          ]
+        },
+        {
+          "region": [
+            627,
+            883,
+            313,
+            134
+          ],
+          "anchor": [
+            158.0,
+            78.5
+          ]
+        },
+        {
+          "region": [
+            940,
+            883,
+            314,
+            134
+          ],
+          "anchor": [
+            159.0,
+            75.5
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "earth_hit": {
+      "path": "res://assets/fx/v0202/terrain-v2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        268,
+        208
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            1017,
+            314,
+            237
+          ],
+          "anchor": [
+            152.5,
+            133.5
+          ],
+          "reference": [
+            223,
+            161
+          ]
+        },
+        {
+          "region": [
+            314,
+            1017,
+            313,
+            237
+          ],
+          "anchor": [
+            160.5,
+            126.5
+          ],
+          "reference": [
+            221,
+            185
+          ]
+        },
+        {
+          "region": [
+            627,
+            1017,
+            313,
+            237
+          ],
+          "anchor": [
+            159.0,
+            117.0
+          ],
+          "reference": [
+            244,
+            198
+          ]
+        },
+        {
+          "region": [
+            940,
+            1017,
+            314,
+            237
+          ],
+          "anchor": [
+            160.0,
+            114.0
+          ],
+          "reference": [
+            268,
+            208
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "emitter": {
+      "path": "res://assets/fx/v0202/energy.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        114,
+        110
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            0,
+            314,
+            220
+          ],
+          "anchor": [
+            160,
+            130
+          ]
+        },
+        {
+          "region": [
+            314,
+            0,
+            313,
+            220
+          ],
+          "anchor": [
+            160,
+            130
+          ]
+        },
+        {
+          "region": [
+            627,
+            0,
+            313,
+            220
+          ],
+          "anchor": [
+            160,
+            130
+          ]
+        },
+        {
+          "region": [
+            940,
+            0,
+            314,
+            220
+          ],
+          "anchor": [
+            160,
+            130
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": false
+    },
+    "laser": {
+      "path": "res://assets/fx/v0202/energy.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        256,
+        127
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            220,
+            314,
+            181
+          ],
+          "anchor": [
+            169.5,
+            103.0
+          ],
+          "reference": [
+            255,
+            118
+          ]
+        },
+        {
+          "region": [
+            314,
+            220,
+            313,
+            181
+          ],
+          "anchor": [
+            168.0,
+            102.0
+          ],
+          "reference": [
+            256,
+            112
+          ]
+        },
+        {
+          "region": [
+            627,
+            220,
+            313,
+            181
+          ],
+          "anchor": [
+            169.0,
+            104.5
+          ],
+          "reference": [
+            256,
+            121
+          ]
+        },
+        {
+          "region": [
+            940,
+            220,
+            314,
+            181
+          ],
+          "anchor": [
+            165.5,
+            101.5
+          ],
+          "reference": [
+            251,
+            127
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "rift": {
+      "path": "res://assets/fx/v0202/energy.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        103,
+        219
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            401,
+            314,
+            271
+          ],
+          "anchor": [
+            159.5,
+            136.0
+          ]
+        },
+        {
+          "region": [
+            314,
+            401,
+            313,
+            271
+          ],
+          "anchor": [
+            155.5,
+            132.5
+          ]
+        },
+        {
+          "region": [
+            627,
+            401,
+            313,
+            271
+          ],
+          "anchor": [
+            155.0,
+            137.5
+          ]
+        },
+        {
+          "region": [
+            940,
+            401,
+            314,
+            271
+          ],
+          "anchor": [
+            158.5,
+            137.5
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "repair": {
+      "path": "res://assets/fx/v0202/energy.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        138,
+        136
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            672,
+            314,
+            187
+          ],
+          "anchor": [
+            160,
+            93
+          ]
+        },
+        {
+          "region": [
+            314,
+            672,
+            313,
+            187
+          ],
+          "anchor": [
+            160,
+            93
+          ]
+        },
+        {
+          "region": [
+            627,
+            672,
+            313,
+            187
+          ],
+          "anchor": [
+            160,
+            93
+          ]
+        },
+        {
+          "region": [
+            940,
+            672,
+            314,
+            187
+          ],
+          "anchor": [
+            160,
+            93
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "spore_shot": {
+      "path": "res://assets/fx/v0202/energy.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        114,
+        86
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            859,
+            314,
+            166
+          ],
+          "anchor": [
+            187,
+            84
+          ]
+        },
+        {
+          "region": [
+            314,
+            859,
+            313,
+            166
+          ],
+          "anchor": [
+            203,
+            84
+          ]
+        },
+        {
+          "region": [
+            627,
+            859,
+            313,
+            166
+          ],
+          "anchor": [
+            205,
+            84
+          ]
+        },
+        {
+          "region": [
+            940,
+            859,
+            314,
+            166
+          ],
+          "anchor": [
+            214,
+            84
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    },
+    "crystal_shot": {
+      "path": "res://assets/fx/v0202/energy.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "reference": [
+        236,
+        101
+      ],
+      "frames": [
+        {
+          "region": [
+            0,
+            1025,
+            314,
+            229
+          ],
+          "anchor": [
+            158,
+            98
+          ]
+        },
+        {
+          "region": [
+            314,
+            1025,
+            313,
+            229
+          ],
+          "anchor": [
+            158,
+            98
+          ]
+        },
+        {
+          "region": [
+            627,
+            1025,
+            313,
+            229
+          ],
+          "anchor": [
+            158,
+            98
+          ]
+        },
+        {
+          "region": [
+            940,
+            1025,
+            314,
+            229
+          ],
+          "anchor": [
+            158,
+            98
+          ]
+        }
+      ],
+      "frame_count": 4,
+      "filter": "nearest",
+      "loop": true
+    }
+  }
+}
