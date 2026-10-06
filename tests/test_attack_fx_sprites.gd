@@ -7,10 +7,13 @@ func _check(ok: bool, label: String) -> void:
 	if ok: passed += 1; print("PASS: ",label)
 	else: failed += 1; push_error("FAIL: "+label)
 func _run() -> void:
-	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Fx.MANIFEST_PATH))
+	var manifest: Dictionary = {"families":{}}
+	for path: String in Fx.MANIFEST_PATHS:
+		var part: Dictionary=JSON.parse_string(FileAccess.get_file_as_string(path))
+		manifest.families.merge(part.families)
 	Fx.prepare()
 	var cache: Dictionary = Fx.cache_stats()
-	_check(cache.textures==6 and cache.families==6 and cache.bytes<=32*1024*1024,"Six selected imported sheets fit the 32 MiB runtime cap")
+	_check(cache.textures==8 and cache.families==8 and cache.bytes<=32*1024*1024,"Eight selected imported sheets fit the 32 MiB runtime cap")
 	for family: String in manifest.families:
 		var info: Dictionary = manifest.families[family]
 		var raw := Image.new()

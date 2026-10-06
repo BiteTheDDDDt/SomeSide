@@ -30,6 +30,7 @@ const Entities = preload("res://scripts/entity_renderer.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
 const EnemyAttackArt = preload("res://scripts/enemy_attack_visual.gd")
+const NaturalThreats = preload("res://scripts/natural_threats.gd")
 const ProcFeedback = preload("res://scripts/proc_feedback.gd")
 const Locale = preload("res://scripts/localization.gd")
 const MAX_EFFECTS: int = 384
@@ -760,6 +761,11 @@ func push_events(events: Array) -> void:
 				if not activation.is_empty(): _add_effect(activation)
 			"shoot":
 				var enemy_shot: bool = event.get("enemy", false)
+				if enemy_shot:
+					_add_effect({"kind":"hostile_natural", "family":"burst", "pos":position_value,
+						"size":Vector2(31, 25), "angle":direction.angle(), "color":Color.WHITE, "age":0.0, "life":0.18})
+					_burst(position_value,Color("efc693"),3,75.0,0.22,direction,0.5,"ember")
+					continue
 				var weapon: String = str(event.get("weapon", event.get("kind", "bullet")))
 				var shot_color: Color = Color("f4a08b") if enemy_shot else (Color("a6dfff") if str(event.get("kind", "")) in ["rail", "railgun"] else GOLD)
 				if str(event.get("kind", "")) in ["storm", "storm_staff"]: shot_color = Color("89dbec")
@@ -797,11 +803,15 @@ func push_events(events: Array) -> void:
 				_burst(position_value,death_color,4,36.0,0.6,Vector2.UP,0.7,"smoke")
 				_add_effect({"kind":"shatter", "pos":position_value,"color":death_color,"radius":(52.0 if elite else 33.0)*sqrt(strength),"strength":strength,"age":0.0,"life":0.38})
 			"explosion":
-				if str(event.get("team",""))=="enemy" and bool(event.get("healing",false)):
-					# Enemy repair reads as a small amber machine pulse, never the
-					# player's large green field or friendly healing crosses.
-					_ring(position_value,Color("e8bd8c"),34.0,0.65)
-					_spark(position_value,Color("ddaf8d"),6,45.0,0.45)
+				if str(event.get("team",""))=="enemy":
+					var repair: bool = bool(event.get("healing",false))
+					# Hazards already animate their release from the snapshot. Never
+					# send hostile events through the player's ring/blast path.
+					if repair or not bool(event.get("visual_only",false)):
+						var extent: float = 54.0 if repair else clampf(float(event.get("radius",48.0))*1.9,32.0,300.0)
+						_add_effect({"kind":"hostile_natural", "family":"charge" if repair else "burst", "pos":position_value,
+							"size":Vector2.ONE*extent, "color":Color(0.95,1,0.72) if repair else Color.WHITE, "age":0.0, "life":0.45})
+					_burst(position_value,Color("dcc590"),5,55.0,0.4,Vector2.UP,PI,"ember" if repair else "fragment")
 					continue
 				var healing: bool = event.get("healing", false)
 				var shielding: bool = event.get("shield", false)
@@ -844,6 +854,11 @@ func push_events(events: Array) -> void:
 				_add_effect(swipe)
 				_burst(position_value,Color("ffa45c") if flame else Color("abead8"),clampi(int(3.0*strength),3,9),160.0 if flame else 90.0,0.32,direction,0.33 if flame else 0.8,"ember" if flame else "spark")
 			"dash":
+				if bool(event.get("enemy",false)):
+					var burrowing: bool = str(event.get("kind","")) == "burrow"
+					_add_effect({"kind":"hostile_natural", "family":"dust_cloud" if burrowing else "charge", "pos":position_value,
+						"size":Vector2(76,62) if burrowing else Vector2(42,70), "color":Color.WHITE, "age":0.0, "life":0.36})
+					continue
 				var rushing: bool = str(event.get("ability", "")) == "shoulder_rush"
 				var dash_color: Color = GOLD if rushing else (Color("eea27c") if bool(event.get("enemy",false)) else TEAL)
 				_spark(position_value, dash_color, clampi(int(8.0 * strength), 4, 24), 95.0, 0.35)
@@ -1714,8 +1729,8 @@ func _draw_projectiles() -> void:
 
 
 func _draw_threat_overlays() -> void:
-	# Fixed authority-authored geometry is drawn LAST, even over atmosphere and
-	# friendly effects. Accessibility FX settings never hide hostile telegraphs.
+	# Material warnings are drawn last so danger remains readable through fog
+	# and friendly effects. There is no collision-shape/trajectory overlay.
 	for value: Variant in _frame.get("hazards", []):
 		_draw_hazard(value)
 	for value: Variant in _frame.get("enemies", []):
@@ -1723,32 +1738,22 @@ func _draw_threat_overlays() -> void:
 		if float(enemy.get("hp",0.0))<=0.0: continue
 		var remaining: float = float(enemy.get("telegraph",0.0))
 		if remaining<=0.0: continue
-		var p: Vector2 = world_to_screen(enemy.get("pos",Vector2.ZERO))
-		var target: Vector2 = world_to_screen(enemy.get("attack_target",enemy.get("pos",Vector2.ZERO)))
+		var p: Vector2 = world_to_screen(_entity_draw_position("e"+str(enemy.get("id",0)),enemy.get("pos",Vector2.ZERO)))
 		var direction: Vector2 = WeaponPose.normalized_aim(enemy.get("attack_dir",Vector2.RIGHT))
 		var progress: float = clampf(1.0-remaining/maxf(0.01,float(enemy.get("telegraph_max",0.8))),0.0,1.0)
-		var color_value: Color = Color("ffac7b")
 		var attack: String = str(enemy.get("attack_kind",""))
+		var detail: bool = not reduced_motion and fx_scale>=.6
 		if attack not in ["beam","prism_beam","prism_cross"] and _visible(p,100.0):
-			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,Entities.enemy_bounds(enemy).end.y,not reduced_motion and fx_scale>=.6)
+			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,Entities.enemy_bounds(enemy).end.y,detail)
 		match attack:
 			"charge", "stone_charge":
 				var reach: float = 249.4 if attack=="charge" else 266.4
-				_draw_warning_lane(p,p+direction*reach,25.0 if attack=="charge" else 43.0,progress)
-			"pounce":
-				if not _visible(p,160): continue
-				var path: PackedVector2Array = PackedVector2Array()
-				for i: int in range(13):
-					var t: float = i/12.0
-					path.append(p+direction*(112*t)+Vector2(0,-sin(t*PI)*28))
-				draw_polyline(path,Color(color_value,0.12+progress*0.20),.8,true)
-				EnemyAttackArt.Sprites.draw_family(self,"burst",Rect2(path[-1]-Vector2(18,10),Vector2(36,20)),.55+progress*.3,Color(.85,.74,.6,.65))
+				var feet: Vector2 = p+Vector2(0,Entities.enemy_bounds(enemy).end.y)
+				_draw_warning_lane(feet,feet+direction*reach,25.0 if attack=="charge" else 43.0,progress)
 			"blink":
 				var destination: Vector2 = world_to_screen(enemy.get("blink_target",enemy.get("pos",Vector2.ZERO)))
-				if _visible(destination,45):
-					EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(destination-Vector2(29,34),Vector2(58,68)),progress,Color.WHITE)
-					draw_arc(destination,24.0,0,TAU,32,Color(color_value,.25),.8,true)
-				_draw_dashes(p,destination,Color(color_value,0.16),1.0,22.0)
+				if _visible(destination,45) or _visible(p,45):
+					NaturalThreats.draw_blink(self,p,destination,progress)
 			"spit", "triple", "salvo", "spore_volley", "mend":
 				if not _visible(p,190): continue
 				var count: int = 3 if attack in ["triple","salvo"] else (7 if attack=="spore_volley" and float(enemy.hp)<float(enemy.max_hp)*0.45 else (5 if attack=="spore_volley" else 1))
@@ -1756,10 +1761,9 @@ func _draw_threat_overlays() -> void:
 					var spacing: float = 0.21 if attack=="spore_volley" else 0.2
 					var ray: Vector2 = direction.rotated((index-(count-1)*0.5)*spacing)
 					var start: float = 49.0 if str(enemy.get("kind",""))=="boss" else 23.0
-					var end: float = 145.0 if count>1 else 112.0
-					draw_line(p+ray*start,p+ray*end,Color(color_value,0.10+progress*0.16),1.0,true)
 					if count>1:
-						var seed: Vector2 = p+ray*(start+8.0*(1.0-progress))
+						# Charged spores/ports form at the mouth; no future path is drawn.
+						var seed: Vector2 = p+ray*(start+4.0*progress)
 						EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(seed-Vector2(9,9),Vector2(18,18)),progress,Color(1,1,1,.65+progress*.25))
 				if attack=="mend":
 					var linked: int=0
@@ -1767,27 +1771,9 @@ func _draw_threat_overlays() -> void:
 						if int(ally.get("id",0))==int(enemy.get("id",0)) or str(ally.get("kind",""))=="boss" or float(ally.get("hp",0))<=0 or float(ally.get("hp",0))>=float(ally.get("max_hp",1)): continue
 						if Vector2(ally.pos).distance_to(enemy.pos)>260.0: continue
 						var end: Vector2 = world_to_screen(ally.pos)
-						_draw_dashes(p,end,Color("cdb291",0.3),1.0,16.0)
-						EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(end-Vector2(20,25),Vector2(40,50)),progress,Color(.9,1,.72,.8))
+						NaturalThreats.draw_mending(self,p,end,progress,detail)
 						linked+=1
 						if linked>=3: break
-
-
-func _draw_arrow(tip: Vector2, direction: Vector2, tint: Color, size_value: float) -> void:
-	var side: Vector2 = direction.orthogonal()*size_value*0.6
-	draw_polyline(PackedVector2Array([tip-direction*size_value+side,tip,tip-direction*size_value-side]),tint,1.2,true)
-
-
-func _draw_dashes(start: Vector2, finish: Vector2, tint: Color, width: float, spacing: float) -> void:
-	var distance: float = start.distance_to(finish)
-	if distance<0.1: return
-	var direction: Vector2 = (finish-start)/distance
-	var count: int = mini(64,ceili(distance/spacing))
-	for index: int in range(count):
-		var a: Vector2 = start+direction*(index*spacing)
-		var b: Vector2 = start+direction*minf(distance,index*spacing+spacing*0.52)
-		if Rect2(a,Vector2.ZERO).expand(b).grow(3).intersects(Rect2(Vector2.ZERO,screen_size)):
-			draw_line(a,b,tint,width,true)
 
 
 func _draw_warning_lane(start: Vector2, finish: Vector2, radius: float, progress: float) -> void:
@@ -1798,10 +1784,6 @@ func _draw_warning_lane(start: Vector2, finish: Vector2, radius: float, progress
 func _draw_hazard(hazard: Dictionary) -> void:
 	var p: Vector2 = world_to_screen(hazard.get("pos",Vector2.ZERO))
 	var radius: float = clampf(float(hazard.get("radius",30.0)),1.0,400.0)
-	var active: bool = bool(hazard.get("active",false))
-	var progress: float = clampf(1.0-float(hazard.get("delay",0.0))/maxf(0.01,float(hazard.get("telegraph_max",0.8))),0.0,1.0)
-	var tint: Color = Color("ffa674")
-	var kind: String = str(hazard.get("kind",""))
 	if str(hazard.get("shape","circle"))=="line":
 		var sampled: Dictionary = EnemyAttackArt.beam_sample(hazard,fx_scale,reduced_motion)
 		var end: Vector2 = world_to_screen(sampled.end)
@@ -1809,15 +1791,7 @@ func _draw_hazard(hazard: Dictionary) -> void:
 		EnemyAttackArt.draw_beam(self,p,end,sampled)
 		return
 	if not _visible(p,radius+14): return
-	# Keep one subdued exact-radius marker, with the authored animation carrying
-	# the charge/eruption instead of progress rings, spokes and geometric seeds.
-	draw_circle(p,radius,Color(tint,.065 if active else .025),true,-1,true)
-	draw_arc(p,radius,0,TAU,48,Color(tint,.48 if active else .3+.15*progress),.8,true)
-	var phase: float = clampf(1.0-float(hazard.get("ttl",.22))/.22,0,1) if active else progress
-	var family: String = "burst" if active else "charge"
-	var extent: float = radius*2.0 if active else minf(radius*1.3,76.0)
-	var color_value: Color = Color(.82,1,.7) if kind in ["spore_bloom","spore_pool"] else Color.WHITE
-	EnemyAttackArt.Sprites.draw_family(self,family,Rect2(p-Vector2.ONE*extent*.5,Vector2.ONE*extent),phase,color_value)
+	NaturalThreats.draw_area(self,p,NaturalThreats.area_sample(hazard,fx_scale,reduced_motion))
 
 
 func _draw_effects() -> void:
@@ -1837,6 +1811,11 @@ func _draw_effects() -> void:
 		var color_value: Color = effect.get("color", TEAL)
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
+		if str(effect.get("kind", "")) == "hostile_natural":
+			var tint: Color = effect.get("color",Color.WHITE)
+			tint.a *= 1.0 - smoothstep(0.6,1.0,t)
+			EnemyAttackArt.Sprites.draw_oriented(self,str(effect.get("family","burst")),p,effect.get("size",Vector2(48,48)),float(effect.get("angle",0.0)),t,tint)
+			continue
 		if str(effect.get("kind", "")) == "proc_activation":
 			ProcFeedback.draw(self, ProcFeedback.activation_sample(effect), p, fx_scale)
 			continue

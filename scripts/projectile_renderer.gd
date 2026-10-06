@@ -44,10 +44,10 @@ static func draw(c: Node2D, shot: Dictionary, position: Vector2, clock: float, s
 		_friendly(c,kind,radius,clampf(strength,0.5,3.3),maxf(0.0,tail),clock,float(shot.get("id",0)))
 	else:
 		_enemy(c,kind,radius,maxf(0.0,float(shot.get("age",0.0))))
-	if bool(Dictionary(shot.get("guidance", {})).get("active", false)):
-		# Small forward fins identify the guided ammunition without another
-		# atlas, target line or bright halo obscuring its dodgeable trajectory.
-		var tint: Color = Color("b8f0ff") if str(shot.get("team", "player")) == "player" else Color("ffcb8b")
+	if str(shot.get("team", "player")) == "player" and bool(Dictionary(shot.get("guidance", {})).get("active", false)):
+		# Friendly guidance keeps its fins. Hostile ammunition reads through its
+		# animated energy texture and actual heading, without auxiliary strokes.
+		var tint: Color = Color("b8f0ff")
 		for side: int in [-1, 1]:
 			c.draw_line(Vector2(-radius - 3, side * (radius + 2)), Vector2(1, side * (radius + 1)), Color(tint, 0.75), 1.0, true)
 	c.draw_set_transform(Vector2.ZERO)

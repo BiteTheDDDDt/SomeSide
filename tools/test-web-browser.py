@@ -202,7 +202,7 @@ def main() -> None:
             check(sim['started'] and sim['tick'] > 300 and sim['screen'] == 'playing', 'Browser simulation advances beyond 300 ticks')
             check(sim['language'] == 'zh', 'First launch detects the browser Chinese locale')
             check(sim['pixel_actors']['actors'] == 14, 'All 14 pixel actor definitions load')
-            check(sim.get('attack_fx', {}).get('textures') == 6 and sim['attack_fx']['bytes'] <= sim['attack_fx']['max_bytes'], 'All 6 animated attack sheets load within the texture budget')
+            check(sim.get('attack_fx', {}).get('textures') == 8 and sim['attack_fx']['bytes'] <= sim['attack_fx']['max_bytes'], 'All 8 animated attack sheets load within the texture budget')
             check(not report['errors'], 'No browser, network or Godot runtime errors')
             browser.close()
     finally:

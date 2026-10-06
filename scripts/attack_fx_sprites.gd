@@ -4,6 +4,7 @@ extends RefCounted
 ## Authored transparent animation sheets. Regions and anchors are fixed data;
 ## drawing allocates no textures and never changes the caller's transform.
 const MANIFEST_PATH: String = "res://assets/fx/v020/manifest.json"
+const MANIFEST_PATHS: Array[String] = [MANIFEST_PATH, "res://assets/fx/v0201/manifest.json"]
 const MAX_BYTES: int = 32 * 1024 * 1024
 static var _families: Dictionary = {}
 static var _textures: Dictionary = {}
@@ -13,9 +14,9 @@ static var _bytes: int = 0
 static func prepare() -> void:
 	if _loaded: return
 	_loaded = true
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST_PATH))
-	if not parsed is Dictionary: return
-	_families = parsed.get("families", {})
+	for path: String in MANIFEST_PATHS:
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if parsed is Dictionary: _families.merge(parsed.get("families", {}))
 	for family: String in _families:
 		var info: Dictionary = _families[family]
 		var texture: Texture2D = load(str(info.path)) as Texture2D

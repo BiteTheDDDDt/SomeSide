@@ -1,39 +1,38 @@
-# SomeSide v0.20.0 构建记录
+# SomeSide v0.20.1 构建记录
 
 日期：2026-10-06。引擎：Godot 4.7.2，GDScript，Compatibility 渲染。
 
 ## 本次变化
 
-- 敌人的蓄能、光束、范围爆发、弹丸及闪现/扑击/治疗准备接入透明多帧贴图；细边界保留实际危险范围。新增六组八帧共48帧素材，固定裁剪与锚点，运行时六张1024²纹理约24 MiB、硬预算32 MiB。内置 image_gen 的源文件和完整提示词见 `assets/fx/v020/ART_PROMPTS.md`；早期布局保留在源码中但排除出发布包。
-- 三件条件遗物：蜂群弹舱由直接暴击触发有限追踪弹；落震线圈由至少90高度落地触发双向波；霜环发生器由直接击杀触发1.5秒随身减速伤害场。当前共27遗物、8武器、8主动装备。
-- 每个职业一个Shift主动和一个自动被动。游侠连续6次不同主武器动作命中后追加8伤害追击弹，相邻有效命中超过2秒重置，冷却3秒；先锋累计实际失去30生命后获得独立10护盾，持续3秒、冷却6秒。两者冷却期间不累积，换装不刷新。
-- 派生攻击禁止暴击与递归触发，落地波一组最多8敌且每敌一次；死亡、凤凰、切关、射击过程中新增弹丸和客户端预测均有独立边界。霜环与霜凝结晶保留当前更强的减速，弱效果不会覆盖强效果。
-- 新物品有图标、角色饰件和独立合成触发音效。选角、构筑和Shift悬停显示主动/被动完整双语说明；已持有27遗物保持两行，临时盾并入原护盾读数，没有增加常驻技能槽。
+- 直接移除敌方预警中的瞄准线、胶囊边框、范围圆框、冲锋通道边线、扑击轨迹、闪现与治疗虚线，以及敌方弹丸的两条辅助翼线。预警改由透明多帧材质承担：激光前方为电离烟流，冲锋为贴地扬尘，范围攻击为尘雾或孢雾，闪现为两端裂隙，治疗为弯曲飘动的能量碎片。
+- 敌方开火、爆发与闪现事件从旧通用几何特效中分流，防止攻击释放时重新出现冲击圆环或速度线。玩家原有技能、武器、护盾和拾取反馈保持原样。
+- `natural_threats.gd` 与 `enemy_attack_visual.gd` 仅消费快照。危险位置、射程、半径和计时继续取自主机，低特效与减少动态选项保留主要预警材质；没有修改 `simulation.gd` 或 `content.gd`。
+- 新增电离烟流与尘雾两组八帧源图。活动特效图集共8张、64帧，导入上限1024²，共32 MiB（本版增加8 MiB，未提高原硬预算）。源文件、固定裁剪/锚点与内置 imagegen 完整提示词见 [素材记录](../assets/fx/v0201/ART_PROMPTS.md)。运行时使用缓存纹理，不生成新图片。
 
-## 原生画面与真实触发
+## 原生画面与攻击验证
 
-- `tools/capture-enemy-fx-v020.gd`：真实哨卫蓄能和释放、棱镜交叉光束、普通敌人准备动作；1x画面、阶段图和48帧图册保存在 `tools/results/enemy-attacks-v020/`。
-- `tools/capture-proc-combat-v020.gd`：五场各180个60Hz模拟步，由真实输入、攻击和伤害触发；没有直接造派生实体或事件。`tools/results/proc-combat-v020/report.json` 全部通过。暴击飞弹总伤42、落地波每侧12、霜环3次各8、游侠6次攻击后总伤56、先锋失血30后护盾再吸收8剩2。PNG、30fps短片、逐tick记录及合并15秒 `proc-preview.webm` 均保留。
-- `tools/capture-class-passives-v020.gd`：21张中英角色、指南、构筑、悬停和遗物截图；`tools/results/class-passives-v020/`。43件实体图册见 `tools/results/icon-art-v020/`。逐项检查没有说明溢出，金币与角色保持可见。
+- `tools/capture-natural-warnings-v0201.gd` 由真实AI准备和释放15种攻击，使用正式世界渲染；每种保留普通特效/最低特效与减少动态的准备、释放画面，每格960×540、1倍游戏尺寸。截图和逐tick轨迹在 `tools/results/natural-warnings-v0201/`，`report.json` 全部通过。
+- 四段正常倍率实机片段覆盖激光、地刺、闪现、治疗，每段180个60Hz模拟步，输出1280×720/30fps；合并12秒 `natural-warnings-preview.webm`。没有直接制造伤害或替换预警形状来拍摄。
+- `tools/capture-enemy-fx-v0201.gd` 保留64帧图册、预警阶段图、正常倍率激光和冲锋截图、交叉光束及60fps短片，位于 `tools/results/enemy-attacks-v0201/`。原生合成未出现源图透明预览的红色边缘。
+- 新增自然预警验收91项，验证真实AI时序、预警期无提前伤害、锁定后可以躲避、低特效可见性、3个治疗目标的总治疗预算、敌方事件不产生旧圆环，以及渲染与未渲染模拟连续210tick结果一致。另有57项敌方动作/材质与44项图集检查，包括左向冲锋尘雾保持直立。
 
-## 验证与产物
+## 完成验证
 
-最终自动检查、独立导出、浏览器和网络结果见下方完成记录。测试与截图保存在本机 `tools/results/`，发布文件位于 `dist/`，这两个目录按原规则不纳入 Git。
+- 完整回归50套、2747项通过，0失败、0运行错误、0警告。日志 `tools/results/tests-v0201.log`，汇总 `tests-v0201-summary.json`。
+- Windows和Web独立导出成功，导出日志无运行错误或警告。独立Windows程序实跑480tick、34事件、1击杀，正常截图并以0退出；8张特效纹理全部从发布资源加载。`tools/results/export-v0201-report.json`，实机截图 `export-v0201-game.png`。
+- 导出程序四人合作、三关跨场景、房主英文/客户端中文通过。同机真实ENet连接，覆盖全部9种普通敌人、3种首领、16种起手与两种危险区形状；客户端收到846/915/948次快照。所有进程正常退出、零运行错误、均加载8张特效。`tools/results/network-export-biomes-bilingual-20261006-190440/summary.json`。本轮未重跑丢包网络模拟。
+- Chrome154 Web验收15/15通过：跨源iframe、960×540与1920×1080适配、全屏、真实Web Audio输出、语言/FPS偏好持久化、全部新贴图加载；模拟推进541tick，浏览器/网络/Godot错误为0。测试iframe存在浏览器提示 `allow` 优先于 `allowfullscreen`，不影响功能。`tools/results/web-v0201-chrome/report.json`。
+- 性能观察：Windows/RTX5070Ti末次读数59FPS；Chrome/AMD610M/ANGLE末次33FPS，冷启动5.50秒。这是自动验收的单次读数，本版未做持续帧率或前后性能基准，不作为帧率保证。
+- Web ZIP审计通过，根入口与11个资源/许可文件齐全，无缺失引用。`tools/results/web-v0201-artifacts.json`。本机用户profile前后SHA-256相同：`37209484288A6F10833133BA615EDCAFB817B0F7128A9C9F77280EA971754E16`。
 
-上版记录：[v0.19.0](BUILD_REPORT_v0.19.0.md)。
-### 完成记录
-
-- 完整回归49套、2642项通过，0失败、0运行错误、0警告。原始日志 `tools/results/tests-v020.log`，逐套汇总 `tools/results/tests-v020-summary.json`。
-- 四人120模拟秒压力回归：44敌堆积时最多49弹，12层全遗物构筑最多30弹、34事件；当前机debug最慢步2.213/2.569ms。这是模拟步耗时，不是帧率保证。触发音效共71个样本，PCM约1.11 MiB，保持既有声音总量限制。
-- 独立Windows程序运行480tick、39事件、2击杀，正常截图并以0退出；六组特效纹理全部从导出资源加载。`tools/results/export-v020-report.json`，原生日志无错误。
-- 导出程序四人高级联机、房主英文/客户端中文通过；三客户端分别收到612/712/714次快照，全部观察到追击弹、落地波、霜环，以及炮台、延迟技能、时序与导引。全部进程零错误并加载六组特效。`tools/results/network-export-bilingual-20261006-181459/summary.json`。本轮为同机真实ENet连接，没有重跑丢包模拟。
-- Chrome154 Web验收15/15通过，540tick，新六组贴图24MiB、跨源iframe、960×540/1920×1080适配、全屏、实际Web Audio输出、语言/FPS偏好保存均正常，浏览器/网络/Godot错误为0。冷启动5.53秒。AMD610M/ANGLE下末次FPS读数27，与上版记录一致；本轮未做持续帧率基准。`tools/results/web-v020-chrome/report.json`。
-- Web ZIP离线审计通过，入口和资源齐全。`tools/results/web-v020-artifacts.json`。本机profile前后SHA-256相同（FCFC06500030549CF81BC94C90B13F6FE7B326C6030D404F2250F414D070ACFA）。
+## 本地发布文件
 
 | 文件 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `dist/SomeSide-v0.20.0-windows-x64.zip` | 67028151 | `1B9712930D9D776900079DA44303D55F01E102C25E64C5F3A9FBAAD53E3F96E6` |
-| `dist/v0.20.0/SomeSide.exe` | 137069440 | `E82CAC64593297FDCC16B737BF60BA82D49A13CC63D013EE12204B18C29C9114` |
-| `dist/SomeSide-v0.20.0-web.zip` | 38181569 | `717D01BC756B716339D8833BD1054EC2351D5869DD1C77E224577F60B9CFC3D6` |
+| `dist/SomeSide-v0.20.1-windows-x64.zip` | 69176653 | `E691D6236B7EBDD8A1AA2200C7C1C219A73021BB9F779868188EEC0B49571ABA` |
+| `dist/v0.20.1/SomeSide.exe` | 139222840 | `527827F5499904CBDB1667B01A5786534ABB2D7A05BBA0FB74B8B864115391F1` |
+| `dist/SomeSide-v0.20.1-web.zip` | 40329511 | `3852F6251831DCBE2AEE1A7F30E326545A4964E9F5DF06DF7B4D52BA89EA9D50` |
 
-清单：`tools/results/package-v020-windows.json`、`package-v020-web.json`。旧版本与宣传素材保留。已生成本地上传包，没有上传或替换itch线上文件。
+清单：`tools/results/package-v0201-windows.json`、`package-v0201-web.json`。Windows版支持2–4人合作，Web版仍为单人。旧版本与宣传素材保留；本轮只生成本地包，未替换itch线上文件。
+
+测试、截图、视频和发布包按既有规则留在本机忽略目录中。上版构建记录：[v0.20.0](BUILD_REPORT_v0.20.0.md)。

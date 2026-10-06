@@ -27,11 +27,11 @@ func _run() -> void:
 		_check(Art.body_rect(original,enemy)==original,attack+": recovery returns exactly to the original sprite rectangle")
 	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":.36,"telegraph_max":.9,"active":false,"ttl":.22}
 	var normal: Dictionary = Art.beam_sample(pending)
-	_check(normal.sprite_family=="charge" and is_equal_approx(float(normal.sprite_phase),.6),"The replicated windup timer selects the authored charge sequence")
+	_check(normal.sprite_family=="ion_stream" and is_equal_approx(float(normal.sprite_phase),.6),"The replicated windup timer selects the wide ionized-vapor sequence")
 	for settings: Array in [[0.0,false],[.5,false],[1.0,true],[2.0,false]]:
 		var sample: Dictionary = Art.beam_sample(pending,settings[0],settings[1])
-		_check(sample.origin==normal.origin and sample.end==normal.end and sample.radius==normal.radius and sample.edge_alpha==normal.edge_alpha,"FX settings preserve the entire authoritative warning capsule and its contrast")
-		_check(int(sample.filaments)<=Art.MAX_FILAMENTS and (int(sample.filaments)==0 if float(settings[0])<.6 or bool(settings[1]) else true),"Optional charge filaments stay bounded and respect low/reduced-motion settings")
+		_check(sample.origin==normal.origin and sample.end==normal.end and sample.radius==normal.radius and sample.material_size==normal.material_size and sample.material_alpha==normal.material_alpha,"FX settings preserve the locked extent and visibility of the warning material")
+		_check(not Art.Sprites.frame_data(sample.material_family,sample.material_phase).is_empty() and float(sample.material_alpha)>=.35,"Low FX still selects a loaded visible painted warning frame")
 	var saved_pending: PackedByteArray = var_to_bytes(pending)
 	_check(Art.beam_sample(pending)==Art.beam_sample(pending) and var_to_bytes(pending)==saved_pending,"Identical remote or paused snapshots produce identical charge samples without history")
 	pending.active=true
@@ -39,8 +39,14 @@ func _run() -> void:
 	pending.ttl=.001
 	var last: Dictionary = Art.beam_sample(pending)
 	_check(first.sprite_family=="beam" and first.sprite_phase<last.sprite_phase,"Active beam lifetime advances the actual textured release frames")
-	_check(float(first.core_width)>float(last.core_width),"The fired beam core decays across its real active lifetime")
-	_check(first.edge_alpha==last.edge_alpha and first.fill_alpha==last.fill_alpha and first.radius==last.radius,"Fading the core never hides still-active damage or shrinks its boundary")
+	_check(Art.Sprites.frame_index(first.sprite_family,first.sprite_phase)<Art.Sprites.frame_index(last.sprite_family,last.sprite_phase),"The fired textured beam advances through its authored decay frames")
+	_check(first.material_size==last.material_size and first.material_alpha==last.material_alpha and first.radius==last.radius,"Residual ionized vapor remains across the full live hazard until authority expiry")
+	var lane: Array[Dictionary]=Art.lane_sample(Vector2.ZERO,Vector2(249.4,0),25.0,.6)
+	_check(lane.size()==3 and lane[0].size!=lane[1].size and lane[1].size!=lane[2].size,"Charge warnings use three unequal overlapping dust volumes")
+	_check(lane[0].origin.distance_to(lane[1].origin)!=lane[1].origin.distance_to(lane[2].origin),"Dust disturbance has natural nonuniform spacing rather than repeated markers")
+	_check(lane==Art.lane_sample(Vector2.ZERO,Vector2(249.4,0),25.0,.6),"Paused charge warnings retain their exact material phase and position")
+	var left_lane: Array[Dictionary]=Art.lane_sample(Vector2.ZERO,Vector2(-249.4,0),25.0,.6)
+	_check(left_lane[0].origin.x<0 and left_lane[0].origin.y==lane[0].origin.y and left_lane[0].angle==0.0,"Leftward charge dust stays grounded instead of rotating its cloud upside down")
 	await _real_locked_attack()
 	print("ENEMY_ATTACK_VISUALS_TEST_RESULT passed=",passed," failed=",failed)
 	quit(0 if failed==0 else 1)
