@@ -67,6 +67,14 @@ func _run() -> void:
 		{"type":"equipment", "equipment":"meteor", "player":1, "pos":position_value}
 	])
 	_check(probe.heard.size()==3 and probe.heard[0].event.double and probe.heard[2].event.equipment=="meteor", "Movement and delayed-skill activation reach audio with their semantic details")
+	probe.heard.clear()
+	for source: String in ["missile_pod", "landing_coil", "frost_halo", "pursuit_protocol", "reactive_plating"]:
+		var event: Dictionary = {"type":"proc", "kind":source, "player":1, "owner":1, "pos":position_value, "proc_id":100}
+		var saved: PackedByteArray = var_to_bytes(event)
+		game._consume_events([event])
+		_check(var_to_bytes(event)==saved and not Soundscape.event_sound(event).is_empty(), source+" remains immutable and selects an audible trigger cue")
+	_check(probe.heard.size()==5, "Authoritative local passive activations are heard by the client rather than suppressed as predicted attacks")
+	_check(game.TRANSIENT_EVENT_TYPES.has("proc"), "Old stage passive effects use the transient event filter")
 	game.online = false
 	probe.shutdown()
 	game.queue_free()

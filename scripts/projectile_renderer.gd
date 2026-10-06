@@ -4,6 +4,7 @@ extends RefCounted
 ## A white, tapered core identifies friendly fire. Hostile ammunition uses a
 ## closed warm shell around a dark centre, so allegiance also reads in shape.
 const Atlas = preload("res://scripts/sprite_atlas.gd")
+const AttackFx = preload("res://scripts/attack_fx_sprites.gd")
 const CACHE_META: StringName = &"someside_projectile_atlas"
 const CACHE_MAX_BYTES: int = 4 * 1024 * 1024
 const ORB_FRAMES: int = 16
@@ -12,6 +13,7 @@ const CORE: Color = Color("f4f7df")
 const HOT: Color = Color("ffb180")
 
 static func prepare(canvas: Node2D) -> void:
+	AttackFx.prepare()
 	if DisplayServer.get_name() == "headless" or canvas.has_meta(CACHE_META):
 		return
 	Atlas.prepare(canvas, CACHE_META, atlas_entries(), _paint_atlas_entry, CACHE_MAX_BYTES, 1024)
@@ -41,7 +43,7 @@ static func draw(c: Node2D, shot: Dictionary, position: Vector2, clock: float, s
 	if str(shot.get("team","player")) == "player":
 		_friendly(c,kind,radius,clampf(strength,0.5,3.3),maxf(0.0,tail),clock,float(shot.get("id",0)))
 	else:
-		_enemy(c,kind,radius,clock)
+		_enemy(c,kind,radius,maxf(0.0,float(shot.get("age",0.0))))
 	if bool(Dictionary(shot.get("guidance", {})).get("active", false)):
 		# Small forward fins identify the guided ammunition without another
 		# atlas, target line or bright halo obscuring its dodgeable trajectory.
@@ -120,6 +122,12 @@ static func _friendly(c: Node2D, kind: String, radius: float, strength: float, t
 
 static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
 	var r: float = maxf(4.0, radius)
+	var organic: bool = kind in ["spit","spore","acid","poison","boss_spore_orb","boss_orb"]
+	var sprite_family: String = "burst" if organic else "charge"
+	var phase: float = .25 + fposmod(clock*1.8,1.0)*.35 if organic else .5 + fposmod(clock*2.0,1.0)*.49
+	var size_value: Vector2 = Vector2(r*3.2,r*3.0)
+	if AttackFx.draw_oriented(c,sprite_family,Vector2.ZERO,size_value,0.0,phase,Color(1.0,.88,.74)):
+		return
 	var cached: Dictionary = Atlas.cache(c, CACHE_META)
 	if not cached.is_empty() and is_equal_approx(r, roundf(r)) and r >= 4.0 and r <= 12.0:
 		var family: String = "energy"

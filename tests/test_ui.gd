@@ -97,7 +97,7 @@ func _run() -> void:
 	await _send_key(KEY_TAB)
 	_check(bool(game.get("paused")), "Tab opens the inventory and pauses solo play")
 	_check_page_bounds("inventory")
-	_check(str(game.get("_inventory_filter")) == "owned" and game.get("_inventory_grid").get_child_count() == simulation.state.players[1].items.size() + 2, "Tab initially lists only the two equipped slots and actually owned relics")
+	_check(str(game.get("_inventory_filter")) == "owned" and game.get("_inventory_grid").get_child_count() == simulation.state.players[1].items.size() + 4, "Tab initially lists both innate abilities, the two equipped slots and actually owned relics")
 	game.get("_inventory_filters").passive.pressed.emit()
 	await _layout()
 	_check(str(game.get("_inventory_filter")) == "passive", "The passive filter button opens the complete relic catalogue")
@@ -295,7 +295,7 @@ func _test_compact_hud(simulation) -> void:
 		var digest: int = hash(image.get_data())
 		icons_unique = icons_unique and not image.is_empty() and not hashes.has(digest)
 		hashes[digest] = definition.id
-	_check(icons_unique and definitions.size() == 40, "All forty passive, weapon and active equipment IDs have distinct nonempty pictograms")
+	_check(icons_unique and definitions.size() == 43, "All 43 passive, weapon and active equipment IDs have distinct nonempty pictograms")
 
 func _test_owned_strip(simulation) -> void:
 	var player: Dictionary = simulation.state.players[1]
@@ -310,7 +310,7 @@ func _test_owned_strip(simulation) -> void:
 	await _layout()
 	var tiles: Array = game.get("_relic_tiles")
 	var rect: Rect2 = game.get("_relic_strip").get_global_rect()
-	_check(tiles.size() == 24 and rect.size.x <= 480.0 and rect.size.y <= 76.0 and rect.position.y >= 628.0 and rect.end.y <= 704.5, "Twenty-four owned relics fit within a compact two-row bottom strip outside the main view")
+	_check(tiles.size() == 27 and rect.size.x <= 520.0 and rect.size.y <= 76.0 and rect.position.y >= 628.0 and rect.end.y <= 704.5, "Twenty-seven owned relics fit within two compact rows confined to the left half of the view")
 	var rarity_matches: bool = true
 	for tile in tiles:
 		rarity_matches = rarity_matches and tile.count == 3 and tile.rarity == simulation.loot_definition(tile.id).rarity and tile.control.is_visible_in_tree()

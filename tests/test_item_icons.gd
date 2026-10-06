@@ -46,7 +46,7 @@ func _run() -> void:
 		_check(source_ok, str(record.id)+" uses bounded supersampling, mipmaps and a texture-owned linear sampler")
 		_check(cache_ok, str(record.id)+" reuses hot entries and keeps framed / transparent caches distinct")
 		_check(alpha_ok, str(record.id)+" has no opaque background in its transparent pickup texture")
-	_check(fingerprints.size() == 40, "All forty physical item silhouettes remain distinct")
+	_check(fingerprints.size() == 43, "All 43 physical item silhouettes remain distinct")
 	var stats: Dictionary = Icons.cache_stats()
 	var measured: int = 0
 	for texture: Texture2D in Icons._textures.values():
@@ -60,7 +60,7 @@ func _run() -> void:
 	for frame: int in range(180):
 		Icons.pickup_texture("pulse_rifle",16)
 	_check(int(Icons.cache_stats().rasterizations) == generation, "Repeated draw requests do not rasterize SVG per frame")
-	for id: String in ["phase_dash","guard_burst","shoulder_rush","cache","choice","blood","combat","equipment_cache","gate","revive","unknown"]:
+	for id: String in ["phase_dash","guard_burst","pursuit_protocol","reactive_plating","shoulder_rush","cache","choice","blood","combat","equipment_cache","gate","revive","unknown"]:
 		var texture: Texture2D = Icons.texture(id,34)
 		_check(texture.get_size() == Vector2(34,34) and texture is CanvasTexture and texture.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS, id+" uses the same smooth logical-size API")
 	_check(Icons.texture("grenade",1).get_size() == Vector2(16,16) and Icons.pickup_texture("grenade",999).get_size() == Vector2(256,256), "Public size limits remain 16 through 256")
@@ -72,6 +72,12 @@ func _run() -> void:
 			if alpha > 0.0 and alpha < 1.0:
 				fractional_alpha = true
 	_check(fractional_alpha, "The diagonal weapon silhouette retains antialiased edge coverage")
+	var innate_images: Dictionary = {}
+	for id: String in ["phase_dash", "guard_burst", "pursuit_protocol", "reactive_plating"]:
+		var image: Image = Icons.pickup_texture(id, 24).get_image()
+		innate_images[hash(image.get_data())] = true
+		_check(image.get_used_rect().size.x >= 50 and image.get_used_rect().size.y >= 50, id + " retains a readable physical silhouette in the 24px preview")
+	_check(innate_images.size() == 4, "Both active and passive class abilities have independent silhouettes")
 	print("ITEM_ICONS_CACHE ",JSON.stringify(Icons.cache_stats()))
 	print("ITEM_ICONS_TEST_RESULT passed=",passed," failed=",failed)
 	quit(0 if failed==0 else 1)

@@ -30,7 +30,7 @@ func _run() -> void:
 	var catalog: Array = Content.passives()
 	var all_items: Dictionary = {}
 	var groups: Dictionary = {}
-	var complete: bool = supported.size()==24 and catalog.size()==24
+	var complete: bool = supported.size()==27 and catalog.size()==27
 	for entry: Dictionary in catalog:
 		var id_value: String = str(entry.id)
 		complete = complete and supported.has(id_value)
@@ -42,7 +42,19 @@ func _run() -> void:
 		all_items[id_value] = 1
 		var descriptor: Array = Appearance.build({id_value:1})
 		_check(descriptor.size()==1 and str(descriptor[0].get("item",""))==id_value and str(descriptor[0].get("slot",""))==slot and _valid_descriptor(descriptor[0]),"A single "+id_value+" produces its own valid wearable part")
-	_check(complete and groups.size()==6,"All 24 catalog relics are supported across exactly six valid body slots")
+	_check(complete and groups.size()==6,"All 27 catalog relics are supported across exactly six valid body slots")
+	var part_hashes: Dictionary = {}
+	for id: String in ["missile_pod", "landing_coil", "frost_halo"]:
+		var bounded_art: bool = true
+		for stacks: int in [1, 4, 8, 1000000]:
+			var descriptor: Dictionary = Appearance.build({id:stacks})[0]
+			var piece: Dictionary = Appearance._piece(descriptor)
+			var image: Image = piece.texture.get_image()
+			bounded_art = bounded_art and image.get_used_rect().has_area() and image.get_width() <= 24 and image.get_height() <= 20
+			bounded_art = bounded_art and Appearance._piece(descriptor).texture == piece.texture
+			if stacks == 1: part_hashes[hash(image.get_data())] = true
+		_check(bounded_art, id + " renders a compact nonempty wearable and reuses three capped stack-tier textures")
+	_check(part_hashes.size() == 3 and Appearance.cache_stats().entries == 9, "The new pod, ankle coil and cold core have three distinct shapes and a fixed nine-texture budget")
 	_check(Appearance.build({}).is_empty(),"A character without relics has no extra body parts")
 	_check(Appearance.build({"unknown_relic":999,"pulse_rifle":4,"overclock":0,"feather":-2}).is_empty(),"Unknown entries, equipment and nonpositive stacks cannot create body parts")
 	var original_items: PackedByteArray = var_to_bytes(all_items)
@@ -105,7 +117,7 @@ func _run() -> void:
 		strengthened = strengthened and float(high[0].scale)>=float(low[0].scale) and float(high[0].brightness)>=float(low[0].brightness)
 	_check(bounded,"Every relic saturates by eight stacks; a million stacks cannot exceed size 1.12, brightness 1.2 or tier three")
 	_check(strengthened,"Higher stacks never make the selected wearable smaller or dimmer")
-	_check(Appearance.build(extreme_items).size()==6,"Even all 24 extreme-stack relics retain the six-part budget")
+	_check(Appearance.build(extreme_items).size()==6,"Even all 27 extreme-stack relics retain the six-part budget")
 	_check(Appearance.build(extreme_items,true).is_empty() and var_to_bytes(all_items)==original_items,"Death hides all wearable parts without removing inventory")
 	var independent: Array = Appearance.build(all_items)
 	if not independent.is_empty(): independent[0]["item"] = "mutated_preview"

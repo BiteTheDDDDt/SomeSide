@@ -105,14 +105,16 @@ try {
             $report = Get-Content -LiteralPath $case.Report -Raw | ConvertFrom-Json
         }
         $passed = $null -ne $report -and $report.passed -eq $true -and $case.Process.ExitCode -eq 0
+        if ($passed) { $passed = $report.attack_fx.textures -eq 6 -and $report.attack_fx.bytes -le $report.attack_fx.max_bytes }
         if ($passed -and $case.Role -eq 'host') { $passed = $report.max_players -ge ($Clients + 1) -and $report.inputs -gt 10 }
         if ($passed -and $case.Role -eq 'client') { $passed = $report.snapshots -gt 10 }
         if ($passed -and $FinishAfter -gt 0) { $passed = $report.phase -eq 'lost' -and $report.screen -eq 'results' }
         if ($passed -and $Advanced) {
             $passed = $report.advanced -eq $true -and $report.observed.deployables -eq $true -and $report.observed.effects -eq $true -and $report.observed.chrono -eq $true
             if ($Clients -eq 3) {
-                foreach ($kind in @('boomerang', 'storm', 'lance')) { $passed = $passed -and $kind -in $report.observed.projectile_kinds }
+                foreach ($kind in @('boomerang', 'storm', 'lance', 'seeker_missile', 'shock_wave')) { $passed = $passed -and $kind -in $report.observed.projectile_kinds }
                 $passed = $passed -and $report.observed.guided_projectiles -eq $true
+                $passed = $passed -and $report.observed.proc_effects -eq $true
             }
         }
         if ($passed -and $Biomes) {

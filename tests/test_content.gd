@@ -17,11 +17,12 @@ func _initialize() -> void:
 	_test_proc_relics()
 	_test_advanced_weapons()
 	_test_advanced_equipment()
+	_test_conditional_relics()
 	var missing: Array[String] = []
 	for definition in Simulation.item_catalog() + Simulation.weapon_catalog() + Simulation.equipment_catalog():
 		if not exercised.has(definition.id):
 			missing.append(definition.id)
-	_check(missing.is_empty(), "Every one of the forty catalog IDs has an exercised gameplay effect: missing=%s" % [missing])
+	_check(missing.is_empty(), "Every one of the 43 catalog IDs has an exercised gameplay effect: missing=%s" % [missing])
 	print("CONTENT_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
 
@@ -80,7 +81,7 @@ func _test_rarity_contract() -> void:
 		complete = complete and rarity in ["common", "uncommon", "rare", "legendary"] and not str(Content.rarity_name(rarity)).is_empty() and definition.color == Content.rarity_color(rarity)
 		seen[rarity] = true
 		colors[Content.rarity_color(rarity)] = true
-	_check(complete and seen.size() == 4 and colors.size() == 4, "All forty items use one consistent four-tier rarity name/color contract")
+	_check(complete and seen.size() == 4 and colors.size() == 4, "All 43 items use one consistent four-tier rarity name/color contract")
 
 func _test_core_relics() -> void:
 	var base = _fresh()
@@ -359,3 +360,27 @@ func _test_advanced_equipment() -> void:
 				_advance(simulation, 180)
 				useful = enemy.hp < 100000.0
 		_cover(id, useful and cooldown_started, "using the active produces its real damage, control, shield or cooperative support effect")
+
+func _test_conditional_relics() -> void:
+	var missile = _fresh("missile_pod")
+	missile.state.players[1].items.lens = 100
+	var target: Dictionary = _dummy(missile, Vector2(180, 0))
+	for index: int in range(12): missile._damage_enemy(target, 1.0, 1, true, 0)
+	var spawned: bool = missile.state.projectiles.size() == 1 and missile.state.projectiles[0].kind == "seeker_missile"
+	var before: float = target.hp
+	for tick: int in range(100): missile._step_projectiles(DT)
+	_cover("missile_pod", spawned and is_equal_approx(before - float(target.hp), 18.0), "a direct critical hit launches a real noncritical guided missile")
+	var landing = _fresh("landing_coil")
+	var waves: bool = false
+	for tick: int in range(90):
+		landing._step_player(landing.state.players[1], {"jump": tick == 0, "jump_held": true}, DT)
+		waves = waves or (landing.state.projectiles.size() == 2 and landing.state.projectiles[0].kind == "shock_wave")
+	var struck: Dictionary = _dummy(landing, Vector2(60, 10))
+	for tick: int in range(30): landing._step_projectiles(DT)
+	_cover("landing_coil", waves and struck.hp == 99988.0, "a full-height landing creates actual horizontal impact damage")
+	var frost = _fresh("frost_halo")
+	var victim: Dictionary = _dummy(frost, Vector2(80, 0)); victim.hp = 1
+	var neighbor: Dictionary = _dummy(frost, Vector2(100, 0))
+	frost._damage_enemy(victim, 5.0, 1, true, 0)
+	for tick: int in range(90): frost._step_proc_effects(DT)
+	_cover("frost_halo", neighbor.hp == 99976.0 and neighbor.slow_factor == 0.75, "a direct kill creates three bounded slowing aura damage pulses")

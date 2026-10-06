@@ -12,12 +12,13 @@ const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
+const AttackFxSprites = preload("res://scripts/attack_fx_sprites.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.19.0"
+const VERSION: String = "0.20.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
-const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "coin_drop", "equipment", "drop"]
+const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "proc", "coin_drop", "equipment", "drop"]
 const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
 const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
 const INK := Color("0b1e27")
@@ -96,7 +97,7 @@ var _map_title: Label
 var _inventory_filter: String = "owned"
 var _inventory_grid: GridContainer
 var _inventory_filters: Dictionary = {}
-var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "projectile_kinds": []}
+var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "proc_effects": false, "projectile_kinds": []}
 var _biome_observed: Dictionary = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 var _biome_smoke_stage: int = 0
 var _settings_in_game: bool = false
@@ -632,7 +633,7 @@ func _begin_run(members: Array, seed_value: int) -> void:
 func _begin_local(members: Array, seed_value: int) -> void:
 	sim.start_run(members, seed_value)
 	sound.reset_game_audio()
-	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "projectile_kinds": []}
+	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "proc_effects": false, "projectile_kinds": []}
 	_biome_observed = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 	_biome_smoke_stage = 0
 	if _smoke in ["host", "client"] and _options.has("smoke-advanced"):
@@ -644,7 +645,7 @@ func _begin_local(members: Array, seed_value: int) -> void:
 			var player: Dictionary = sim.state.players[int(members[index].id)]
 			player.weapon = weapons[index]
 			player.equipment = equipment[index]
-			for item in ["plating", "magnet", "harvest", "battery", "frost", "momentum", "toxin", "echo", "piercer", "resonator", "phoenix", "nova"]:
+			for item in ["plating", "magnet", "harvest", "battery", "frost", "momentum", "toxin", "echo", "piercer", "resonator", "phoenix", "nova", "missile_pod", "landing_coil", "frost_halo"]:
 				sim._grant_item(player, item)
 	_commands.clear()
 	_command_times.clear()
@@ -991,6 +992,7 @@ func _observe_advanced_state(snapshot: Dictionary) -> void:
 	# before one render frame, especially during initial texture/font setup.
 	_advanced_observed.deployables = _advanced_observed.deployables or not snapshot.get("deployables", []).is_empty()
 	_advanced_observed.effects = _advanced_observed.effects or not snapshot.get("effects", []).is_empty()
+	_advanced_observed.proc_effects = _advanced_observed.proc_effects or not snapshot.get("proc_effects", []).is_empty()
 	for player in snapshot.get("players", {}).values():
 		_advanced_observed.chrono = _advanced_observed.chrono or float(player.get("chrono_timer", 0)) > 0.0
 	for projectile in snapshot.get("projectiles", []):
@@ -1031,6 +1033,7 @@ func _finish_automation() -> void:
 	report["language"] = Locale.current_language
 	report["profile_language"] = str(profile.get("language", ""))
 	report["pixel_actors"] = PixelActorRenderer.stats()
+	report["attack_fx"] = AttackFxSprites.cache_stats()
 	report["fps"] = {"visible": is_instance_valid(_fps_label) and _fps_label.is_visible_in_tree(), "value": _fps_value}
 	report["performance"] = {"process_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, "physics_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, "draw_calls": Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), "scenery": world.scenery_cache_stats()}
 	report["advanced"] = _options.has("smoke-advanced")
@@ -1257,7 +1260,7 @@ func _show_menu(message: String = "") -> void:
 
 func _show_characters() -> void:
 	screen = "characters"
-	var page_width: float = 590
+	var page_width: float = 670
 	var column: VBoxContainer = _page("选择角色", "选择初始武器与技能；遗物会改变你的战斗方式。", page_width)
 	column.add_theme_constant_override("separation", 8)
 	for definition in Simulation.character_catalog():
@@ -1290,14 +1293,20 @@ func _show_characters() -> void:
 		content.add_theme_constant_override("separation", 6)
 		row.add_child(content)
 		_label(content, str(definition.name), 22, PAPER)
-		var description: Label = _label(content, str(definition.description), 15, MUTED)
+		var description: Label = _label(content, "脉冲步枪 + 震荡手雷 · 100 生命" if str(definition.id) == "ranger" else "共鸣弧刃 + 裂地冲击 · 145 生命", 14, MUTED)
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		description.custom_minimum_size.x = page_width - 130
 		var character_id: String = str(definition.id)
+		var active: Dictionary = Content.movement_ability(character_id)
+		var passive: Dictionary = Content.character_passive(character_id)
+		_label(content, Locale.format("Shift 主动 · %s", [Locale.text(str(active.name))]), 14, TEAL)
+		var passive_label: Label = _label(content, Locale.format("自动被动 · %s", [Locale.text(str(passive.name))]) + "\n" + Locale.text("持续命中后追加追击弹。" if character_id == "ranger" else "累计失血后获得临时护盾。"), 14, AMBER)
+		passive_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		passive_label.custom_minimum_size.x = page_width - 130
 		var select: Button = _button(content, "已选中" if selected else "选择", func(): profile.character = character_id; _save_profile(); _show_characters(), selected)
 		select.custom_minimum_size.y = 38
 		select.disabled = selected
-	_gap(column, 8)
+	_gap(column, 2)
 	_button(column, "返回", _show_menu)
 
 func _text_field(parent: Node, value: String, placeholder: String = "") -> LineEdit:
@@ -1523,7 +1532,8 @@ func _show_guide() -> void:
 		["S + Space", "穿过脚下的平台"],
 		["鼠标左键", "使用当前主武器，跟随鼠标瞄准"],
 		["鼠标右键 / Q", "使用当前主动装备；下方显示冷却"],
-		["Shift", "角色技能：游侠闪身，先锋架盾反击"],
+		["Shift", "职业主动：游侠闪身，先锋架盾反击"],
+		["自动触发", "职业被动与遗物无需按键；Tab 查看触发条件"],
 		["E", "拾取 / 使用设施 / 激活裂隙门 / 救援"],
 		["F   /   按住 Alt", "切换附近目标 / 展开道具与装备详情"],
 		["Tab / M / Esc / F3", "构筑 / 地图 / 菜单 / 帧率"] if _is_web() else ["Tab / M / Esc / F11 / F3", "构筑 / 地图 / 菜单 / 全屏 / 帧率"]
@@ -1669,7 +1679,7 @@ func _build_hud() -> void:
 	_hud_labels.relics.position = Vector2(20, 644)
 	_relic_strip = GridContainer.new()
 	_relic_strip.position = Vector2(18, 666)
-	_relic_strip.columns = 12
+	_relic_strip.columns = 14
 	_relic_strip.add_theme_constant_override("h_separation", 3)
 	_relic_strip.add_theme_constant_override("v_separation", 3)
 	_relic_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1879,7 +1889,7 @@ func _refresh_relics(inventory: Dictionary) -> void:
 		amount.size = Vector2(31, 16)
 		amount.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		_relic_tiles.append({"control": tile, "id": str(definition.id), "count": count, "rarity": definition.get("rarity", "common")})
-	var rows: int = maxi(1, ceili(_relic_tiles.size() / 12.0))
+	var rows: int = maxi(1, ceili(_relic_tiles.size() / float(_relic_strip.columns)))
 	_relic_strip.position = Vector2(18, 704 - rows * 34 - (rows - 1) * 3)
 	_hud_labels.relics.position.y = _relic_strip.position.y - 20
 	_hud_labels.hint.position.y = _relic_strip.position.y - 42
@@ -1911,8 +1921,9 @@ func _update_hud() -> void:
 	_hp_bar.max_value = maxf(1.0, float(player.max_hp))
 	_hp_bar.value = float(player.hp)
 	_hud_labels.health.text = "%d / %d" % [ceili(float(player.hp)), ceili(float(player.max_hp))]
-	if float(player.get("shield", 0.0)) > 0.0:
-		_hud_labels.health.text += Locale.format("   +%d 护盾", [ceili(float(player.shield))])
+	var total_shield: float = float(player.get("shield", 0.0)) + float(player.get("reactive_shield", 0.0))
+	if total_shield > 0.0:
+		_hud_labels.health.text += Locale.format("   +%d 护盾", [ceili(total_shield)])
 	var elapsed: int = int(sim.state.get("time", 0.0))
 	var difficulty: float = float(sim.state.get("difficulty", 1.0))
 	_hud_labels.expedition.text = Locale.format("%02d/03  %02d:%02d  威胁%.1f", [int(sim.state.get("stage", 1)), elapsed / 60, elapsed % 60, difficulty])
@@ -1974,12 +1985,12 @@ func _hovered_loadout() -> Dictionary:
 	for tile in _relic_tiles:
 		if tile.control.is_visible_in_tree() and tile.control.get_global_rect().has_point(pointer):
 			return tile
-	for key in ["weapon", "equipment"]:
+	for key in ["weapon", "equipment", "dash"]:
 		if not _slot_ui.has(key):
 			continue
 		var slot: Dictionary = _slot_ui[key]
 		if slot.icon.is_visible_in_tree() and slot.icon.get_global_rect().has_point(pointer):
-			return {"id": str(slot.id), "count": 1, "equipped": true}
+			return {"id": str(slot.id), "count": 1, "equipped": true, "innate": key == "dash"}
 	return {}
 
 func _update_interaction_panel(player: Dictionary) -> void:
@@ -1991,9 +2002,14 @@ func _update_interaction_panel(player: Dictionary) -> void:
 	var hovered: Dictionary = _hovered_loadout()
 	if not hovered.is_empty():
 		expanded = true
-		var definition: Dictionary = Simulation.loot_definition(str(hovered.id))
-		var suffix: String = Locale.text(" · 已装备") if hovered.get("equipped", false) else " ×" + str(hovered.count)
-		target = {"kind": "inspect", "item": hovered.id, "title": Locale.text(str(definition.name)) + suffix, "description": definition.description, "warning": definition.get("warning", ""), "category": definition.category, "prompt": "[Tab] 查看完整构筑", "affordable": true}
+		if bool(hovered.get("innate", false)):
+			var active: Dictionary = Content.movement_ability(str(player.get("character", "ranger")))
+			var passive: Dictionary = Content.character_passive(str(player.get("character", "ranger")))
+			target = {"kind": "inspect", "item": active.id, "title": Locale.format("Shift 主动 · %s", [Locale.text(str(active.name))]), "description": Locale.text(str(active.description)) + "\n\n" + Locale.format("自动被动 · %s", [Locale.text(str(passive.name))]) + "\n" + Locale.text(str(passive.description)), "category": "character", "prompt": "[Tab] 查看完整构筑", "affordable": true}
+		else:
+			var definition: Dictionary = Simulation.loot_definition(str(hovered.id))
+			var suffix: String = Locale.text(" · 已装备") if hovered.get("equipped", false) else " ×" + str(hovered.count)
+			target = {"kind": "inspect", "item": hovered.id, "title": Locale.text(str(definition.name)) + suffix, "description": definition.description, "warning": definition.get("warning", ""), "category": definition.category, "prompt": "[Tab] 查看完整构筑", "affordable": true}
 	_loot_panel.visible = not target.is_empty()
 	if target.is_empty():
 		return
@@ -2012,7 +2028,7 @@ func _update_interaction_panel(player: Dictionary) -> void:
 	var id: String = str(target.get("item", ""))
 	var category: String = str(target.get("category", ""))
 	var definition: Dictionary = Simulation.loot_definition(id)
-	var category_text: String = {"passive": "被动遗物  ·  可叠加", "weapon": "主武器  ·  单一槽位", "equipment": "主动装备  ·  单一槽位"}.get(category, "交互设施")
+	var category_text: String = {"passive": "被动遗物  ·  可叠加", "weapon": "主武器  ·  单一槽位", "equipment": "主动装备  ·  单一槽位", "character": "职业能力 · 换装后保留"}.get(category, "交互设施")
 	if str(target.get("kind", "")) == "chest":
 		category_text = "补给设施  ·  操作前确认代价"
 	var icon_id: String = id if not id.is_empty() else str(target.get("kind", "unknown"))
@@ -2125,7 +2141,8 @@ func _show_inventory() -> void:
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
 	_label(content, Locale.format("%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s", [Locale.text("游侠" if player.get("character", "ranger") == "ranger" else "先锋"), ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), Locale.text("合作远征仍在继续" if online else "远征已暂停")]), 14, MUTED)
 	var innate: Dictionary = Simulation.movement_ability(player)
-	var innate_description: Label = _label(content, "Shift  ·  " + Locale.text(str(innate.name)) + "  ·  " + Locale.text(str(innate.description)), 13, MUTED)
+	var passive: Dictionary = Content.character_passive(str(player.get("character", "ranger")))
+	var innate_description: Label = _label(content, Locale.format("Shift 主动 · %s", [Locale.text(str(innate.name))]) + "   /   " + Locale.format("自动被动 · %s", [Locale.text(str(passive.name))]), 13, MUTED)
 	innate_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	innate_description.custom_minimum_size.x = 1136
 	_inventory_filters.clear()
@@ -2175,6 +2192,8 @@ func _populate_inventory(filter_key: String) -> void:
 		"weapon": definitions = Simulation.weapon_catalog()
 		"equipment": definitions = Simulation.equipment_catalog()
 		_:
+			_character_ability_card(_inventory_grid, Content.movement_ability(str(player.get("character", "ranger"))), true)
+			_character_ability_card(_inventory_grid, Content.character_passive(str(player.get("character", "ranger"))), false)
 			for key in ["weapon", "equipment"]:
 				definitions.append(Simulation.loot_definition(str(player.get(key, "pulse_rifle" if key == "weapon" else "grenade"))))
 			for definition in Simulation.item_catalog():
@@ -2196,6 +2215,31 @@ func _populate_inventory(filter_key: String) -> void:
 			style.content_margin_bottom = 6
 	var scroll: ScrollContainer = _inventory_grid.get_parent()
 	scroll.scroll_vertical = 0
+
+func _character_ability_card(parent: Node, definition: Dictionary, active: bool) -> void:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size = Vector2(510, 110)
+	var tint: Color = TEAL if active else AMBER
+	var style: StyleBoxFlat = _style(SURFACE, Color(tint, 0.5), 4)
+	style.border_width_left = 3
+	style.content_margin_left = 13
+	style.content_margin_right = 13
+	panel.add_theme_stylebox_override("panel", style)
+	parent.add_child(panel)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	_icon(row, str(definition.id), 42)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 4)
+	row.add_child(words)
+	_label(words, "职业主动 · Shift" if active else "职业被动 · 自动触发", 11, tint)
+	_label(words, str(definition.name), 16, PAPER)
+	var description: Label = _label(words, str(definition.description), 14, PAPER)
+	description.custom_minimum_size.x = 414
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 func _show_map() -> void:
 	_reset_controls()

@@ -30,6 +30,7 @@ const Entities = preload("res://scripts/entity_renderer.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const ProjectileArt = preload("res://scripts/projectile_renderer.gd")
 const EnemyAttackArt = preload("res://scripts/enemy_attack_visual.gd")
+const ProcFeedback = preload("res://scripts/proc_feedback.gd")
 const Locale = preload("res://scripts/localization.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
@@ -754,6 +755,9 @@ func push_events(events: Array) -> void:
 		if direction.length_squared() < 0.001: direction = Vector2.RIGHT
 		direction = direction.normalized()
 		match kind:
+			"proc":
+				var activation: Dictionary = ProcFeedback.activation(event)
+				if not activation.is_empty(): _add_effect(activation)
 			"shoot":
 				var enemy_shot: bool = event.get("enemy", false)
 				var weapon: String = str(event.get("weapon", event.get("kind", "bullet")))
@@ -997,6 +1001,7 @@ func _draw() -> void:
 	_draw_gate()
 	_draw_chests()
 	_draw_deployables()
+	_draw_proc_fields()
 	_draw_pickups()
 	_draw_enemies()
 	_draw_players()
@@ -1487,6 +1492,22 @@ func _draw_weapon(weapon: String, mechanism: float = 0.0, energy: float = 0.0) -
 	WeaponArt.draw(self, weapon, mechanism, energy)
 
 
+func _draw_proc_fields() -> void:
+	var players: Dictionary = _frame.get("players", {})
+	var count: int = 0
+	for field: Dictionary in _frame.get("proc_effects", []):
+		if count >= 8: break
+		count += 1
+		var owner: int = int(field.get("owner", -1))
+		var position_value: Vector2 = field.get("pos", Vector2.ZERO)
+		if players.has(owner):
+			if bool(players[owner].get("dead", false)): continue
+			position_value = weapon_draw_pose(players[owner]).position
+		var p: Vector2 = world_to_screen(position_value)
+		if not _visible(p, 140.0): continue
+		ProcFeedback.draw(self, ProcFeedback.field_sample(field), p, fx_scale)
+
+
 func _draw_players() -> void:
 	var players: Dictionary = _frame.get("players", {})
 	for key: Variant in players:
@@ -1551,6 +1572,7 @@ func _draw_players() -> void:
 			_draw_weapon(weapon)
 		draw_set_transform(Vector2.ZERO)
 		_draw_movement_ability(player, p)
+		ProcFeedback.draw(self, ProcFeedback.shield_sample(player), p, fx_scale)
 		if float(player.get("chrono_timer", 0.0)) > 0.0:
 			var phase: float = _clock * 1.7
 			draw_arc(p,32.0,phase,phase+PI*1.2,30,Color(0.54,0.86,0.93,0.42),1.2,true)
@@ -1684,6 +1706,7 @@ func _draw_projectiles() -> void:
 		var friendly: bool = str(projectile.get("team","player"))=="player"
 		var kind: String = str(projectile.get("kind","bullet"))
 		var strength: float = effect_strength(projectile) if friendly else 1.0
+		if ProcFeedback.draw(self, ProcFeedback.projectile_sample(projectile), p, fx_scale): continue
 		var velocity: Vector2 = projectile.get("vel",Vector2.RIGHT)
 		var requested: float = minf(velocity.length()*0.032*sqrt(strength),92.0 if kind in ["rail","lance"] else 42.0)
 		var tail: float = rendered_projectile_trail_length(projectile,rendered,requested)
@@ -1718,14 +1741,13 @@ func _draw_threat_overlays() -> void:
 				for i: int in range(13):
 					var t: float = i/12.0
 					path.append(p+direction*(112*t)+Vector2(0,-sin(t*PI)*28))
-				draw_polyline(path,Color(color_value,0.25+progress*0.45),1.3,true)
-				draw_circle(path[-1],2.0,Color(color_value,.5),true,-1,true)
+				draw_polyline(path,Color(color_value,0.12+progress*0.20),.8,true)
+				EnemyAttackArt.Sprites.draw_family(self,"burst",Rect2(path[-1]-Vector2(18,10),Vector2(36,20)),.55+progress*.3,Color(.85,.74,.6,.65))
 			"blink":
 				var destination: Vector2 = world_to_screen(enemy.get("blink_target",enemy.get("pos",Vector2.ZERO)))
 				if _visible(destination,45):
-					draw_arc(destination,24.0,0,TAU,32,Color(color_value,0.6),1.5,true)
-					draw_arc(destination,29.0,-PI*0.5,-PI*0.5+TAU*progress,32,Color(color_value,0.9),1.5,true)
-					for side: float in [-1.0,1.0]: draw_line(destination+Vector2(side*16,-17),destination+Vector2(side*16,17),Color(color_value,0.4),1.0,true)
+					EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(destination-Vector2(29,34),Vector2(58,68)),progress,Color.WHITE)
+					draw_arc(destination,24.0,0,TAU,32,Color(color_value,.25),.8,true)
 				_draw_dashes(p,destination,Color(color_value,0.16),1.0,22.0)
 			"spit", "triple", "salvo", "spore_volley", "mend":
 				if not _visible(p,190): continue
@@ -1735,10 +1757,10 @@ func _draw_threat_overlays() -> void:
 					var ray: Vector2 = direction.rotated((index-(count-1)*0.5)*spacing)
 					var start: float = 49.0 if str(enemy.get("kind",""))=="boss" else 23.0
 					var end: float = 145.0 if count>1 else 112.0
-					draw_line(p+ray*start,p+ray*end,Color(color_value,0.17+progress*0.27),1.0,true)
+					draw_line(p+ray*start,p+ray*end,Color(color_value,0.10+progress*0.16),1.0,true)
 					if count>1:
 						var seed: Vector2 = p+ray*(start+8.0*(1.0-progress))
-						draw_circle(seed,1.5+progress*2.0,Color(color_value,.5+progress*.35),true,-1,true)
+						EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(seed-Vector2(9,9),Vector2(18,18)),progress,Color(1,1,1,.65+progress*.25))
 				if attack=="mend":
 					var linked: int=0
 					for ally: Dictionary in _frame.get("enemies",[]):
@@ -1746,7 +1768,7 @@ func _draw_threat_overlays() -> void:
 						if Vector2(ally.pos).distance_to(enemy.pos)>260.0: continue
 						var end: Vector2 = world_to_screen(ally.pos)
 						_draw_dashes(p,end,Color("cdb291",0.3),1.0,16.0)
-						draw_arc(end,24,0,TAU,24,Color("e8bd8c",0.35),1.0,true)
+						EnemyAttackArt.Sprites.draw_family(self,"charge",Rect2(end-Vector2(20,25),Vector2(40,50)),progress,Color(.9,1,.72,.8))
 						linked+=1
 						if linked>=3: break
 
@@ -1787,32 +1809,15 @@ func _draw_hazard(hazard: Dictionary) -> void:
 		EnemyAttackArt.draw_beam(self,p,end,sampled)
 		return
 	if not _visible(p,radius+14): return
-	draw_circle(p,radius,Color(tint,0.09 if active else 0.035+progress*0.025),true,-1,true)
-	draw_arc(p,radius,0,TAU,48,Color(tint,0.88 if active else 0.55),1.8,true)
-	if not active:
-		draw_arc(p,radius+4,-PI*0.5,-PI*0.5+TAU*progress,48,Color(tint,0.95),2.0,true)
-		for index: int in range(8):
-			var angle: float = index*TAU/8.0
-			var direction: Vector2 = Vector2.from_angle(angle)
-			draw_line(p+direction*(radius-6),p+direction*radius,Color(tint,0.48),1.2,true)
-		draw_line(p+Vector2(-5,0),p+Vector2(5,0),Color(tint,0.7),1.0,true)
-		draw_line(p+Vector2(0,-5),p+Vector2(0,5),Color(tint,0.7),1.0,true)
-	else:
-		if kind in ["stone_spike","burrow"]:
-			for index: int in range(5):
-				var x: float = (index-2)*radius*0.29
-				var height: float = radius*(0.5+0.3*sin(index*2.7+0.8))
-				var base: Vector2 = p+Vector2(x,radius*0.3)
-				var points: PackedVector2Array = PackedVector2Array([base+Vector2(-6,0),base+Vector2(1,-height),base+Vector2(7,0)])
-				draw_colored_polygon(points,Color("b7907c"))
-				draw_line(base+Vector2(1,-height),base+Vector2(7,0),Color("ffbe86"),1.2,true)
-		else:
-			for index: int in range(6):
-				var direction: Vector2 = Vector2.from_angle(index*TAU/6.0+0.2)
-				var seed: Vector2 = p+direction*radius*0.52
-				draw_circle(seed,4.5,Color("65433f"),true,-1,true)
-				draw_arc(seed,4.5,0,TAU,12,Color("e6b78c"),1.3,true)
-			draw_arc(p,radius*0.64,0,TAU,32,Color(tint,0.35),1.0,true)
+	# Keep one subdued exact-radius marker, with the authored animation carrying
+	# the charge/eruption instead of progress rings, spokes and geometric seeds.
+	draw_circle(p,radius,Color(tint,.065 if active else .025),true,-1,true)
+	draw_arc(p,radius,0,TAU,48,Color(tint,.48 if active else .3+.15*progress),.8,true)
+	var phase: float = clampf(1.0-float(hazard.get("ttl",.22))/.22,0,1) if active else progress
+	var family: String = "burst" if active else "charge"
+	var extent: float = radius*2.0 if active else minf(radius*1.3,76.0)
+	var color_value: Color = Color(.82,1,.7) if kind in ["spore_bloom","spore_pool"] else Color.WHITE
+	EnemyAttackArt.Sprites.draw_family(self,family,Rect2(p-Vector2.ONE*extent*.5,Vector2.ONE*extent),phase,color_value)
 
 
 func _draw_effects() -> void:
@@ -1832,6 +1837,9 @@ func _draw_effects() -> void:
 		var color_value: Color = effect.get("color", TEAL)
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
+		if str(effect.get("kind", "")) == "proc_activation":
+			ProcFeedback.draw(self, ProcFeedback.activation_sample(effect), p, fx_scale)
+			continue
 		match str(effect.get("kind", "spark")):
 			"flame":
 				var angle: float = effect_angle

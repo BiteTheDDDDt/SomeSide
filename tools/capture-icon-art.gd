@@ -2,7 +2,7 @@ extends SceneTree
 
 const Icons=preload("res://scripts/item_icons.gd")
 const Content=preload("res://scripts/content.gd")
-const DIRECTORY="res://tools/results/icon-art-v0181/"
+const DIRECTORY="res://tools/results/icon-art-v020/"
 var tag: String="smooth"
 
 class Catalogue extends Node2D:
@@ -11,9 +11,9 @@ class Catalogue extends Node2D:
 	var objects: bool=false
 	func _draw() -> void:
 		var font: Font=ThemeDB.fallback_font
-		draw_rect(Rect2(0,0,1280,872),Color("08161d"))
+		draw_rect(Rect2(0,0,1280,1026),Color("08161d"))
 		draw_string(font,Vector2(28,34),"SOMESIDE / ITEM ART / "+title.to_upper(),HORIZONTAL_ALIGNMENT_LEFT,-1,22,Color("e6e6ce"))
-		draw_string(font,Vector2(28,58),"Native 64 px + 24 px + 16 px / 24 relics, 8 weapons, 8 equipment",HORIZONTAL_ALIGNMENT_LEFT,-1,14,Color("829e9f"))
+		draw_string(font,Vector2(28,58),"Native 64 px + 24 px + 16 px / 27 relics, 8 weapons, 8 equipment",HORIZONTAL_ALIGNMENT_LEFT,-1,14,Color("829e9f"))
 		for index: int in range(entries.size()):
 			var entry: Dictionary=entries[index]
 			var p=Vector2(28+(index%8)*154,82+(index/8)*154)
@@ -49,14 +49,14 @@ func _run() -> void:
 			if pixels==64: object_unique[image.get_data().hex_encode().hash()]=true
 	for id: String in ["phase_dash","guard_burst","shoulder_rush","cache","choice","blood","combat","equipment_cache","gate","revive","unknown"]:
 		if Icons.texture(id,24).get_size()!=Vector2(24,24): failures.append(id+" utility")
-	if unique.size()!=40: failures.append("Catalogue must retain 40 distinct icon images")
-	if object_unique.size()!=40: failures.append("Transparent objects must retain 40 distinct silhouettes")
+	if unique.size()!=43: failures.append("Catalogue must retain 43 distinct icon images")
+	if object_unique.size()!=43: failures.append("Transparent objects must retain 43 distinct silhouettes")
 	if Icons.texture("grenade",1).get_width()!=16 or Icons.pickup_texture("grenade",999).get_width()!=256: failures.append("Size clamps")
 	DirAccess.make_dir_recursive_absolute(DIRECTORY)
 	var native: bool=DisplayServer.get_name()!="headless"
 	if native:
 		var view=SubViewport.new()
-		view.size=Vector2i(1280,872)
+		view.size=Vector2i(1280,1026)
 		view.render_target_update_mode=SubViewport.UPDATE_ALWAYS
 		root.add_child(view)
 		var page=Catalogue.new()

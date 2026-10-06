@@ -14,6 +14,7 @@ const ITEMS: Dictionary = {
 	"lens":"head", "overclock":"head", "frost":"head", "toxin":"head",
 	"coolant":"belt", "ember":"belt", "siphon":"belt", "harvest":"belt", "magnet":"belt",
 	"plating":"legs", "moss":"legs", "momentum":"legs", "piercer":"legs",
+	"missile_pod":"shoulder", "landing_coil":"legs", "frost_halo":"chest",
 }
 const INK: Color = Color("07171e")
 const WHITE: Color = Color("edf4dc")
@@ -156,6 +157,31 @@ static func _rivet(image: Image, x: int, y: int) -> void:
 
 static func _paint(image: Image, id: String, tint: Color, tier: int) -> void:
 	match id:
+		"missile_pod":
+			_plate(image,-18,-16,14,14,STEEL)
+			_rect(image,-16,-12,10,8,RUBBER)
+			for x: int in [-15,-10]:
+				_plate(image,x,-14,4,9,COPPER)
+				_rect(image,x+1,-13,2,2,tint)
+				_rect(image,x+1,-10,2,4,STEEL_LIGHT)
+			_rivet(image,-17,-4)
+			_rivet(image,-7,-4)
+		"landing_coil":
+			for x: int in [-9,2]:
+				_plate(image,x,14,7,8,STEEL)
+				_rect(image,x+1,16,5,4,RUBBER)
+				_rect(image,x+1,16,5,1,tint)
+				_rect(image,x+1,19,5,1,tint)
+				_rect(image,x,21,7,2,COPPER)
+		"frost_halo":
+			_plate(image,-5,-11,11,13,STEEL)
+			_rect(image,-3,-8,7,6,RUBBER)
+			_window(image,-1,-7,3,4,tint)
+			for x: int in [-6,4]:
+				_plate(image,x,-8,3,5,STEEL_LIGHT)
+				_rect(image,x+1,-6,1,2,tint)
+			_rect(image,-1,-12,3,2,COPPER)
+			_rect(image,-1,1,3,2,COPPER)
 		"feather":
 			_plate(image,-19,-13,10,24,RUBBER)
 			# Three folded, feather-shaped metal vanes, bolted to a common spine.

@@ -72,7 +72,7 @@ func _test_resolution() -> void:
 func _test_catalogue() -> void:
 	var records: Array = Content.passives()+Content.weapons()+Content.equipment()
 	var original: PackedByteArray = var_to_bytes(records)
-	_check(records.size()==40,"Localization covers the complete forty-item catalogue")
+	_check(records.size()==43,"Localization covers the complete forty-three-item catalogue")
 	for record: Dictionary in records:
 		var missing: Array[String] = []
 		for key: String in ["name","description","warning"]:
@@ -83,6 +83,10 @@ func _test_catalogue() -> void:
 		_check(missing.is_empty(),"%s name, effect and risk have complete English translations%s"%[record.id,"" if missing.is_empty() else " / "+str(missing)])
 		_check(_digits(str(record.description))==_digits(Locale.text(str(record.description))),"%s translated effect preserves every numeric value"%record.id)
 	var missing_world: Array[String] = []
+	for character: String in ["ranger", "vanguard"]:
+		for ability: Dictionary in [Content.movement_ability(character), Content.character_passive(character)]:
+			_check(Locale.has_translation(str(ability.name)) and Locale.has_translation(str(ability.description)) and not _has_chinese(Locale.text(str(ability.description))), character+" active and passive ability have complete English descriptions")
+			_check(_digits(str(ability.description))==_digits(Locale.text(str(ability.description))), str(ability.id)+" translated rules preserve all numerical values")
 	for stage: int in range(1,4):
 		var layout: Dictionary = Layouts.build(stage)
 		var terms: Array = [layout.stage_name,Enemies.boss_definition(layout.biome).name]

@@ -75,7 +75,7 @@ func _test_catalogs() -> void:
 			complete = complete and definition.get("category", "") == category and not ids.has(item.id)
 			ids[item.id] = true
 	_check(complete, "Every unique loot ID resolves to a complete, categorized definition")
-	_check(categories.passive.size() == 24 and categories.weapon.size() == 8 and categories.equipment.size() == 8, "The catalog contains 24 passive relics, eight weapons and eight active equipment choices")
+	_check(categories.passive.size() == 27 and categories.weapon.size() == 8 and categories.equipment.size() == 8, "The catalog contains 27 passive relics, eight weapons and eight active equipment choices")
 	_check(Simulation.loot_definition("glass").warning.length() > 0, "The harmful glass relic explicitly declares its downside")
 	var simulation = _fresh(2)
 	_check(simulation.state.players[1].weapon == "pulse_rifle" and simulation.state.players[1].equipment == "grenade", "Ranger starts with the rifle and grenade slots")

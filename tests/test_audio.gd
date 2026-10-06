@@ -166,6 +166,9 @@ func _run() -> void:
 	_reset_voices()
 	_check(sound._play_sound("weapon_pulse_rifle", 0.0, 2000) and not sound._play_sound("weapon_pulse_rifle", 0.0, 2020) and not sound._play_sound("weapon_scattergun", 0.0, 2020) and sound._play_sound("weapon_pulse_rifle", 0.0, 2045), "Per-weapon and shared attack cooldowns prevent multi-pellet and cooperative shot bursts from clipping the mix")
 	_reset_voices()
+	_check(sound._play_sound("hit",0.0,2100) and sound._play_sound("proc_missile",0.0,2100), "A triggering hit and its missile launch can both be heard in one authority tick")
+	_check(not sound._play_sound("proc_wave",0.0,2105) and sound._play_sound("proc_halo",0.0,2200), "Cooperative trigger bursts share a bounded cue rate and recover after the window")
+	_reset_voices()
 	for index in range(8):
 		sound._voice_until[index] = 4000
 		sound._voice_priority[index] = 2

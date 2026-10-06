@@ -106,6 +106,11 @@ static func _backplate(id: String) -> String:
 static func color(id: String) -> Color:
 	match id:
 		"phase_dash": return Color("6cd6bd")
+		"pursuit_protocol": return Color("7ee9c8")
+		"reactive_plating": return Color("f2c18c")
+		"missile_pod": return Color("ffb37d")
+		"landing_coil": return Color("8eddf0")
+		"frost_halo": return Color("a8cfff")
 		"shoulder_rush", "guard_burst": return Color("f2b96d")
 		"overclock": return Color("67e5ef")
 		"capacitor": return Color("ffd06f")
@@ -177,6 +182,12 @@ static func _drawing(id: String) -> String:
 
 static func _secondary_drawing(id: String) -> String:
 	match id:
+		"missile_pod":
+			return '<path d="M13 16L22 9H43L52 18V48L44 55H18L10 47V24Z" fill="#5c6f77" stroke="#071219" stroke-width="3"/><path d="M16 19L23 13H41L47 19V23H16Z" fill="#b8bdab"/><path d="M15 26H46V46H15Z" fill="#24343d"/><path d="M17 28H29V44H17ZM33 28H45V44H33Z" fill="#94704e" stroke="#071219" stroke-width="2"/><path d="M19 30H27V40L23 43L19 40ZM35 30H43V40L39 43L35 40Z" fill="#dae0c9"/><path d="M23 24L27 30H19ZM39 24L43 30H35Z" fill="ACCENT"/><path d="M21 34H25V39H21ZM37 34H41V39H37Z" fill="#526c78"/><path d="M13 48H47V51H13Z" fill="#9ca995"/><path d="M22 52H39V57H22Z" fill="#495e63" stroke="#071219" stroke-width="2"/><path d="M48 23H55V42H48Z" fill="#85938b" stroke="#071219" stroke-width="2"/><path d="M50 27H53V34H50Z" fill="ACCENT"/><path d="M18 18H28M37 18H43" stroke="#ece8cc" stroke-width="2"/>'
+		"landing_coil":
+			return '<path d="M22 6H41L45 13V34L52 43V53H12V42L20 32V13Z" fill="#5c737d" stroke="#071219" stroke-width="3"/><path d="M24 10H38V18H24Z" fill="#c4d0bd"/><path d="M23 20H41V31H23Z" fill="#233d4c"/><path d="M24 22H39V25H24ZM24 28H39V31H24Z" fill="ACCENT"/><path d="M20 34H44L48 40H16Z" fill="#aec0af" stroke="#071219" stroke-width="2"/><path d="M16 42H48V48H16Z" fill="#21333b"/><path d="M18 43H25V47H18ZM28 43H35V47H28ZM38 43H45V47H38Z" fill="ACCENT"/><path d="M12 50H52V55H12Z" fill="#8c9484" stroke="#071219" stroke-width="2"/><path d="M15 53H24M29 53H38M43 53H49" stroke="#dde0bf" stroke-width="2"/><path d="M14 18H20V30H14ZM44 18H50V30H44Z" fill="#a18b69" stroke="#071219" stroke-width="2"/><path d="M16 20H19M45 20H48" stroke="#efe4ba" stroke-width="2"/>'
+		"frost_halo":
+			return '<path d="M21 9H43L55 21V43L43 55H21L9 43V21Z" fill="#5f7890" stroke="#071219" stroke-width="3"/><path d="M23 14H41L49 23V41L41 49H23L15 41V23Z" fill="#c5d6cf"/><path d="M26 20H38L44 26V38L38 44H26L20 38V26Z" fill="#243d55" stroke="#071219" stroke-width="2"/><path d="M30 23L38 28L37 37L30 41L25 32Z" fill="ACCENT"/><path d="M30 25L33 27L29 35L27 32Z" fill="#edfff0"/><path d="M26 5H38V17H26ZM47 26H59V38H47ZM26 47H38V59H26ZM5 26H17V38H5Z" fill="#7898a9" stroke="#071219" stroke-width="2"/><path d="M29 8H35V14H29ZM50 29H56V35H50ZM29 50H35V56H29ZM8 29H14V35H8Z" fill="ACCENT"/><path d="M23 15L18 21M43 15L48 21M18 43L23 48M43 48L48 43" stroke="#e3ecd7" stroke-width="2"/>'
 		"frost":
 			return '<path d="M25 5L38 10L44 30L37 46L22 42L15 25Z" fill="#527b91" stroke="#071219" stroke-width="3"/><path d="M25 9L32 13L29 34L21 38L19 25Z" fill="#d7efdf"/><path d="M33 13L37 15L40 29L34 39L29 34Z" fill="ACCENT"/><path d="M30 18L25 26L28 31L24 36" fill="none" stroke="#8eb8c5" stroke-width="2"/><path d="M42 14L50 10L55 26L46 35L41 29Z" fill="#84b9c5" stroke="#071219" stroke-width="2"/><path d="M47 15L50 14L51 24L45 30Z" fill="#e9f2df"/><path d="M14 35L22 39L36 42L44 35L48 41L40 52H24L16 46Z" fill="#566f7d" stroke="#071219" stroke-width="3"/><path d="M21 43H39M26 53V58H35V53" fill="none" stroke="#bacbbd" stroke-width="3"/>'
 		"momentum":
@@ -215,6 +226,10 @@ static func _secondary_drawing(id: String) -> String:
 
 static func _utility_drawing(id: String) -> String:
 	match id:
+		"pursuit_protocol":
+			return '<path d="M10 21L20 13H44L54 23V42L45 51H18L9 42Z" fill="#4c7475" stroke="#071219" stroke-width="3"/><path d="M15 23L22 18H40L47 23V28H15Z" fill="#b9cabe"/><path d="M17 29H46V42H17Z" fill="#152e3e"/><path d="M20 31H43V39H20Z" fill="ACCENT"/><path d="M22 32H28V35H22Z" fill="#e1ffe2"/><path d="M32 29V42M27 35H38" stroke="#214855" stroke-width="2"/><path d="M22 45H40V50H22Z" fill="#8b9d87"/><path d="M5 28H11V40H5ZM53 28H59V40H53Z" fill="#9a8c6d" stroke="#071219" stroke-width="2"/><path d="M19 11V7H25V13M40 13V7H46V12" fill="none" stroke="#7eab9c" stroke-width="3"/>'
+		"reactive_plating":
+			return '<path d="M15 12L32 6L49 12V36L42 48L32 57L21 48L14 36Z" fill="#6a797a" stroke="#071219" stroke-width="3"/><path d="M18 16L32 11L45 16V23L32 28L18 23Z" fill="#e0d3ac"/><path d="M18 26L32 31L45 26V35L39 42L32 47L24 42L18 35Z" fill="#a78e69"/><path d="M24 30H39V37L32 42L25 37Z" fill="#243c47"/><path d="M28 31H35V35H38V38H34V42H30V38H26V35H28Z" fill="ACCENT"/><path d="M24 44L32 50L40 44L35 52H29Z" fill="#d8c9a6"/><path d="M10 20H15V32H10ZM49 20H54V32H49Z" fill="#ac9677" stroke="#071219" stroke-width="2"/><path d="M22 18L30 15M36 15L42 18" stroke="#fff1ce" stroke-width="2"/>'
 		"dash", "phase_dash":
 			return '<path d="M30 16H39L37 33L49 41V49H28L20 42L25 31Z" fill="#626a88" stroke="ACCENT" stroke-width="2.5"/><path d="M28 45H46M11 25H24M8 33H20M10 41H17" stroke="#e1e5ef" stroke-width="3"/><path d="M33 21L29 32L34 35" fill="none" stroke="ACCENT" stroke-width="3"/>'
 		"shoulder_rush":

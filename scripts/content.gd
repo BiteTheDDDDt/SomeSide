@@ -3,6 +3,11 @@ extends RefCounted
 
 static var _definitions: Dictionary = {}
 
+static func character_passive(character: String) -> Dictionary:
+	if character == "vanguard":
+		return {"id": "reactive_plating", "name": "应急装甲", "description": "累计实际损失30生命后，获得10点独立护盾，持续3秒；冷却6秒，冷却期间不累积。护盾吸收、献祭和致死伤害不触发。角色专属，换装不重置。", "color": Color("ffa66a")}
+	return {"id": "pursuit_protocol", "name": "追猎协议", "description": "连续6次主武器命中发射8伤害追击弹；相邻命中间隔超过2秒清空，每次攻击最多计1次。冷却3秒，冷却期间不累积。角色专属，换装不重置。", "color": Color("65e2d6")}
+
 ## Character-owned Shift abilities are independent of replaceable equipment.
 static func movement_ability(character: String) -> Dictionary:
 	if character == "vanguard":
@@ -40,6 +45,9 @@ static func passives() -> Array:
 		_record("resonator", "广域共鸣器", "首层使自己的伤害爆炸半径增加30%，后续每层再增加10%，最多增加80%。", "ffd071", "passive", "legendary"),
 		_record("phoenix", "不灭余火", "每层每关可抵挡1次致命伤（最多2次），恢复35%生命并获得2秒无敌。", "ffd071", "passive", "legendary"),
 		_record("nova", "超新星种子", "直接暴击释放130范围新星，每层16伤害（最多8层）；0.75秒内置冷却，不递归触发。", "ffd071", "passive", "legendary"),
+		_record("missile_pod", "蜂群弹舱", "直接攻击暴击时向600范围内一敌发射追踪弹：首层18伤害，每额外层+6，最高48；冷却1.25秒。追踪弹不暴击或触发连锁。", "ffb37d", "passive", "rare"),
+		_record("landing_coil", "落震线圈", "从至少90高度落地时向两侧发出冲击波：首层12伤害，每额外层+4，最高32；冷却2秒。每次最多命中8敌且每敌1次，不暴击或触发连锁。", "8eddf0", "passive", "uncommon"),
+		_record("frost_halo", "霜环发生器", "直接击杀后产生随身霜环，持续1.5秒：每0.5秒造成8伤害，每额外层+2，最高18；半径105，每额外层+5，最高130，并减速25%持续0.65秒。冷却4秒，不暴击或触发连锁。", "a8cfff", "passive", "rare"),
 	]
 
 static func weapons() -> Array:

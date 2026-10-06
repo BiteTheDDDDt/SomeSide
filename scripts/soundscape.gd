@@ -121,6 +121,12 @@ static func event_sound(event: Dictionary) -> String:
 	if type in ["shoot", "slash"] and event.has("weapon"):
 		return "weapon_" + str(event.weapon) if str(event.weapon) in ["pulse_rifle", "arc_blade", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance"] else ""
 	match type:
+		"proc":
+			match kind:
+				"missile_pod", "pursuit_protocol": return "proc_missile"
+				"landing_coil": return "proc_wave"
+				"frost_halo": return "proc_halo"
+				"reactive_plating": return "proc_plate"
 		"equipment":
 			var equipment: String = str(event.get("equipment", kind))
 			return "equipment_" + equipment if equipment in ["grenade", "shockwave", "repair_field", "aegis", "graviton", "turret", "meteor", "time_warp"] else ""
@@ -269,6 +275,12 @@ static func _prepare_samples() -> void:
 	_add("explosion", [_layer("noise", .36, .8, 3400, 90), _layer("sine", .30, .7, 82, 26)], 1, 110, "blasts", 80)
 	_add("meteor_impact", [_layer("noise", .56, 1, 6600, 160), _layer("sine", .50, .9, 105, 25), _layer("crackle", .33, .35, 3000, 700, .15, 2, 31)], 2, 170, "blasts", 80)
 	_add("resonance", [_layer("bell", .20, .6, 660, 320), _layer("fm", .12, .4, 440, 140, 0, 2, 4)], 1, 130, "blasts", 80, .17)
+	# Triggered attacks have their own cue budget; an ordinary hit in the same
+	# authority tick must not erase a launch or drown out the next enemy warning.
+	_add("proc_missile", [_layer("air", .22, .65, 950, 4200, 0, .8), _layer("fm", .12, .4, 580, 1300, .025, 1.7, 2)], 1, 160, "procs", 90, .15)
+	_add("proc_wave", [_layer("sine", .24, .7, 150, 42), _layer("noise", .17, .5, 2600, 420), _layer("air", .25, .35, 780, 2300, .02)], 1, 160, "procs", 90, .17)
+	_add("proc_halo", [_layer("bell", .36, .55, 1174.66, 880), _layer("air", .29, .4, 3700, 1450), _layer("bell", .22, .3, 1760, 1320, .045)], 1, 200, "procs", 90, .14)
+	_add("proc_plate", [_layer("metal", .09, .6, 840, 360), _layer("swell", .29, .5, 180, 540, .025), _layer("bell", .23, .3, 660, 880, .07)], 2, 200, "procs", 90, .16)
 	_add("turret_shot", [_layer("metal", .06, .55, 880, 480), _layer("noise", .045, .35, 3300, 1400)], 0, 90, "shots", 24, .13)
 	_add("enemy_spit", [_layer("fm", .17, .55, 240, 70, 0, 1.2, 6), _layer("noise", .12, .6, 780, 180)], 0, 140, "enemy_shots", 100, .15)
 	_add("enemy_crystal", [_layer("metal", .21, .6, 1240, 980), _layer("air", .055, .35, 4600, 1700)], 0, 140, "enemy_shots", 100, .15)

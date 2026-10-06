@@ -27,6 +27,7 @@ func _run() -> void:
 		_check(Art.body_rect(original,enemy)==original,attack+": recovery returns exactly to the original sprite rectangle")
 	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":.36,"telegraph_max":.9,"active":false,"ttl":.22}
 	var normal: Dictionary = Art.beam_sample(pending)
+	_check(normal.sprite_family=="charge" and is_equal_approx(float(normal.sprite_phase),.6),"The replicated windup timer selects the authored charge sequence")
 	for settings: Array in [[0.0,false],[.5,false],[1.0,true],[2.0,false]]:
 		var sample: Dictionary = Art.beam_sample(pending,settings[0],settings[1])
 		_check(sample.origin==normal.origin and sample.end==normal.end and sample.radius==normal.radius and sample.edge_alpha==normal.edge_alpha,"FX settings preserve the entire authoritative warning capsule and its contrast")
@@ -37,6 +38,7 @@ func _run() -> void:
 	var first: Dictionary = Art.beam_sample(pending)
 	pending.ttl=.001
 	var last: Dictionary = Art.beam_sample(pending)
+	_check(first.sprite_family=="beam" and first.sprite_phase<last.sprite_phase,"Active beam lifetime advances the actual textured release frames")
 	_check(float(first.core_width)>float(last.core_width),"The fired beam core decays across its real active lifetime")
 	_check(first.edge_alpha==last.edge_alpha and first.fill_alpha==last.fill_alpha and first.radius==last.radius,"Fading the core never hides still-active damage or shrinks its boundary")
 	await _real_locked_attack()

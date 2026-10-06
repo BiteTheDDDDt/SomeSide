@@ -26,6 +26,7 @@ func _labels(node: Node) -> String:
 	return text
 
 func _run() -> void:
+	root.size = Vector2i(1280, 720)
 	var existed: bool = FileAccess.file_exists("user://profile.cfg")
 	var saved: PackedByteArray = FileAccess.get_file_as_bytes("user://profile.cfg") if existed else PackedByteArray()
 	var game = load("res://main.tscn").instantiate()
@@ -56,11 +57,44 @@ func _run() -> void:
 			var snapshot: PackedByteArray = var_to_bytes(game.sim.state)
 			game._update_hud()
 			_check(str(slot.id) == str(ability.id) and snapshot == var_to_bytes(game.sim.state), "Equipment changes cannot replace or reset the innate ability through HUD rendering")
+			player.shield = 12.5
+			player.reactive_shield = 10.0
+			game._update_hud()
+			_check(game._hud_labels.health.text.contains(Locale.format("   +%d 护盾", [23])), "Existing shield readout includes independent temporary armour without a new HUD slot")
+			game._show_inventory()
+			var class_passive: Dictionary = Content.character_passive(character)
+			var build: String = _labels(game.overlay)
+			_check(build.contains(Locale.text(str(class_passive.name))) and build.contains(Locale.text(str(class_passive.description))) and build.contains(Locale.text("职业被动 · 自动触发")), "%s %s build explains the automatic passive's complete conditions and numbers" % [language, character])
+			_check(build.contains(Locale.text(str(ability.description))) and build.contains(Locale.text("职业主动 · Shift")), "Active and passive cards remain distinct and retain the full active description")
+			_check(game._inventory_grid.get_child_count() == player.items.size() + 4 and game._slot_ui.size() == 3, "Only the build view gains innate cards; combat retains three loadout slots")
+			game._resume()
+			for frame: int in range(3): await process_frame
+			var pointer: Vector2 = game._slot_ui.dash.icon.get_global_rect().get_center()
+			root.warp_mouse(pointer)
+			var mouse := InputEventMouseMotion.new()
+			mouse.position = pointer
+			mouse.global_position = pointer
+			Input.parse_input_event(mouse)
+			root.push_input(mouse, true)
+			await process_frame
+			game._update_interaction_panel(player)
+			for frame: int in range(3): await process_frame
+			game._update_interaction_panel(player)
+			var detail: Rect2 = game._loot_panel.get_global_rect()
+			_check(bool(game._hovered_loadout().get("innate", false)) and game._loot_ui.description.text.contains(Locale.text(str(class_passive.description))) and game._loot_ui.description.text.contains(Locale.text(str(ability.description))), "Hovering Shift exposes both complete innate descriptions without another permanent icon")
+			_check(detail.position.x >= 0 and detail.end.x <= 1280 and detail.position.y >= 80 and detail.end.y <= 704, "%s %s combined ability hover stays within the viewport" % [language, character])
+			mouse = InputEventMouseMotion.new()
+			mouse.position = Vector2(640, 300)
+			mouse.global_position = mouse.position
+			Input.parse_input_event(mouse)
+			root.push_input(mouse, true)
+			await process_frame
 		game._show_characters()
 		var selection: String = _labels(game.ui)
 		_check(selection.contains(Locale.text("相位闪身")) and selection.contains(Locale.text("铁壁反击")), "Character selection explains both distinct abilities in " + language)
+		_check(selection.contains(Locale.text(str(Content.character_passive("ranger").name))) and selection.contains(Locale.text(str(Content.character_passive("vanguard").name))) and selection.contains(Locale.text("持续命中后追加追击弹。")) and selection.contains(Locale.text("累计失血后获得临时护盾。")), "Selection previews each automatic passive and its trigger in " + language)
 		game._show_guide()
-		_check(_labels(game.ui).contains(Locale.text("角色技能：游侠闪身，先锋架盾反击")), "The Shift guide explains role-specific controls in " + language)
+		_check(_labels(game.ui).contains(Locale.text("职业主动：游侠闪身，先锋架盾反击")) and _labels(game.ui).contains(Locale.text("职业被动与遗物无需按键；Tab 查看触发条件")), "The guide distinguishes role-specific Shift controls from automatic passives in " + language)
 		game._show_inventory()
 		var ability_details: Dictionary = Simulation.movement_ability(game.sim.state.players[1])
 		_check(_labels(game.ui).contains(Locale.text(str(ability_details.description))), "The build screen exposes innate ability mechanics and base cooldown in " + language)

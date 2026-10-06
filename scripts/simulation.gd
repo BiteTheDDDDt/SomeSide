@@ -6,6 +6,7 @@ const StageLayouts = preload("res://scripts/stage_layouts.gd")
 const WeaponPose = preload("res://scripts/weapon_pose.gd")
 const WeaponAction = preload("res://scripts/weapon_action_motion.gd")
 const Guidance = preload("res://scripts/projectile_guidance.gd")
+const Procs = preload("res://scripts/proc_rules.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 
@@ -36,6 +37,8 @@ var events: Array = []
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_id: int = 100
 var _spawn_clock: float = 1.8
+var _projectiles_stepping: bool = false
+var _pending_projectiles: Array = []
 
 
 static func character_catalog() -> Array:
@@ -54,6 +57,9 @@ static func movement_ability(player: Dictionary) -> Dictionary:
 
 static func item_catalog() -> Array:
 	return Content.passives()
+
+static func character_passive(character: String) -> Dictionary:
+	return Content.character_passive(character)
 
 
 static func weapon_catalog() -> Array:
@@ -91,7 +97,7 @@ func start_run(roster: Array, seed_value: int = 1) -> void:
 		"seed": seed_value, "kills": 0, "difficulty": 1.0,
 		"players": {}, "enemies": [], "projectiles": [], "pickups": [], "coin_pickups": [],
 		"chests": [], "platforms": [], "world_size": WORLD_SIZE,
-		"deployables": [], "effects": [], "hazards": [], "loot_history": {"gear": [], "passive": []},
+		"deployables": [], "effects": [], "proc_effects": [], "hazards": [], "loot_history": {"gear": [], "passive": []},
 		"gate": {}, "boss_alive": false,
 		"director": {"mode": "rest", "resting": true, "explorers": [], "event_active": false, "threat_time": 0.0},
 	}
@@ -132,6 +138,7 @@ func add_player(id: int, player_name: String, character: String) -> void:
 		"chrono_timer": 0.0, "momentum_timer": 0.0, "nova_cd": 0.0, "attack_count": 0, "phoenix_spent": 0,
 	}
 	state["players"] = players
+	Procs.reset(players[id])
 
 
 func remove_player(id: int) -> void:
@@ -175,6 +182,7 @@ func step(delta: float, commands: Dictionary) -> void:
 	_step_enemies(dt)
 	_step_deployables(dt)
 	_step_effects(dt)
+	_step_proc_effects(dt)
 	_step_projectiles(dt)
 	_step_hazards(dt)
 	_cleanup_enemies()
@@ -191,6 +199,7 @@ func step(delta: float, commands: Dictionary) -> void:
 
 
 func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
+	Procs.tick(player, dt)
 	for key in ["fire_cd", "skill_cd", "invuln", "hurt_timer", "interact_cd", "nova_cd"]:
 		player[key] = maxf(0.0, float(player.get(key, 0.0)) - dt)
 	if float(player.get("shield_timer", 0.0)) > 0.0:
@@ -198,6 +207,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		if float(player["shield_timer"]) <= 0.0:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
+		Procs.cancel(player)
 		_cancel_movement_ability(player)
 		_cancel_guard(player)
 		player.erase("melee")
@@ -289,6 +299,9 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 	# sound. Prediction maintains this state too, but never emits feedback.
 	if grounded:
 		player["land_ready"] = true
+		player["fall_peak_y"] = position.y
+	else:
+		player["fall_peak_y"] = minf(float(player.get("fall_peak_y", position.y)), position.y)
 	# Only a deliberate jump owns variable-height control. Dash momentum,
 	# knockback and simply walking off a ledge must never be cut by this input.
 	if grounded or velocity.y >= 0.0 or float(player.get("dash_timer", 0.0)) > 0.0:
@@ -371,6 +384,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 			_emit("jump", player["pos"], {"player": player["id"], "double": double_jump})
 		if not was_grounded and bool(result["grounded"]) and bool(player.get("land_ready", false)) and velocity.y >= 120.0:
 			_emit("land", player["pos"], {"player": player["id"], "impact_speed": velocity.y})
+			_landing_proc(player, maxf(0.0, Vector2(player.pos).y - float(player.get("fall_peak_y", player.pos.y))))
 	if bool(result["grounded"]):
 		player["jumps"] = 0
 		player["land_ready"] = true
@@ -382,6 +396,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 		player["vel"] = Vector2.ZERO
 		player["jump_rising"] = false
 		player["land_ready"] = false
+		player["fall_peak_y"] = Vector2(player.pos).y
 		_cancel_movement_ability(player)
 		_cancel_guard(player)
 		guard_finished = false
@@ -477,7 +492,7 @@ func _fire_weapon(player: Dictionary) -> void:
 				var enemy: Dictionary = enemy_value
 				var offset: Vector2 = Vector2(enemy["pos"]) - position
 				if offset.length() < 170.0 + _enemy_radius(enemy) and offset.normalized().dot(aim) > 0.55:
-					_damage_enemy(enemy, 8.0 * _damage_scale(player), int(player["id"]), true, 0)
+					_damage_enemy(enemy, 8.0 * _damage_scale(player), int(player["id"]), true, 0, int(player.attack_count))
 					enemy["burn_timer"] = 2.0
 					enemy["burn_dps"] = 5.0 * _damage_scale(player)
 					enemy["burn_owner"] = int(player["id"])
@@ -521,7 +536,7 @@ func _step_melee(player: Dictionary, dt: float) -> void:
 			var enemy: Dictionary = enemy_value
 			var offset: Vector2 = Vector2(enemy["pos"]) - Vector2(player.pos)
 			if float(enemy["hp"]) > 0.0 and offset.length() <= 110.0 + _enemy_radius(enemy) and (offset.length() < 34.0 or offset.normalized().dot(aim) > -0.12):
-				_damage_enemy(enemy, float(melee.damage), int(player["id"]), true, 0)
+				_damage_enemy(enemy, float(melee.damage), int(player["id"]), true, 0, int(melee.id))
 				if str(enemy["kind"]) != "boss":
 					enemy["vel"] = Vector2(enemy["vel"]) + aim * 170.0
 				player["hp"] = minf(float(player["max_hp"]), float(player["hp"]) + 0.35)
@@ -603,10 +618,11 @@ func _use_skill(player: Dictionary) -> void:
 			_spawn_projectile(position + aim * 24.0, aim * 640.0 + Vector2(0.0, -90.0), "player", "grenade", 70.0 * _damage_scale(player), int(player["id"]), 0.95, 7.0)
 			_emit("shoot", position + aim * 22.0, {"aim": aim, "player": player["id"], "kind": "grenade"})
 
-func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind: String, damage: float, owner: int, ttl: float, radius: float, sweep_origin: Vector2 = Vector2(INF, INF)) -> void:
+func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind: String, damage: float, owner: int, ttl: float, radius: float, sweep_origin: Vector2 = Vector2(INF, INF)) -> Dictionary:
 	var projectiles: Array = state["projectiles"]
-	if projectiles.size() >= MAX_PROJECTILES:
-		return
+	if projectiles.size() + _pending_projectiles.size() >= MAX_PROJECTILES:
+		return {}
+	if _projectiles_stepping: projectiles = _pending_projectiles
 	var player: Dictionary = Dictionary(state.get("players", {})).get(owner, {})
 	var base_pierce: int = 3 if kind == "rail" else (6 if kind == "lance" else (4 if kind == "boomerang" else 1))
 	var extra_pierce: int = mini(3, _stacks(player, "piercer")) if kind != "grenade" and not player.is_empty() else 0
@@ -620,7 +636,9 @@ func _spawn_projectile(position: Vector2, velocity: Vector2, team: String, kind:
 			projectile["guidance"] = guidance
 	if sweep_origin.is_finite():
 		projectile["sweep_origin"] = sweep_origin
+		projectile["primary_attack"] = int(player.get("attack_count", 0))
 	projectile.merge(_visual_data(owner), true)
+	return projectile
 
 
 func _step_projectiles(dt: float) -> void:
@@ -630,8 +648,10 @@ func _step_projectiles(dt: float) -> void:
 	# table again after launch, even when their original target disappears.
 	var guidance_enemies: Dictionary = {}
 	var guidance_index_ready: bool = false
+	_projectiles_stepping = true
 	for projectile_value in projectiles:
 		var projectile: Dictionary = projectile_value
+		if not _proc_projectile_valid(projectile): continue
 		var previous: Vector2 = projectile["pos"]
 		var sweep_origin: Vector2 = projectile.get("sweep_origin", previous)
 		var launch_sweep: bool = projectile.has("sweep_origin")
@@ -697,8 +717,8 @@ func _step_projectiles(dt: float) -> void:
 					var enemy: Dictionary = hit["enemy"]
 					if float(enemy["hp"]) <= 0.0:
 						continue
-					_damage_enemy(enemy, float(projectile["damage"]), int(projectile["owner"]), true, 0)
-					_projectile_secondary(projectile, enemy)
+					if not _projectile_can_hit(projectile, enemy): continue
+					_projectile_damage(projectile, enemy)
 					projectile["hit_ids"].append(int(enemy["id"]))
 					projectile["pierce"] = int(projectile["pierce"]) - 1
 					if int(projectile["pierce"]) <= 0:
@@ -715,8 +735,7 @@ func _step_projectiles(dt: float) -> void:
 				if kind == "grenade":
 					_explode(projectile["pos"], 135.0, float(projectile["damage"]), int(projectile["owner"]), "player", 0)
 				else:
-					_damage_enemy(target, float(projectile["damage"]), int(projectile["owner"]), true, 0)
-					_projectile_secondary(projectile, target)
+					if _projectile_can_hit(projectile, target): _projectile_damage(projectile, target)
 				removed = true
 		else:
 			var players: Dictionary = state["players"]
@@ -749,7 +768,111 @@ func _step_projectiles(dt: float) -> void:
 			removed = true
 		if not removed and next.x > -100.0 and next.x < _world_size().x + 100.0 and next.y > -100.0 and next.y < _world_size().y + 100.0:
 			kept.append(projectile)
-	state["projectiles"] = kept
+	_projectiles_stepping = false
+	kept.append_array(_pending_projectiles)
+	_pending_projectiles.clear()
+	state["projectiles"] = kept.filter(_proc_projectile_valid)
+
+
+func _proc_projectile_valid(projectile: Dictionary) -> bool:
+	if not bool(projectile.get("proc", false)): return true
+	var owner: Dictionary = Dictionary(state["players"]).get(int(projectile["owner"]), {})
+	return not owner.is_empty() and not bool(owner.get("dead", false)) and int(projectile.get("proc_epoch", -1)) == int(owner.get("proc_epoch", 0))
+
+
+func _projectile_can_hit(projectile: Dictionary, enemy: Dictionary) -> bool:
+	if str(projectile["kind"]) != "shock_wave": return true
+	var owner: Dictionary = Dictionary(state["players"]).get(int(projectile["owner"]), {})
+	if owner.is_empty(): return false
+	var data: Dictionary = Procs.ensure(owner)
+	if int(data.landing_group) != int(projectile.get("proc_group", -2)) or data.landing_hits.size() >= 8 or int(enemy.id) in data.landing_hits:
+		return false
+	data.landing_hits.append(int(enemy.id))
+	return true
+
+
+func _projectile_damage(projectile: Dictionary, enemy: Dictionary) -> void:
+	var secondary: bool = bool(projectile.get("proc", false))
+	_damage_enemy(enemy, float(projectile["damage"]), int(projectile["owner"]), not secondary, 1 if secondary else 0, 0 if secondary else int(projectile.get("primary_attack", 0)))
+	if not secondary: _projectile_secondary(projectile, enemy)
+
+
+func _launch_proc_missile(player: Dictionary, source: String, damage: float) -> bool:
+	if player.is_empty() or bool(player.get("dead", false)): return false
+	var origin: Vector2 = Vector2(player.pos) + Vector2(0, -15)
+	var target: Dictionary = _nearest_enemy(origin, 600.0)
+	if target.is_empty(): return false
+	var direction: Vector2 = WeaponPose.normalized_aim(Vector2(target.pos) - origin).rotated(-0.30)
+	var missile: Dictionary = _spawn_projectile(origin, direction * 500.0, "player", "seeker_missile", damage * _damage_scale(player), int(player.id), 1.6, 5.0)
+	if missile.is_empty(): return false
+	missile.merge({"proc": true, "proc_source": source, "proc_group": int(missile.id), "proc_epoch": int(player.get("proc_epoch", 0)), "pierce": 1, "max_pierce": 1}, true)
+	missile["guidance"] = Guidance.lock(origin, direction * 500.0, [target], Procs.MISSILE)
+	_emit("proc", origin, {"kind": source, "player": player.id, "owner": player.id, "proc_id": missile.id, "aim": direction, "duration": 0.3, "radius": 14.0})
+	return true
+
+
+func _direct_proc(player: Dictionary, critical: bool, killed: bool, primary_attack: int) -> void:
+	if player.is_empty() or bool(player.get("dead", false)): return
+	var data: Dictionary = Procs.ensure(player)
+	if critical and _stacks(player, "missile_pod") > 0 and float(data.missile_cd) <= 0.0:
+		# Start the cooldown before creating anything so procs cannot re-enter.
+		data.missile_cd = 1.25
+		_launch_proc_missile(player, "missile_pod", Procs.missile_damage(_stacks(player, "missile_pod")))
+	if Procs.primary_hit(player, primary_attack):
+		_launch_proc_missile(player, "pursuit_protocol", 8.0)
+	if killed and _stacks(player, "frost_halo") > 0 and float(data.halo_cd) <= 0.0:
+		var effects: Array = state.get("proc_effects", [])
+		if effects.size() >= Procs.MAX_AURAS: return
+		data.halo_cd = 4.0
+		var stacks: int = _stacks(player, "frost_halo")
+		var aura: Dictionary = {"id": _id(), "kind": "frost_halo", "owner": int(player.id), "pos": Vector2(player.pos), "radius": Procs.halo_radius(stacks),
+			"ttl": 1.5, "duration": 1.5, "pulse": 0.5, "damage": Procs.halo_damage(stacks) * _damage_scale(player), "slow_factor": 0.75}
+		effects.append(aura)
+		state["proc_effects"] = effects
+		_emit("proc", player.pos, {"kind": "frost_halo", "player": player.id, "owner": player.id, "proc_id": aura.id, "radius": aura.radius, "duration": aura.duration})
+
+
+func _landing_proc(player: Dictionary, height: float) -> void:
+	var stacks: int = _stacks(player, "landing_coil")
+	var data: Dictionary = Procs.ensure(player)
+	if stacks <= 0 or height < 90.0 or float(data.landing_cd) > 0.0 or bool(player.get("dead", false)): return
+	if Array(state["projectiles"]).size() + _pending_projectiles.size() > MAX_PROJECTILES - 2: return
+	data.landing_cd = 2.0
+	data.landing_group = _id()
+	data.landing_hits = []
+	var origin: Vector2 = Vector2(player.pos) + Vector2(0, 13)
+	for direction: float in [-1.0, 1.0]:
+		var wave: Dictionary = _spawn_projectile(origin, Vector2(direction * 420.0, 0), "player", "shock_wave", Procs.landing_damage(stacks) * _damage_scale(player), int(player.id), 0.45, 13.0)
+		wave.merge({"proc": true, "proc_source": "landing_coil", "proc_group": int(data.landing_group), "proc_epoch": int(player.get("proc_epoch", 0)), "pierce": 8, "max_pierce": 8}, true)
+	_emit("proc", origin, {"kind": "landing_coil", "player": player.id, "owner": player.id, "proc_id": data.landing_group, "radius": 32.0, "duration": 0.45})
+
+
+func _step_proc_effects(dt: float) -> void:
+	var kept: Array = []
+	for aura: Dictionary in state.get("proc_effects", []):
+		var owner: Dictionary = Dictionary(state["players"]).get(int(aura.owner), {})
+		if owner.is_empty() or bool(owner.get("dead", false)): continue
+		aura.pos = Vector2(owner.pos)
+		aura.ttl = float(aura.ttl) - dt
+		aura.pulse = float(aura.pulse) - dt
+		if float(aura.pulse) <= 0.000001:
+			aura.pulse = float(aura.pulse) + 0.5
+			# One bounded pulse, one pass, one hit per enemy. Secondary damage
+			# never adds new auras or projectiles during this traversal.
+			for enemy: Dictionary in state["enemies"]:
+				if float(enemy.hp) <= 0.0 or Vector2(enemy.pos).distance_squared_to(aura.pos) > pow(float(aura.radius) + _enemy_radius(enemy), 2.0): continue
+				_damage_enemy(enemy, float(aura.damage), int(aura.owner), false, 1)
+				enemy.slow_factor = minf(float(enemy.get("slow_factor", 1.0)) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0, float(aura.slow_factor))
+				enemy.slow_timer = maxf(float(enemy.get("slow_timer", 0.0)), 0.65)
+		if float(aura.ttl) > 0.000001: kept.append(aura)
+	state["proc_effects"] = kept
+
+
+func _cancel_owner_procs(player: Dictionary) -> void:
+	player.proc_epoch = int(player.get("proc_epoch", 0)) + 1
+	var owner_id: int = int(player.id)
+	state["proc_effects"] = Array(state.get("proc_effects", [])).filter(func(a: Dictionary) -> bool: return int(a.owner) != owner_id)
+	state["projectiles"] = Array(state["projectiles"]).filter(func(p: Dictionary) -> bool: return not bool(p.get("proc", false)) or int(p.owner) != owner_id)
 
 
 func _segment_circle(from: Vector2, to: Vector2, center: Vector2, radius: float) -> float:
@@ -769,7 +892,7 @@ func _segment_circle(from: Vector2, to: Vector2, center: Vector2, radius: float)
 	return t if t >= 0.0 and t <= 1.0 else -1.0
 
 
-func _damage_enemy(enemy: Dictionary, amount: float, owner: int, can_proc: bool, depth: int) -> void:
+func _damage_enemy(enemy: Dictionary, amount: float, owner: int, can_proc: bool, depth: int, primary_attack: int = 0) -> void:
 	if float(enemy.get("hp", 0.0)) <= 0.0:
 		return
 	var players: Dictionary = state["players"]
@@ -781,8 +904,10 @@ func _damage_enemy(enemy: Dictionary, amount: float, owner: int, can_proc: bool,
 		amount *= 2.0
 	if can_proc and depth == 0 and not player.is_empty():
 		if _stacks(player, "frost") > 0:
-			enemy["slow_timer"] = 1.5
-			enemy["slow_factor"] = 1.0 - minf(0.5, 0.15 + 0.05 * _stacks(player, "frost"))
+			var frost_factor: float = 1.0 - minf(0.5, 0.15 + 0.05 * _stacks(player, "frost"))
+			var active_factor: float = float(enemy.get("slow_factor", 1.0)) if float(enemy.get("slow_timer", 0.0)) > 0.0 else 1.0
+			enemy["slow_factor"] = minf(active_factor, frost_factor)
+			enemy["slow_timer"] = maxf(float(enemy.get("slow_timer", 0.0)), 1.5)
 		if _stacks(player, "toxin") > 0:
 			enemy["poison_timer"] = 4.0
 			enemy["poison_dps"] = 3.0 * mini(8, _stacks(player, "toxin")) * _damage_scale(player)
@@ -792,6 +917,8 @@ func _damage_enemy(enemy: Dictionary, amount: float, owner: int, can_proc: bool,
 	_emit("hit", enemy["pos"], {"amount": amount, "crit": critical, "owner": owner})
 	if float(enemy["hp"]) <= 0.0:
 		_kill_enemy(enemy, player, owner, depth)
+	if can_proc and depth == 0 and not player.is_empty() and not bool(player.get("dead", false)):
+		_direct_proc(player, critical, float(enemy["hp"]) <= 0.0, primary_attack)
 	if critical and depth == 0 and not player.is_empty() and _stacks(player, "nova") > 0 and float(player.get("nova_cd", 0.0)) <= 0.0:
 		player["nova_cd"] = 0.75
 		_explode(enemy["pos"], 130.0, 16.0 * mini(8, _stacks(player, "nova")) * _damage_scale(player), owner, "player", 1, "nova")
@@ -995,6 +1122,10 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 		amount -= prevented
 		_emit("ability", player["pos"], {"ability": "guard_burst", "phase": "block", "player": player.id,
 			"ability_id": player.guard_id, "amount": prevented, "absorbed": player.guard_absorbed})
+	var hp_before: float = float(player["hp"])
+	var reactive_absorbed: float = minf(float(player.get("reactive_shield", 0.0)), amount)
+	player["reactive_shield"] = float(player.get("reactive_shield", 0.0)) - reactive_absorbed
+	amount -= reactive_absorbed
 	var shield: float = float(player["shield"])
 	var absorbed: float = minf(shield, amount)
 	player["shield"] = shield - absorbed
@@ -1010,6 +1141,8 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 		_cancel_guard(player)
 	_emit("hit", player["pos"], {"amount": amount, "crit": false, "player": player["id"], "friendly": true})
 	if float(player["hp"]) <= 0.0:
+		_cancel_owner_procs(player)
+		Procs.cancel(player)
 		_cancel_guard(player)
 		if int(player.get("phoenix_spent", 0)) < mini(2, _stacks(player, "phoenix")):
 			player["phoenix_spent"] = int(player.get("phoenix_spent", 0)) + 1
@@ -1021,6 +1154,8 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 		player["revive"] = 0.0
 		player["revive_timer"] = 0.0
 		_emit("death", player["pos"], {"player": player["id"], "kind": "player"})
+	elif Procs.hurt(player, hp_before - float(player["hp"])):
+		_emit("proc", player["pos"], {"kind": "reactive_plating", "player": player.id, "owner": player.id, "proc_id": _id(), "radius": 34.0, "duration": 3.0, "amount": 10.0})
 
 
 func _step_enemies(dt: float) -> void:
@@ -2027,6 +2162,9 @@ func _build_stage(stage: int) -> void:
 	state["chests"] = []
 	state["deployables"] = []
 	state["effects"] = []
+	state["proc_effects"] = []
+	_pending_projectiles.clear()
+	_projectiles_stepping = false
 	state["hazards"] = []
 	state["boss_alive"] = false
 	_spawn_clock = 0.3
@@ -2106,6 +2244,7 @@ func _build_stage(stage: int) -> void:
 		player["momentum_timer"] = 0.0
 		player["nova_cd"] = 0.0
 		player["attack_count"] = 0
+		Procs.reset(player)
 		player.erase("melee")
 		player.erase("attack_pose")
 		_reset_exploration(player, true)
