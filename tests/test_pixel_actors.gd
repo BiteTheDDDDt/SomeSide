@@ -13,7 +13,7 @@ class Probe extends Node2D:
 		draw_set_transform(Vector2(100, 100), 0.0, Vector2.ONE * 12.0)
 		Entities.player_body(self, {"character": "ranger", "grounded": true, "vel": Vector2.ZERO}, 0.0)
 		draw_set_transform(Vector2(240, 100), 0.0, Vector2(-12, 12))
-		Entities.enemy(self, {"kind": "drone", "id": 0, "vel": Vector2.ZERO}, 0.0)
+		Pixels.draw_enemy(self, {"kind": "drone", "id": 0, "vel": Vector2.ZERO}, 0.0)
 		draw_set_transform(Vector2.ZERO)
 
 func _initialize() -> void:
@@ -73,7 +73,7 @@ func _run() -> void:
 	enemy.flash = 0.1
 	_check(Color(Pixels.frame_for("drone", enemy, 0.0).tint).r > 1.0, "Hit flash brightens the sprite without adding state or allocating variants")
 	_check(Pixels.enemy_id({"kind": "boss", "boss_style": "stone"}) == "boss_stone" and Pixels.enemy_id({"kind": "boss", "biome": "ruins"}) == "boss_prism", "Boss styles and biome fallback resolve to their distinct authored actors")
-	_check(Pixels.frame_for("unavailable", {}, 0.0).is_empty() and Entities.enemy_bounds({"kind": "drone"}) == Pixels.bounds("drone"), "Unknown art uses fallback while loaded enemies expose actual sprite bounds")
+	_check(Pixels.frame_for("unavailable", {}, 0.0).is_empty() and Pixels.bounds("drone").size != Vector2.ZERO, "Unknown pixel art uses fallback while loaded definitions expose their crop bounds")
 	var probe := Probe.new()
 	probe.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	root.content_scale_size = Vector2i.ZERO
@@ -84,7 +84,7 @@ func _run() -> void:
 		var rendered: Image = root.get_texture().get_image()
 		rendered.save_png("res://tools/results/pixel-nearest-fixture-v010.png")
 		_check(rendered.get_pixel(94, 88).r > 0.95 and rendered.get_pixel(106, 88).g > 0.95 and rendered.get_pixel(118, 88).r < 0.02, "The real Entities player entrypoint renders the cropped red/green body and transparent margin")
-		_check(rendered.get_pixel(246, 88).r > 0.95 and rendered.get_pixel(234, 88).g > 0.95, "The real enemy entrypoint preserves the caller's left-facing mirror")
+		_check(rendered.get_pixel(246, 88).r > 0.95 and rendered.get_pixel(234, 88).g > 0.95, "The legacy pixel renderer preserves the caller's left-facing mirror")
 		var crisp: bool = true
 		for x in range(90, 110):
 			var pixel: Color = rendered.get_pixel(x, 88)

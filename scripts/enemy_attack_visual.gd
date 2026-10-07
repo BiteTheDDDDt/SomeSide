@@ -7,13 +7,15 @@ const Pose = preload("res://scripts/weapon_pose.gd")
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
 const Geometry = preload("res://scripts/combat_geometry.gd")
 const ACTIVE_LIFETIME: float = 0.22
+const BEAM_LIFETIME: float = 0.55
 
 static func attack_sample(enemy: Dictionary) -> Dictionary:
 	var kind: String = str(enemy.get("attack_kind", ""))
 	var remaining: float = maxf(0.0,float(enemy.get("telegraph",0.0)))
 	var progress: float = clampf(1.0-remaining/maxf(.01,float(enemy.get("telegraph_max",.8))),0,1)
 	var elapsed: float = maxf(0.0,float(enemy.get("attack_cooldown",3.0))-float(enemy.get("attack_cd",0.0)))
-	var active: bool = not kind.is_empty() and float(enemy.get("hp",1.0))>0 and (remaining>0 or elapsed<ACTIVE_LIFETIME)
+	var duration: float = BEAM_LIFETIME if kind in ["beam","prism_beam","prism_cross"] else ACTIVE_LIFETIME
+	var active: bool = not kind.is_empty() and float(enemy.get("hp",1.0))>0 and (remaining>0 or elapsed<duration)
 	var amount: float = smoothstep(0.0,1.0,progress) if remaining>0 else (lerpf(1,-.35,smoothstep(0.0,.055,elapsed)) if elapsed<.055 else lerpf(-.35,0,smoothstep(.055,ACTIVE_LIFETIME,elapsed)))
 	return {"active":active,"winding":remaining>0,"progress":progress,"elapsed":elapsed,"amount":amount if active else 0.0,"kind":kind}
 
@@ -42,7 +44,7 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 	var radius: float = clampf(float(hazard.get("radius",30.0)),1.0,400.0)
 	var active: bool = bool(hazard.get("active",false))
 	var progress: float = clampf(1.0-float(hazard.get("delay",0.0))/maxf(.01,float(hazard.get("telegraph_max",.8))),0,1)
-	var release: float = clampf(1.0-float(hazard.get("ttl",ACTIVE_LIFETIME))/ACTIVE_LIFETIME,0,1) if active else 0.0
+	var release: float = clampf(1.0-float(hazard.get("ttl",BEAM_LIFETIME))/BEAM_LIFETIME,0,1) if active else 0.0
 	# Warning geometry is visible from the first replicated windup frame.
 	# Its hollow red dashed footprint is distinct from filled geometric bands
 	# that exist only while authority marks damage active.
@@ -100,7 +102,7 @@ static func draw_preparation(canvas: CanvasItem, enemy: Dictionary, center: Vect
 	if str(enemy.get("attack_kind","")) in ["spit","mend"]:
 		Geometry.draw_ammunition(canvas,sample.origin,direction,Vector2(sample.size).y*.35,str(enemy.get("attack_kind",""))=="spit",true,progress)
 		return
-	Sprites.draw_oriented(canvas,sample.family,sample.origin,sample.size,sample.angle,sample.phase,sample.tint)
+	Geometry.draw_ground_charge(canvas,sample.origin,float(sample.size.x),progress)
 
 static func warning_capsule(start: Vector2, finish: Vector2, radius: float) -> PackedVector2Array:
 	return Geometry.capsule(start,finish,radius)
@@ -124,12 +126,21 @@ static func draw_beam(canvas: CanvasItem, start: Vector2, finish: Vector2, sampl
 		# Both phases consume exactly the same capsule, including both end caps.
 		# Damage fills it with hard bands fading along distance; no texture/bloom/taper can
 		# imply a different width or an early fade during the authority window.
-		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)),start,finish,Color("e59485"),.14)
-		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)*.55),start,finish,Color("f4d1b4"),.24)
-		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,maxf(1.5,float(sample.radius)*.15)),start,finish,Geometry.CORE,.38)
-		# Fading is spatial, never a fade-out before damage expires. Keep the
-		# full distant width readable with a restrained continuous active edge.
-		var edge: PackedVector2Array=warning_capsule(start,finish,float(sample.radius))
-		edge.append(edge[0])
-		canvas.draw_polyline(edge,Color("e9b7a7",.38),1.1,true)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)),start,finish,Color("d99089"),.06)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)*.55),start,finish,Color("edd2bb"),.12)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,maxf(1.5,float(sample.radius)*.15)),start,finish,Geometry.CORE,.22)
+
+		# Short energy packets travel inside the filled core; these do not
+		# redraw the removed warning perimeter or extend the hit silhouette.
+		var across: Vector2=direction.orthogonal()
+		var length: float=start.distance_to(finish)
+		for index: int in range(3):
+			var along: float=fposmod(float(sample.release)*1.4+index/3.0,1.0)
+			if length*along<1.0: continue
+			var head: Vector2=start.lerp(finish,along)
+			var tail: Vector2=head-direction*minf(34.0,length*along)
+			var width: float=maxf(.8,float(sample.radius)*.09)
+			var tint:=Color(Geometry.CORE,lerpf(.72,.16,along))
+			canvas.draw_colored_polygon(PackedVector2Array([head,tail-across*width,tail+across*width]),tint)
+
 	draw_source(canvas,start,direction,1.0 if bool(sample.active) else float(sample.progress),bool(sample.detail),bool(sample.active),float(sample.release))

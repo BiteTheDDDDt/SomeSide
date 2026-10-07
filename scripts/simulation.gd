@@ -1207,7 +1207,7 @@ func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float, target_suppor
 	var winding: bool = float(enemy.get("telegraph", 0.0)) > 0.0
 	var charging: bool = float(enemy.get("charge_timer", 0.0)) > 0.0
 	var navigation: Dictionary = {} if bool(enemy.get("flying", false)) else _enemy_platform_navigation(enemy, target, target_support, dt)
-	if str(enemy.get("attack_kind", "")) in ["beam", "prism_beam", "prism_cross"] and (winding or float(enemy["attack_cd"]) > float(enemy["attack_cooldown"]) - 0.25):
+	if str(enemy.get("attack_kind", "")) in ["beam", "prism_beam", "prism_cross"] and (winding or float(enemy["attack_cd"]) > float(enemy["attack_cooldown"]) - 0.58):
 		# Beam geometry remains fixed through both warning and active frames.
 		# A hovering boss stops in place; a ground sentinel only starts landed.
 		enemy["vel"] = Vector2.ZERO
@@ -1475,7 +1475,7 @@ func _spawn_hazard(enemy: Dictionary, kind: String, position: Vector2, shape: St
 	var hazard: Dictionary = {"id": _id(), "kind": kind, "shape": shape, "pos": position,
 		"dir": WeaponPose.normalized_aim(direction), "length": length, "radius": radius,
 		"delay": maxf(0.55, delay), "telegraph_max": maxf(0.55, delay), "active": false,
-		"ttl": 0.22, "damage": damage, "owner": int(enemy["id"]), "hit_ids": [], "biome": str(enemy.get("biome", state.get("biome", "rainforest")))}
+		"ttl": 0.55 if shape == "line" else 0.22, "damage": damage, "owner": int(enemy["id"]), "hit_ids": [], "biome": str(enemy.get("biome", state.get("biome", "rainforest")))}
 	hazards.append(hazard)
 	state["hazards"] = hazards
 	return hazard

@@ -58,15 +58,11 @@ static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary)
 			# The seed can coincide with the player's torso. A compact dark
 			# backing and full-opacity seed keep its first frame recognizable.
 			canvas.draw_circle(center, Vector2(sample.size).x * 0.47, Color(0.025, 0.055, 0.065, 0.8), true, -1, true)
-	# Every active frame remains solid. There is no generic blast or lingering
-	# damaging-looking cloud after the authority removes this hazard.
-	Sprites.draw_family(canvas, str(sample.family), Rect2(center - Vector2(sample.size) * 0.5, sample.size), float(sample.phase), tint)
+	Geometry.draw_area_material(canvas,position,sample)
 
 static func draw_blink(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float) -> void:
-	# Paired vertical tears imply a transition without drawing the path between.
-	var size_value: Vector2 = Vector2(12.0 + progress * 8.0, 42.0)
-	Sprites.draw_family(canvas, "rift", Rect2(destination - size_value * 0.5, size_value), progress, Color(1, 1, 1, 0.5 + progress * 0.3))
-	Sprites.draw_family(canvas, "rift", Rect2(source - Vector2(7, 18), Vector2(14, 36)), progress, Color(1, 1, 1, 0.3 + progress * 0.35))
+	Geometry.draw_rift(canvas,source,36.0,progress)
+	Geometry.draw_rift(canvas,destination,42.0,progress)
 
 static func draw_mending(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float, detail: bool) -> void:
 	var direction: Vector2 = (destination - source).normalized()
@@ -78,5 +74,5 @@ static func draw_mending(canvas: CanvasItem, source: Vector2, destination: Vecto
 		var bend: float = (18.0 if index % 2 == 0 else -14.0) * sin(t * PI)
 		var point: Vector2 = source.lerp(destination, t) + direction.orthogonal() * bend
 		var size_value: float = 6.0 + sin(t * PI) * 3.0
-		Sprites.draw_family(canvas, "repair", Rect2(point - Vector2.ONE * size_value * 0.5, Vector2.ONE * size_value), t, Color(1, 1, 1, 0.68))
-	Sprites.draw_family(canvas, "repair", Rect2(destination - Vector2(6, 9), Vector2(12, 18)), progress, Color(1, 1, 1, 0.5))
+		Geometry.diamond(canvas,point,direction,size_value*.5,size_value*.25,Color("9ac7ad"),1.0)
+	Geometry.diamond(canvas,destination,Vector2.UP,5,3,Color("9ac7ad"),1.0)

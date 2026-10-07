@@ -127,10 +127,10 @@ func _test_dodging() -> void:
 		# React late enough to still be airborne during the actual damage
 		# window, then keep simulating until that entire window has expired.
 		if kind == "sentinel":
-			_advance(simulation, int(ceil((float(enemy.telegraph_max) - 0.45) / DT)))
-		var command: Dictionary = {"move": -1.0} if kind != "sentinel" else {"jump": true}
+			_advance(simulation, int(ceil((float(enemy.telegraph_max) - 0.10) / DT)))
+		var command: Dictionary = {"move": -1.0} if kind != "sentinel" else {"jump": true, "jump_held":true}
 		simulation.step(DT, {1: command})
-		_advance(simulation, int(ceil((float(enemy.telegraph) + 0.24) / DT)), {1: {"move": -1.0 if kind != "sentinel" else 0.0}})
+		_advance(simulation, int(ceil((float(enemy.telegraph) + (0.57 if kind=="sentinel" else 0.24)) / DT)), {1: {"move": -1.0 if kind != "sentinel" else 0.0,"jump_held":kind=="sentinel"}})
 		_check(simulation.state.hazards.is_empty() and float(simulation.state.players[1].hp) == 100.0 and enemy.attack_target == target_before and enemy.attack_dir == direction_before, kind + ": real movement during a locked warning dodges the entire danger window")
 	var ranged = _fresh()
 	var spitter: Dictionary = _spawn(ranged, "spitter")

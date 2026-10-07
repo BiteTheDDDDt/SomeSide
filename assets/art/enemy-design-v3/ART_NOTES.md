@@ -1,0 +1,11 @@
+# Enemy illustration atlas, v0.20.5
+
+Generated with the built-in image-generation tool on 2026-10-07, guided by the user's geometric-symbol and monster-silhouette references. The references inform rhythm, negative space and anatomical differentiation; they are not shipped as game assets.
+
+`cast-concept.png` is the original first pass; `cast-flat.png` is the selected transparent RGBA revision. Both are unmodified generator outputs. The runtime samples measured UV regions in `scripts/illustrated_enemy_renderer.gd`. This is raster illustration with runtime mesh motion, not SVG or a hand-authored frame sequence.
+
+Layout: crawler / spitter / spore moth / drone; charger / burrower / sentinel / skirmisher; conductor / stone boss / spore boss / prism boss.
+
+## Selected revision prompt (verbatim)
+
+Edit image 1, preserving all twelve creature identities, their strong poses and silhouettes, anatomical attack organs, the four-column three-row arrangement and transparency. Image 2 is the intended graphic reduction: confident sophisticated solid silhouettes, simple interiors and expressive bright eyes. Refine image 1 into beautiful clean flat game illustration with exactly a main midtone, a broad deep shadow and a small hard-edge highlight per creature. Remove ALL painterly texture, faceted noise, brush strokes, small cracks, surface mottling and soft glows. Do not add any details. Keep the appealing anatomy, wing curves, hunched postures, claws, negative spaces between limbs and distinctive head shapes. The design should read elegantly at 48 to 70 pixels tall. Moderately lighten the muted olive / warm taupe / blue-grey main masses so they read on a dark teal game background; deepest silhouette edges navy-black. Eyes ivory, tiny and solid, no bloom. Crisp smoothly antialiased curved contours, sparse selective sharp edges. Especially simplify the rock creatures to three or four purposeful interlocking stone masses, not dozens of triangles. No thick cartoon outline around every interior color patch. Preserve the actual transparent alpha background; do not add checkerboard, floor, shadows, labels, text or borders. Leave clear transparent gutters between all twelve complete bodies.

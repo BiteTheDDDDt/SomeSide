@@ -129,23 +129,8 @@ static func enemy_sample(kind: String, radius: float, age: float) -> Dictionary:
 		"phase":fposmod(maxf(0.0,age)*5.0,1.0),"tint":Color.WHITE}
 
 static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
-	var r: float = maxf(4.0,radius)
-	if kind in ["spit","spore","acid","poison"]:
-		Geometry.draw_ammunition(c,Vector2.ZERO,Vector2.RIGHT,r,true)
-		return
-	var sample: Dictionary = enemy_sample(kind,radius,clock)
-	if AttackFx.draw_oriented(c,sample.family,Vector2.ZERO,sample.size,0.0,sample.phase,sample.tint):
-		return
-	var cached: Dictionary = Atlas.cache(c, CACHE_META)
-	if not cached.is_empty() and is_equal_approx(r, roundf(r)) and r >= 4.0 and r <= 12.0:
-		var family: String = "energy"
-		if kind in ["spit", "spore", "acid", "poison"]: family = "spit"
-		elif kind in ["crystal", "pulse"]: family = "crystal"
-		elif kind in ["boss_spore_orb", "boss_orb"]: family = "boss_spore_orb"
-		var frame: int = int(floor(fposmod(clock * 1.3, TAU) / TAU * ORB_FRAMES)) if family == "boss_spore_orb" else 0
-		if Atlas.draw_region(c, cached, "enemy/%s/%d/%d" % [family, int(r), frame]):
-			return
-	_enemy_vector(c, kind, radius, clock)
+	var organic: bool = kind in ["spit","spore","acid","poison","boss_spore_orb","boss_orb"]
+	Geometry.draw_ammunition(c,Vector2.ZERO,Vector2.RIGHT,maxf(4.0,radius),organic)
 
 static func _enemy_vector(c: Node2D, kind: String, radius: float, clock: float) -> void:
 	var r: float = maxf(4.0,radius)

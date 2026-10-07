@@ -74,7 +74,7 @@ func _timed_attack(attack: String) -> void:
 			break
 	_check(safe and synchronized and activation_time >= expected - 0.000001 and activation_time <= expected + DT + 0.000001, attack + ": no early damage and attacker/hazard countdowns remain synchronized for the full duration")
 	var impact_hp: float = float(setup.player.hp)
-	for tick: int in range(16): sim.step(DT, {})
+	for tick: int in range(35 if attack in ["beam","prism_beam","prism_cross"] else 16): sim.step(DT, {})
 	_check(impact_hp < 10000.0 and float(setup.player.hp) == impact_hp and sim.state.hazards.is_empty(), attack + ": activation still damages the exposed player once and expires normally")
 	var late: Dictionary = _fixture(attack, 3600.0)
 	late.sim.step(DT, {})

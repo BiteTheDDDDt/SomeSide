@@ -1,6 +1,6 @@
 # SomeSide 网页版上传 / Web upload
 
-目标页面：[SomeSide by BiteTheDDDDt](https://bitetheddddt.itch.io/someside)。本说明面向 v0.20.4 网页单人模式；Windows 下载版继续提供单人和 2–4 人合作。
+目标页面：[SomeSide by BiteTheDDDDt](https://bitetheddddt.itch.io/someside)。本说明面向 v0.20.5 网页单人模式；Windows 下载版继续提供单人和 2–4 人合作。
 
 Target: update the existing SomeSide page. This first Web build is single-player; keep the Windows download for solo play and 2–4 player co-op.
 
@@ -13,7 +13,7 @@ For local testing, run `PlayWeb.cmd` (Python 3 required), keep its console open 
 ## 上传设置 / Upload settings
 
 1. 在已有项目的编辑页，将 **Kind** 设为 **HTML Game**。不需要另建页面。
-2. 上传 `dist/SomeSide-v0.20.4-web.zip`，将这个 Web ZIP 标为 **This file will be played in the browser**。另将 `SomeSide-v0.20.4-windows-x64.zip` 保持为可下载文件并标为 Windows。
+2. 上传 `dist/SomeSide-v0.20.5-web.zip`，将这个 Web ZIP 标为 **This file will be played in the browser**。另将 `SomeSide-v0.20.5-windows-x64.zip` 保持为可下载文件并标为 Windows。
 3. Web ZIP 的根目录必须直接包含 `index.html`，以及同次导出的所有配套文件，例如 `index.js`、`index.wasm`、`index.pck`。不要再包一层文件夹，不要只上传 HTML，也不要改动导出文件名。
 4. 在 **Embed options** 中优先选择 **Click to launch in fullscreen**，玩家点击后直接展开游玩，无须填写固定尺寸。若希望留在页面内，选择 **Embed in page**、设为 **1280 × 720**、保留 **Click to Play** 并启用 **Fullscreen Button**；不要保留640 × 360的小窗口。使用桌面键盘和鼠标；本版没有触屏操作，不标记 **Mobile Friendly**。
 5. 等 itch.io 处理完 ZIP，在预览中点击开始，检查载入、声音、瞄准和全屏，再保存页面更改。这份说明不代表已经上传或发布。

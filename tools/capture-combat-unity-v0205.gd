@@ -7,12 +7,27 @@ const Enemies = preload("res://scripts/enemy_catalog.gd")
 const World = preload("res://scripts/world_view.gd")
 const CASES = Base.CASES
 const DT: float = 1.0 / 60.0
-const DIRECTORY: String = "res://tools/results/attack-phases-v0203/"
+const DIRECTORY: String = "res://tools/results/combat-unity-v0205/"
 const PANEL: Vector2i = Vector2i(960, 540)
+
+class BodiesOnly extends World:
+	func _draw_threat_overlays() -> void: pass
+	func _draw_projectiles() -> void: pass
+	func _draw_effects() -> void: pass
 
 static func fixture(attack: String, invulnerable: bool = true) -> Dictionary:
 	var underlying: String = attack.trim_prefix("airborne_")
-	var setup: Dictionary = Base.fixture(underlying, invulnerable)
+	var setup: Dictionary = Base.fixture("beam" if underlying=="crowd" else underlying, invulnerable and not ("--hit-demo" in OS.get_cmdline_user_args()))
+	if underlying=="crowd":
+		var sim = setup.sim
+		var floor_y: float = sim.state.floor_y
+		for data: Array in [["sentinel",1160.0,floor_y-165.0],["sentinel",1570.0,floor_y-17.0],["spitter",1080.0,floor_y-17.0],["spitter",1630.0,floor_y-17.0],["crawler",1210.0,floor_y-17.0],["crawler",1500.0,floor_y-17.0]]:
+			var y: float = sim._surface_below(float(data[1]),float(data[2])-1.0)-17.0
+			var added: Dictionary = sim._spawn_enemy(str(data[0]),Vector2(float(data[1]),y))
+			added.grounded=true
+			added.attack_cd=.25 if str(added.kind)=="sentinel" else .9
+		setup.enemy.move_speed=55.0
+		setup.camera=Vector2(1350.0,floor_y-170.0)
 	if attack.begins_with("airborne_"):
 		var sim = setup.sim
 		var enemy: Dictionary = setup.enemy
@@ -39,7 +54,7 @@ static func phase_samples(attack: String) -> Dictionary:
 	var has_hazard: bool = not sim.state.hazards.is_empty()
 	var window: float = float(enemy.telegraph_max)
 	for hazard: Dictionary in sim.state.hazards: window = maxf(window, float(hazard.delay))
-	for tick: int in range(int(ceil(window / DT)) + 90):
+	for tick: int in range(int(ceil(window / DT)) + 230):
 		var active: bool = false
 		var progress: float = 1.0 - float(enemy.telegraph) / maxf(0.01, float(enemy.telegraph_max))
 		var remaining: float = float(enemy.telegraph)
@@ -57,11 +72,11 @@ static func phase_samples(attack: String) -> Dictionary:
 		if active and released_at < 0: released_at = tick
 		history.append({"tick": tick, "state": sim.get_snapshot(), "events": sim.events.duplicate(true),
 			"active": active, "progress": progress, "remaining": remaining, "ttl": ttl})
-		if not active and selected[0] < 0: selected[0] = tick
-		if not active and selected[1] < 0 and progress >= 0.82: selected[1] = tick
+		if not active and selected[0] < 0 and progress >= 0.6: selected[0] = tick
+		if active and released_at >= 0 and tick - released_at >= (3 if has_hazard else 5) and selected[1] < 0: selected[1] = tick
 		# Sample a true damaging frame at ~60ms into the .22s active window,
 		# rather than inferring danger from a rounded display timer.
-		if active and released_at >= 0 and tick - released_at >= 3:
+		if released_at >= 0 and tick - released_at >= 40 and (not has_hazard or ttl < 0.0) and (underlying != "spit" or sim.state.projectiles.is_empty()):
 			selected[2] = tick
 			break
 		sim.step(DT, {})
@@ -79,13 +94,19 @@ func _panel(board: SubViewport, sample: Dictionary, low: bool, phase_index: int,
 	pane.size = PANEL
 	pane.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	container.add_child(pane)
-	var world = World.new()
+	var world = BodiesOnly.new() if "--bodies-only" in OS.get_cmdline_user_args() else World.new()
 	world.screen_size = Vector2(PANEL)
 	world.scenery_cache_enabled = false
 	world.shake_enabled = false
 	world.fx_scale = 0.0 if low else 1.0
 	world.reduced_motion = low
 	pane.add_child(world)
+	if "--grayscale" in OS.get_cmdline_user_args():
+		var shader := Shader.new()
+		shader.code="shader_type canvas_item; void fragment(){ float y=dot(COLOR.rgb,vec3(0.2126,0.7152,0.0722)); COLOR=vec4(vec3(y),COLOR.a); }"
+		var material_value := ShaderMaterial.new()
+		material_value.shader=shader
+		world.material=material_value
 	world.set_process(false)
 	var tick: int = int(sample.selected[phase_index])
 	for index: int in range(tick + 1):
@@ -104,7 +125,7 @@ func _panel(board: SubViewport, sample: Dictionary, low: bool, phase_index: int,
 	var label := Label.new()
 	label.position = Vector2(14, 5)
 	label.add_theme_font_size_override("font_size", 16)
-	var phase: String = ["FIRST VISIBLE FRAME", "LATE READY", "DAMAGE ACTIVE" if sample.has_hazard else "RELEASE"][phase_index]
+	var phase: String = ["WINDUP", "DAMAGE / RELEASE", "RECOVERED"][phase_index]
 	var entry: Dictionary = sample.history[tick]
 	label.text = "%s / %s / %s / 1x\nTick %d | delay %.3fs | active %s | ttl %.3fs" % [str(sample.attack).to_upper(), phase, "LOW FX" if low else "NORMAL", tick, entry.remaining, str(entry.active), entry.ttl]
 	pane.add_child(label)
@@ -118,8 +139,7 @@ func _run() -> void:
 		quit(2)
 		return
 	DirAccess.make_dir_recursive_absolute(DIRECTORY)
-	var attacks: Array = CASES.duplicate()
-	attacks.append("airborne_mortar")
+	var attacks: Array = Array(CASES)
 	var selection: String = ""
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--cases="): selection = argument.trim_prefix("--cases=")
@@ -147,13 +167,14 @@ func _run() -> void:
 			await process_frame
 			await process_frame
 			await RenderingServer.frame_post_draw
-			assert(board.get_texture().get_image().save_png(DIRECTORY + attack + ".png") == OK)
+			var suffix: String = "-gray" if "--grayscale" in OS.get_cmdline_user_args() else ("-bodies" if "--bodies-only" in OS.get_cmdline_user_args() else ("-hit" if "--hit-demo" in OS.get_cmdline_user_args() else ""))
+			assert(board.get_texture().get_image().save_png(DIRECTORY + attack + suffix + ".png") == OK)
 			board.queue_free()
 			await process_frame
 		FileAccess.open(DIRECTORY + attack + "-phases.json", FileAccess.WRITE).store_string(JSON.stringify(records, "\t"))
 		report.append({"attack": attack, "ticks": sample.selected, "first_active_tick": sample.first_active_tick, "hazard": sample.has_hazard})
 	if video and not verify:
-		var film_attacks: Array = ["beam", "stone_spikes", "mortar", "burrow", "spore_bloom", "airborne_mortar"] if selection.is_empty() else attacks
+		var film_attacks: Array = attacks
 		for attack: String in film_attacks: await _film(attack)
 	var result: Dictionary = {"passed": accepted, "native": not verify, "scale": 1.0, "panel_size": [960, 540],
 		"attacks": report, "film_fps": 30, "film_size": [1280, 720], "simulation_sha256": FileAccess.get_sha256("res://scripts/simulation.gd")}

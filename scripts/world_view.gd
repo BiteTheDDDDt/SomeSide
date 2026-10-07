@@ -1686,7 +1686,7 @@ func _draw_enemies() -> void:
 		var p: Vector2 = world_to_screen(_entity_draw_position("e" + str(enemy.get("id", 0)), enemy.get("pos", Vector2.ZERO)))
 		if not Entities.Geometric.supports(str(enemy.get("kind", ""))) and Pixels.available(Pixels.enemy_id(enemy)):
 			p = Pixels.snap_position(self, p)
-		if str(enemy.get("kind", "")) == "sentinel":
+		if str(enemy.get("kind", "")) == "sentinel" or (str(enemy.get("kind", ""))=="boss" and str(enemy.get("boss_style",""))=="prism"):
 			for hazard: Dictionary in _frame.get("hazards", []):
 				if int(hazard.get("owner",-1)) == int(enemy.get("id",0)) and str(hazard.get("shape", "")) == "line":
 					p = world_to_screen(hazard.pos)
@@ -1758,7 +1758,7 @@ func _draw_threat_overlays() -> void:
 		var attack: String = str(enemy.get("attack_kind",""))
 		var detail: bool = not reduced_motion and fx_scale>=.6
 		if attack not in ["beam","prism_beam","prism_cross"] and _visible(p,100.0):
-			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,Entities.enemy_bounds(enemy).end.y,detail)
+			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,44.0 if str(enemy.get("kind",""))=="boss" else 17.0,detail)
 		match attack:
 			"blink":
 				var destination: Vector2 = world_to_screen(enemy.get("blink_target",enemy.get("pos",Vector2.ZERO)))
@@ -1775,14 +1775,14 @@ func _draw_threat_overlays() -> void:
 						# Charged spores/ports form at the mouth; no future path is drawn.
 						var seed: Vector2 = p+ray*start
 						var extent: float = 7.0+6.0*progress
-						EnemyAttackArt.Sprites.draw_oriented(self,"spore_shot" if attack=="spore_volley" else "crystal_shot",seed,Vector2.ONE*extent,ray.angle(),progress,Color(.72,.72,.72,.8))
+						EnemyAttackArt.Geometry.draw_ammunition(self,seed,ray,extent*.35,attack=="spore_volley",true,progress)
 				if attack=="mend":
 					var linked: int=0
 					for ally: Dictionary in _frame.get("enemies",[]):
 						if int(ally.get("id",0))==int(enemy.get("id",0)) or str(ally.get("kind",""))=="boss" or float(ally.get("hp",0))<=0 or float(ally.get("hp",0))>=float(ally.get("max_hp",1)): continue
 						if Vector2(ally.pos).distance_to(enemy.pos)>260.0: continue
 						var end: Vector2 = world_to_screen(ally.pos)
-						NaturalThreats.draw_mending(self,p,end,progress,detail)
+						NaturalThreats.draw_mending(self,p+EnemyAttackArt.Geometry.source_offset(enemy,direction),end,progress,detail)
 						linked+=1
 						if linked>=3: break
 
@@ -1823,7 +1823,12 @@ func _draw_effects() -> void:
 		if str(effect.get("kind", "")) == "hostile_natural":
 			var tint: Color = effect.get("color",Color.WHITE)
 			tint.a *= 1.0 - smoothstep(0.6,1.0,t)
-			EnemyAttackArt.Sprites.draw_oriented(self,str(effect.get("family","burst")),p,effect.get("size",Vector2(48,48)),float(effect.get("angle",0.0)),t,tint)
+			if str(effect.get("family",""))=="rift":
+				EnemyAttackArt.Geometry.draw_rift(self,p,30,t,true)
+			elif str(effect.get("family",""))=="repair":
+				EnemyAttackArt.Geometry.diamond(self,p,Vector2.UP,5*(1-t),3*(1-t),Color("9ac7ad"))
+			else:
+				EnemyAttackArt.Geometry.draw_impact(self,p,"spore" if str(effect.get("family","")).begins_with("spore") else "stone",Vector2.UP,t)
 			continue
 		if str(effect.get("kind", "")) == "proc_activation":
 			ProcFeedback.draw(self, ProcFeedback.activation_sample(effect), p, fx_scale)
