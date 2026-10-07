@@ -3,8 +3,9 @@ extends RefCounted
 
 ## Shared visual vocabulary. World units are logical display pixels; this module
 ## never chooses a target, advances a timer, or changes a collision shape.
-const INK := Color("091e26")
-const WARNING := Color("fb716d")
+const INK := Color("424e55")
+const FX = preload("res://scripts/illustrated_fx.gd")
+const WARNING := Color("f16b78")
 const CORE := Color("fff0cf")
 const EDGE: float = 2.0
 const BACK: float = 4.0
@@ -52,10 +53,10 @@ static func capsule(start: Vector2, finish: Vector2, radius: float) -> PackedVec
 static func warning_alpha(elapsed: float) -> float:
 	return .68+.32*(.5+.5*cos(maxf(0.0,elapsed)*TAU*2.0))
 
-static func dashed_boundary(points: PackedVector2Array) -> PackedVector2Array:
+static func dashed_boundary(points: PackedVector2Array, closed: bool = true) -> PackedVector2Array:
 	var segments := PackedVector2Array()
 	var traveled: float = 0.0
-	for i: int in range(points.size()):
+	for i: int in range(points.size() if closed else points.size()-1):
 		var a: Vector2 = points[i]
 		var b: Vector2 = points[(i+1)%points.size()]
 		var length: float = a.distance_to(b)
@@ -72,14 +73,11 @@ static func dashed_boundary(points: PackedVector2Array) -> PackedVector2Array:
 			traveled+=advance
 	return segments
 
-static func draw_warning(c: CanvasItem, points: PackedVector2Array, alpha: float) -> void:
-	var border: PackedVector2Array=points.duplicate()
-	border.append(points[0])
-	c.draw_polyline(border,INK,BACK,true)
-	# The restrained dark-red under-line persists between bright dashes and
-	# pulses. Timing never creates an invisible warning frame.
-	c.draw_polyline(border,Color("8d484c"),1.0,true)
-	c.draw_multiline(dashed_boundary(points),Color(WARNING,alpha),EDGE,true)
+static func draw_warning(c: CanvasItem, points: PackedVector2Array, alpha: float, closed: bool = true) -> void:
+	var dashes: PackedVector2Array=dashed_boundary(points,closed)
+	if dashes.is_empty(): return
+	c.draw_multiline(dashes,Color("26383c"),BACK,true)
+	c.draw_multiline(dashes,Color(WARNING,alpha),EDGE,true)
 
 static func beam_fade(point: Vector2, start: Vector2, finish: Vector2) -> float:
 	var axis: Vector2=finish-start
@@ -112,26 +110,41 @@ static func impact_family(kind: String) -> String:
 	return ""
 
 static func draw_ammunition(c: CanvasItem, origin: Vector2, direction: Vector2, radius: float, organic: bool, preparing: bool = false, progress: float = 1.0) -> void:
-	var colors: Dictionary = palette("spore" if organic else "crystal")
-	var across: Vector2 = direction.orthogonal()
+	var colors: Dictionary=palette("spore" if organic else "crystal")
+	var across: Vector2=direction.orthogonal()
 	if organic:
-		var points := PackedVector2Array()
-		for index: int in range(12):
-			var angle: float = TAU*index/12.0
-			points.append(origin+direction*cos(angle)*radius+across*sin(angle)*radius*.85)
-		polygon(c,points,colors.base,BODY)
-		c.draw_arc(origin,radius*.6,direction.angle()-2.5,direction.angle()-.7,8,colors.light,1.5,true)
+		# A seed with a fleshy forward lobe and a tapered rear, matching the
+		# inflated spitter abdomen; broad hard highlights instead of a ring.
+		var shell:=PackedVector2Array()
+		var inset:=PackedVector2Array()
+		for i: int in range(32):
+			var angle: float=TAU*i/32.0
+			var x: float=cos(angle)
+			var y: float=sin(angle)*( .72+.24*(x+1.0)*.5 )
+			shell.append(origin+direction*x*radius+across*y*radius)
+			inset.append(origin+direction*(x*.68+.12)*radius+across*(y*.60-.18)*radius)
+		polygon(c,shell,Color("717951"),0)
+		polygon(c,inset,colors.base,0)
+		FX.ribbon(c,origin-across*radius*.13,radius*.64,direction.angle()-2.5,direction.angle()-.3,radius*.25,colors.light)
 		if not preparing:
-			c.draw_line(origin-direction*(radius+2),origin-direction*(radius+5),colors.attack,1.5,true)
+			for i: int in range(2):
+				var point: Vector2=origin-direction*radius*(1.25+i*.65)+across*radius*(.18 if i==0 else -.23)
+				FX.shard(c,point,direction.angle(),radius*(.45-i*.12),radius*.18,Color(colors.base,.8-i*.2))
 	else:
-		diamond(c,origin,direction,radius*1.3,radius*.85,colors.attack,BODY)
-		diamond(c,origin-direction*radius*.12-across*radius*.12,direction,radius*.55,radius*.25,CORE)
+		# Unequal facets form a physical crystal dart, rather than a hollow
+		# diamond glyph. The preparation grows the same object at the port.
+		var points:=PackedVector2Array()
+		for point: Vector2 in [Vector2(1.3,0),Vector2(.15,-.72),Vector2(-.9,-.36),Vector2(-1.15,.18),Vector2(-.18,.72)]:
+			points.append(origin+(direction*point.x+across*point.y)*radius)
+		polygon(c,points,Color("b87679"),.8)
+		polygon(c,PackedVector2Array([points[0],points[1],origin-direction*radius*.6,origin+across*radius*.13]),Color("ead0b7"),0)
+		polygon(c,PackedVector2Array([points[0],origin+across*radius*.13,points[4]]),Color("cd9391"),0)
+		if not preparing:
+			FX.shard(c,origin-direction*radius*1.5,direction.angle(),radius*.7,radius*.18,Color("d7b8ac",.6))
 	if preparing:
-		# Inward gathering only beside the organ; no hypothetical trajectory.
 		for side: float in [-1.0,1.0]:
-			var near: Vector2 = origin-direction*3+across*side*(radius+2.0)
-			var far: Vector2 = near-direction*(3.0-progress*2.0)+across*side*2.0
-			c.draw_line(far,near,colors.attack,DETAIL,true)
+			var point: Vector2=origin-direction*(radius*.4)+across*side*(radius+3.0-progress*2.0)
+			FX.shard(c,point,direction.angle()-side*.4,2.0,1.0,colors.light)
 
 static func draw_impact(c: CanvasItem, position: Vector2, family_name: String, direction: Vector2, phase: float) -> void:
 	var tint: Color = palette(family_name).attack
@@ -153,7 +166,7 @@ static func draw_impact(c: CanvasItem, position: Vector2, family_name: String, d
 	else:
 		for index: int in range(2):
 			var center: Vector2 = position+side*(index*4.0-2.0)
-			c.draw_arc(center,5.0+phase*5.0,direction.angle()-.65,direction.angle()+.35,8,tint,1.8*(1.0-phase),true)
+			FX.ribbon(c,center,6.0+phase*6.0,direction.angle()-1.0,direction.angle()+.45,3.0*(1.0-phase),tint)
 
 static func draw_ground_charge(c: CanvasItem, center: Vector2, width: float, progress: float) -> void:
 	var colors: Dictionary=palette("stone")
@@ -162,13 +175,18 @@ static func draw_ground_charge(c: CanvasItem, center: Vector2, width: float, pro
 		polygon(c,PackedVector2Array([point+Vector2(-4,2),point+Vector2(-2,-3-progress*2),point+Vector2(3,-2),point+Vector2(5,2)]),colors.base,1)
 
 static func draw_rift(c: CanvasItem, center: Vector2, height: float, progress: float, ending: bool = false) -> void:
-	var colors: Dictionary=palette("crystal")
-	var alpha: float=1.0-progress if ending else .7
+	var amount: float=1.0-progress if ending else .5+.5*progress
+	if amount<.025: return
 	for side: float in [-1.0,1.0]:
-		var x: float=side*(3+progress*4)
-		var points:=PackedVector2Array([center+Vector2(x, -height*.45),center+Vector2(x+side*4,-height*.1),center+Vector2(x, height*.15)])
-		c.draw_polyline(points,Color(colors.attack,alpha),2,true)
-		if not ending: diamond(c,center+Vector2(x,height*.34),Vector2.UP,4,2,colors.light)
+		var ribbon:=PackedVector2Array()
+		for j: int in range(17):
+			var t: float=j/16.0
+			ribbon.append(center+Vector2(side*sin(PI*t)*height*.17*amount,(t-.5)*height))
+		for j: int in range(16,-1,-1):
+			var t: float=j/16.0
+			ribbon.append(center+Vector2(side*sin(PI*t)*height*.08*amount,(t-.5)*height))
+		polygon(c,ribbon,Color("aabec9",amount),0)
+		FX.shard(c,center+Vector2(side*height*.1,-height*.22),-PI*.5,height*.16*amount,height*.025,Color("e2d8c1",amount))
 
 static func draw_area_material(c: CanvasItem, center: Vector2, sample: Dictionary) -> void:
 	var organic: bool=str(sample.family).begins_with("spore")
@@ -180,8 +198,6 @@ static func draw_area_material(c: CanvasItem, center: Vector2, sample: Dictionar
 		if organic:
 			var seed: float=Vector2(sample.size).x*.38
 			draw_ammunition(c,center,Vector2.UP,seed,true,true,phase)
-			# A closed capsule and small seam, never a filled danger region.
-			c.draw_line(center-Vector2(0,seed*.6),center+Vector2(0,seed*.6),INK,1.5,true)
 		else: draw_ground_charge(c,center+Vector2(0,13),minf(radius,48),phase)
 		return
 	# Only active authority owns the complete filled footprint. No textured
@@ -190,23 +206,22 @@ static func draw_area_material(c: CanvasItem, center: Vector2, sample: Dictionar
 	for i: int in range(48): disk.append(center+Vector2.from_angle(i*TAU/48.0)*radius)
 	c.draw_colored_polygon(disk,Color(colors.attack,.22))
 	if organic:
-		# Split seed walls open into broad curved ribbons, with a few expelled
-		# beads. Unequal arcs avoid a radial emblem / concentric target look.
-		for i: int in range(3):
-			var angle: float=-2.4+i*2.1
-			var extent: float=radius*(.45+i*.14+.08*phase)
-			var arc:=PackedVector2Array()
-			for j: int in range(9): arc.append(center+Vector2.from_angle(angle+j*.95/8)*extent)
-			for j: int in range(8,-1,-1): arc.append(center+Vector2.from_angle(angle+j*.95/8)*(extent-radius*.15))
-			polygon(c,arc,colors.base,1)
-			c.draw_arc(center,extent-radius*.035,angle+.1,angle+.68,9,colors.light,1.8,true)
-			var ray:=Vector2.from_angle(angle+.4)
-			draw_ammunition(c,center+ray*radius*(.45+.12*phase),ray,maxf(3,radius*.095),true)
-		for side: float in [-1.0,1.0]:
-			var shell:=PackedVector2Array()
-			var offset:=center+Vector2(side*radius*(.10+.08*phase),-radius*.06)
-			for j: int in range(8): shell.append(offset+Vector2.from_angle(-PI*.5+side*j*PI/7)*radius*.26)
-			polygon(c,shell,colors.light,1)
+		# Broad asymmetric acid lobes and rising seeds, with the underlying
+		# full footprint retained. No concentric emblems or orbiting rings.
+		for i: int in range(4):
+			var angle: float=-2.5+i*1.7
+			var offset: Vector2=Vector2.from_angle(angle)*radius*(.34+.05*sin(phase*PI))
+			var lobe:=PackedVector2Array()
+			var extent: float=radius*(.35 if i%2==0 else .28)
+			for j: int in range(28):
+				var a: float=TAU*j/28.0
+				lobe.append(center+offset+Vector2(cos(a),sin(a)*.76)*extent*(1.0+.08*sin(a*3+i)))
+			polygon(c,lobe,colors.shade,0)
+			FX.ribbon(c,center+offset,extent*.7,angle-1.1,angle+.65,extent*.35,colors.base)
+			FX.ribbon(c,center+offset,extent*.65,angle-.95,angle-.05,extent*.13,colors.light)
+			var point: Vector2=center+offset*.95+Vector2(0,-radius*.12*phase)
+			draw_ammunition(c,point,Vector2.from_angle(angle),maxf(3,radius*.065),true)
+
 	else:
 		# Ground-launched uneven shards: tall top facets and small underground
 		# roots stay within the real circular footprint, without a star emblem.
@@ -218,7 +233,7 @@ static func draw_area_material(c: CanvasItem, center: Vector2, sample: Dictionar
 			var tip:=center+Vector2(x+half_width*.25,-safe_y*(.7 if i%2==0 else 1.0)*lerpf(.82,1.0,smoothstep(0,.18,phase)))
 			var left:=center+Vector2(x-half_width,base)
 			var right:=center+Vector2(x+half_width,base)
-			polygon(c,PackedVector2Array([left,tip,right,center+Vector2(x,minf(safe_y,base+radius*.2))]),colors.base,1)
+			polygon(c,PackedVector2Array([left,tip+Vector2(-half_width*.3,half_width*.8),tip,tip+Vector2(half_width*.45,half_width*1.15),right,center+Vector2(x,minf(safe_y,base+radius*.2))]),colors.base,1)
 			polygon(c,PackedVector2Array([center+Vector2(x,base),tip,right]),colors.light,0)
 
 			var ridge: Vector2=tip.lerp(center+Vector2(x,base),.5)

@@ -1744,6 +1744,8 @@ func _draw_threat_overlays() -> void:
 	for value: Variant in _frame.get("enemies", []):
 		var enemy: Dictionary = value
 		if float(enemy.get("hp",0.0))<=0.0: continue
+		var attack_position: Vector2=world_to_screen(_entity_draw_position("e"+str(enemy.get("id",0)),enemy.get("pos",Vector2.ZERO)))
+		if _visible(attack_position,100.0): EnemyAttackArt.draw_lunge(self,enemy,attack_position)
 		var remaining: float = float(enemy.get("telegraph",0.0))
 		if remaining<=0.0: continue
 		var p: Vector2 = world_to_screen(_entity_draw_position("e"+str(enemy.get("id",0)),enemy.get("pos",Vector2.ZERO)))

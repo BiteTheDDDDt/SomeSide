@@ -3,6 +3,8 @@ extends RefCounted
 
 ## Stateless presentation sampled from replicated attack timers. No global-clock
 ## wobble, simulation writes, runtime textures, or unbounded particle queues.
+const Envelope = preload("res://scripts/beam_envelope.gd")
+const FX = preload("res://scripts/illustrated_fx.gd")
 const Pose = preload("res://scripts/weapon_pose.gd")
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
 const Geometry = preload("res://scripts/combat_geometry.gd")
@@ -49,6 +51,8 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 	# Its hollow red dashed footprint is distinct from filled geometric bands
 	# that exist only while authority marks damage active.
 	return {"origin":position,"end":position+direction*length,"direction":direction,"radius":radius,"active":active,"progress":progress,"release":release,
+		"envelope":Envelope.sample(float(hazard.get("ttl",BEAM_LIFETIME))),
+		"warning_reach":smoothstep(0.0,.65,progress),
 		"warning_visible":not active,"warning_origin":position,"warning_end":position+direction*length,"warning_radius":radius,
 		"warning_alpha":0.0 if active else Geometry.warning_alpha(progress*float(hazard.get("telegraph_max",1.5))),
 		"warning_fill_alpha":0.0,
@@ -63,15 +67,19 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 		"source_alpha":1.0 if active else .6+.3*progress,
 		"detail":not reduced_motion and fx_scale>=.6}
 
-static func draw_source(canvas: CanvasItem, origin: Vector2, direction: Vector2, progress: float, _detail: bool, active: bool = false, _release: float = 0.0) -> void:
+static func draw_source(canvas: CanvasItem, origin: Vector2, direction: Vector2, progress: float, detail: bool, active: bool = false, release: float = 0.0) -> void:
 	var phase: float = clampf(progress,0,1)
-	var color: Color = Geometry.palette("crystal").attack
-	Geometry.diamond(canvas,origin,direction,6.0 if active else 2.0+phase*3.0,4.5 if active else 1.5+phase*2.0,Geometry.CORE if active else color,1.2)
-	if not active and _detail:
-		# Paired facets converge into the aperture, never paint a second path.
+	var scale_value: float = Envelope.sample((1.0-release)*BEAM_LIFETIME).y if active else .3+.7*phase
+	if scale_value<.015: return
+	var across: Vector2 = direction.orthogonal()
+	# Nested solid facets sit inside the actual eye. Separate curved jaws
+	# close into its aperture, instead of a floating star or target reticle.
+	Geometry.diamond(canvas,origin,direction,5.5*scale_value,4.0*scale_value,Color("b1c6cd"),.8)
+	Geometry.diamond(canvas,origin-direction, direction,3.2*scale_value,2.0*scale_value,Geometry.CORE)
+	if not active and detail:
 		for side: float in [-1.0,1.0]:
-			var from: Vector2 = origin-direction*(10.0-phase*4.0)+direction.orthogonal()*side*(7.0-phase*3.0)
-			canvas.draw_line(from,from+direction*3.0-direction.orthogonal()*side*2.0,color,Geometry.DETAIL,true)
+			var point: Vector2=origin-direction*(9.0-phase*5.0)+across*side*(7.0-phase*4.0)
+			FX.shard(canvas,point,direction.angle()+side*.3,3.5,1.6,Color("b1c6cd"))
 
 static func preparation_sample(enemy: Dictionary, center: Vector2, direction: Vector2, progress: float, foot: float) -> Dictionary:
 	var kind: String = str(enemy.get("attack_kind",""))
@@ -107,40 +115,50 @@ static func draw_preparation(canvas: CanvasItem, enemy: Dictionary, center: Vect
 static func warning_capsule(start: Vector2, finish: Vector2, radius: float) -> PackedVector2Array:
 	return Geometry.capsule(start,finish,radius)
 
+static func draw_lunge(canvas: CanvasItem, enemy: Dictionary, center: Vector2) -> void:
+	var remaining: float=float(enemy.get("charge_timer",0.0))
+	if remaining<=0.0: return
+	var kind: String=str(enemy.get("attack_kind",""))
+	var duration: float=.35 if kind=="pounce" else (.72 if kind=="stone_charge" else .58)
+	var phase: float=clampf(1.0-remaining/duration,0,1)
+	var direction: Vector2=Pose.normalized_aim(enemy.get("attack_dir",Vector2.RIGHT))
+	var radius: float=float(enemy.get("radius",19.0))
+	if kind=="pounce":
+		# Two short claw sweeps travel with the forelimbs, never a detached
+		# complete circle or a warning corridor in front of the creature.
+		for i: int in range(2):
+			var origin: Vector2=center+direction*radius*.36+Vector2(0,4+i*4)
+			FX.ribbon(canvas,origin,radius*.65,direction.angle()-1.1+phase*.6,direction.angle()+.5+phase*.6,2.8*(1-phase),Color("c5c797",1-phase*.5))
+	elif kind in ["charge","stone_charge"]:
+		# Broad kicked-up chips follow the feet; avoid speed-line runways.
+		for i: int in range(3):
+			var t: float=fposmod(phase*2.0+i/3.0,1.0)
+			var point: Vector2=center-direction*radius*(.4+t*.9)+Vector2(0,radius*.6-t*8)
+			FX.shard(canvas,point,direction.angle()+.3,4*(1-t)+1,2*(1-t)+.3,Color("a99583",1-t))
+
 static func draw_beam_warning(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
 	if not bool(sample.warning_visible): return
-	var outline: PackedVector2Array = warning_capsule(start,finish,float(sample.radius))
-	Geometry.draw_warning(canvas,outline,float(sample.warning_alpha))
-	if bool(sample.detail):
-		# Two small inward-facing crystal facets are subordinate to the intact
-		# boundary. Nothing extends beyond the announced danger silhouette.
-		var direction: Vector2 = sample.direction
-		for side: float in [-1.0,1.0]:
-			var point: Vector2 = start.lerp(finish,.18)+direction.orthogonal()*side*(float(sample.radius)-3.0)
-			Geometry.diamond(canvas,point,direction,4.0,1.4,Geometry.WARNING)
+	var direction: Vector2=sample.direction
+	var end: Vector2=start.lerp(finish,float(sample.warning_reach))
+	# One extending red dashed aim line. No capsule, parallel borders,
+	# secondary progress arc or differently colored trajectory.
+	Geometry.draw_warning(canvas,PackedVector2Array([start,end]),float(sample.warning_alpha),false)
+	if end.distance_to(start)>12.0:
+		var across: Vector2=direction.orthogonal()
+		var arrow:=PackedVector2Array([end-direction*7.0+across*4.0,end,end-direction*7.0-across*4.0])
+		canvas.draw_polyline(arrow,Color("26383c"),Geometry.BACK,true)
+		canvas.draw_polyline(arrow,Color(Geometry.WARNING,float(sample.warning_alpha)),Geometry.EDGE,true)
 
 static func draw_beam(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
-	var direction: Vector2 = sample.direction
+	var direction: Vector2=sample.direction
 	draw_beam_warning(canvas,start,finish,sample)
-	if bool(sample.material_visible):
-		# Both phases consume exactly the same capsule, including both end caps.
-		# Damage fills it with hard bands fading along distance; no texture/bloom/taper can
-		# imply a different width or an early fade during the authority window.
-		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)),start,finish,Color("d99089"),.06)
-		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)*.55),start,finish,Color("edd2bb"),.12)
-		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,maxf(1.5,float(sample.radius)*.15)),start,finish,Geometry.CORE,.22)
-
-		# Short energy packets travel inside the filled core; these do not
-		# redraw the removed warning perimeter or extend the hit silhouette.
-		var across: Vector2=direction.orthogonal()
-		var length: float=start.distance_to(finish)
-		for index: int in range(3):
-			var along: float=fposmod(float(sample.release)*1.4+index/3.0,1.0)
-			if length*along<1.0: continue
-			var head: Vector2=start.lerp(finish,along)
-			var tail: Vector2=head-direction*minf(34.0,length*along)
-			var width: float=maxf(.8,float(sample.radius)*.09)
-			var tint:=Color(Geometry.CORE,lerpf(.72,.16,along))
-			canvas.draw_colored_polygon(PackedVector2Array([head,tail-across*width,tail+across*width]),tint)
-
+	var envelope: Vector2=sample.envelope
+	if bool(sample.material_visible) and envelope.y>.005 and envelope.x>.001:
+		var end: Vector2=start.lerp(finish,envelope.x)
+		var width: float=float(sample.radius)*envelope.y
+		# The same temporal envelope controls the actual collider. The beam
+		# shoots out, holds, then contracts to a hairline before disappearing.
+		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width),start,end,Color("ce8987"),.08)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width*.57),start,end,Color("e9bfaf"),.15)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width*.16),start,end,Geometry.CORE,.27)
 	draw_source(canvas,start,direction,1.0 if bool(sample.active) else float(sample.progress),bool(sample.detail),bool(sample.active),float(sample.release))

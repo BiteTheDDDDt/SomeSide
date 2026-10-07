@@ -9,6 +9,7 @@ const Guidance = preload("res://scripts/projectile_guidance.gd")
 const Procs = preload("res://scripts/proc_rules.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
+const BeamEnvelope = preload("res://scripts/beam_envelope.gd")
 
 ## Authoritative, scene-independent game rules. State contains only serializable
 ## values. All positions are centers; platforms are one-way from above.
@@ -1503,13 +1504,15 @@ func _step_hazards(dt: float, new_hazard_min_id: int = -1) -> void:
 			hazard["active"] = true
 			_emit("explosion", hazard["pos"], {"radius": hazard["radius"], "team": "enemy", "kind": hazard["kind"], "visual_only": true})
 		hazard["ttl"] = float(hazard["ttl"]) - dt
+		if float(hazard["ttl"])<=0.0: continue
 		for player_value in Dictionary(state["players"]).values():
 			var player: Dictionary = player_value
 			if bool(player["dead"]) or int(player["id"]) in Array(hazard["hit_ids"]):
 				continue
 			var hit: bool = false
 			if str(hazard["shape"]) == "line":
-				hit = _segment_circle(hazard["pos"], Vector2(hazard["pos"]) + Vector2(hazard["dir"]) * float(hazard["length"]), player["pos"], float(hazard["radius"]) + 15.0) >= 0.0
+				var envelope: Vector2 = BeamEnvelope.sample(float(hazard["ttl"]))
+				hit = envelope.y>0.0 and _segment_circle(hazard["pos"], Vector2(hazard["pos"]) + Vector2(hazard["dir"]) * float(hazard["length"])*envelope.x, player["pos"], float(hazard["radius"])*envelope.y + 15.0) >= 0.0
 			else:
 				hit = Vector2(player["pos"]).distance_to(hazard["pos"]) <= float(hazard["radius"]) + 15.0
 			if hit:

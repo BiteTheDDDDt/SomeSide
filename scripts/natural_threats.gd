@@ -51,13 +51,6 @@ static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary)
 		var boundary := PackedVector2Array()
 		for index: int in range(64): boundary.append(position+Vector2.from_angle(index*TAU/64.0)*radius)
 		Geometry.draw_warning(canvas,boundary,float(sample.warning_alpha))
-		var progress: float = float(sample.warning_progress)
-		if progress > 0.001:
-			canvas.draw_arc(position, radius - 4.0, -PI * 0.5, -PI * 0.5 + TAU * progress, 48, Color("e8a7a0"), 1.1, true)
-		if str(sample.family) == "spore_ready":
-			# The seed can coincide with the player's torso. A compact dark
-			# backing and full-opacity seed keep its first frame recognizable.
-			canvas.draw_circle(center, Vector2(sample.size).x * 0.47, Color(0.025, 0.055, 0.065, 0.8), true, -1, true)
 	Geometry.draw_area_material(canvas,position,sample)
 
 static func draw_blink(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float) -> void:

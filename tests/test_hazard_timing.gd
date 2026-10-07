@@ -73,9 +73,13 @@ func _timed_attack(attack: String) -> void:
 			activation_time = elapsed
 			break
 	_check(safe and synchronized and activation_time >= expected - 0.000001 and activation_time <= expected + DT + 0.000001, attack + ": no early damage and attacker/hazard countdowns remain synchronized for the full duration")
+	# Lasers extend for 45ms: distant players are hit when the visible beam
+	# reaches them, rather than on the first short emission frame.
+	if attack in ["beam","prism_beam","prism_cross"]:
+		for tick: int in range(3): sim.step(DT,{})
 	var impact_hp: float = float(setup.player.hp)
 	for tick: int in range(35 if attack in ["beam","prism_beam","prism_cross"] else 16): sim.step(DT, {})
-	_check(impact_hp < 10000.0 and float(setup.player.hp) == impact_hp and sim.state.hazards.is_empty(), attack + ": activation still damages the exposed player once and expires normally")
+	_check(impact_hp < 10000.0 and float(setup.player.hp) == impact_hp and sim.state.hazards.is_empty(), attack + ": released attack reaches the exposed player, damages once and expires normally")
 	var late: Dictionary = _fixture(attack, 3600.0)
 	late.sim.step(DT, {})
 	_check(float(late.sim.state.difficulty) > 20.0 and late.enemy.telegraph == enemy.telegraph_max and late.sim.state.hazards[0].delay == expected, attack + ": late-run difficulty never shortens the ready period")
