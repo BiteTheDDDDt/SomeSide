@@ -38,6 +38,7 @@ const MAX_DAMAGE_NUMBERS: int = 32
 const PARTICLE_KINDS: Array[String] = ["spark", "fragment", "ember", "smoke"]
 const PARTICLE_WIDTHS: Array[float] = [1.0, 2.0, 4.0, 7.0]
 
+const IllustratedFX = preload("res://scripts/illustrated_fx.gd")
 const INK: Color = Color("07171e")
 const SKY: Color = Color("081e28")
 const TEAL: Color = Color("7df3d0")
@@ -1157,13 +1158,19 @@ func _draw_gate() -> void:
 		charge *= 0.01
 	var glow_color: Color = TEAL if ready else GOLD
 	var center: Vector2 = p + Vector2(0.0, -46.0)
-	_glow(center, 112.0, Color(glow_color, 0.028 if active else 0.013), 5)
+	_glow(center, 72.0, Color(glow_color, 0.018 if active else 0.0), 2)
 	draw_colored_polygon(PackedVector2Array([p + Vector2(-64.0, 16.0), p + Vector2(64.0, 16.0), p + Vector2(49.0, -1.0), p + Vector2(-47.0, -1.0)]), Color("15363a"))
 	draw_line(p + Vector2(-57.0, 13.0), p + Vector2(57.0, 13.0), Color("508b7e"), 2.0, true)
 	# Physical split arch remains readable before activation.
 	for side: float in [-1.0, 1.0]:
-		var arch: PackedVector2Array = PackedVector2Array([p + Vector2(side * 47.0, 1.0), p + Vector2(side * 49.0, -56.0), p + Vector2(side * 30.0, -100.0), p + Vector2(side * 16.0, -103.0), p + Vector2(side * 32.0, -57.0), p + Vector2(side * 31.0, -1.0)])
-		draw_colored_polygon(arch, Color("1b3a3c"))
+		var arch: PackedVector2Array = PackedVector2Array()
+		for step: int in range(17):
+			var t: float=step/16.0
+			arch.append(p+Vector2(side*(47+22*sin(t*PI)-31*t),1-104*t))
+		for step: int in range(16,-1,-1):
+			var t: float=step/16.0
+			arch.append(p+Vector2(side*(31+15*sin(t*PI)-15*t),-1-102*t))
+		draw_colored_polygon(arch, Color("728581"))
 		draw_polyline(PackedVector2Array([p + Vector2(side * 41.0, -7.0), p + Vector2(side * 42.0, -56.0), p + Vector2(side * 24.0, -94.0)]), Color(glow_color, 0.9 if active else 0.46), 2.0, true)
 		for rune: int in range(3):
 			var rp: Vector2 = p + Vector2(side * 39.0, -19.0 - float(rune) * 13.0)
@@ -1397,8 +1404,11 @@ func _draw_coin_pickups() -> void:
 				draw_line(p - direction * tail, p - direction * tail * 0.40, Color(GOLD, 0.12 * fx_scale), 3.0, false)
 				draw_line(p - direction * tail * 0.40, p, Color(GOLD, 0.62 * fx_scale), 2.0, false)
 			var width: float = 1.0 + absf(sin(age * 11.0 + phase)) * 3.0
-			draw_rect(Rect2(p - Vector2(width + 1, 5), Vector2(width * 2 + 2, 10)), Color("764a2d"))
-			draw_rect(Rect2(p - Vector2(width, 4), Vector2(width * 2, 8)), GOLD)
+			var coin_shape:=PackedVector2Array()
+			for step: int in range(16): coin_shape.append(p+Vector2(cos(step*TAU/16)*(width+1),sin(step*TAU/16)*5))
+			draw_colored_polygon(coin_shape,Color("ad8e63"))
+			for step: int in range(16): coin_shape[step]=p+Vector2(cos(step*TAU/16)*width,sin(step*TAU/16)*4)
+			draw_colored_polygon(coin_shape,Color("d2b787"))
 			draw_line(p + Vector2(-width, -3), p + Vector2(width, -3), CREAM, 1.0)
 			draw_line(p + Vector2(0, -2), p + Vector2(0, 2), Color("b77538"), 1.0)
 			if fx_scale >= 0.75 and sin(age * 15.0 + phase) > 0.83:
@@ -1488,12 +1498,8 @@ func _draw_deployables() -> void:
 		draw_polyline(PackedVector2Array([p+Vector2(-16,12),p+Vector2(-6,2),p+Vector2(6,2),p+Vector2(16,12)]), INK,6.0,true)
 		draw_polyline(PackedVector2Array([p+Vector2(-16,12),p+Vector2(-6,2),p+Vector2(6,2),p+Vector2(16,12)]), tint,2.5,true)
 		draw_line(p,p+Vector2(0,14),tint,3.0,true)
-		draw_set_transform(p+Vector2(0,-5),angle)
-		draw_rect(Rect2(-10,-7,24,14),INK)
-		draw_rect(Rect2(-8,-5,18,10),Color("526951"))
-		draw_rect(Rect2(10,-3,17,6),INK)
-		draw_line(Vector2(11,-1),Vector2(26,-1),tint,2.5,true)
-		draw_circle(Vector2(-1,0),3.0,TEAL,true,-1.0,true)
+		draw_set_transform(p+Vector2(0,-5),angle,Vector2(.75,.75))
+		WeaponArt.draw(self,"pulse_rifle")
 		draw_set_transform(Vector2.ZERO)
 		draw_arc(p,22.0,0,TAU*clampf(float(device.get("ttl",8.0))/8.0,0.0,1.0),28,Color(tint,0.35),1.0,true)
 	for pending: Dictionary in _frame.get("effects", []):
@@ -1562,12 +1568,7 @@ func _draw_players() -> void:
 		var vel: Vector2 = player.get("vel", Vector2.ZERO)
 		var grounded: bool = player.get("grounded", false)
 		var running: float = clampf(absf(vel.x) / 100.0, 0.0, 1.0)
-		if Pixels.available(character):
-			# Pixel poses already contain their authored step motion. Additional
-			# fractional body bob detached the torso from its selected weapon shoulder.
-			p = Pixels.snap_position(self, p)
-		else:
-			p.y -= absf(cos(_clock * 16.0)) * running if grounded else 0.0
+		# Illustrated bodies retain continuous subpixel movement; the gait owns foot contact.
 		draw_set_transform(p, 0.0, Vector2(facing, 1.0))
 		Appearance.draw_layer(self, appearance, true, _clock)
 		# Body and weapon sample exactly the same interpolated world position.
@@ -1590,6 +1591,7 @@ func _draw_players() -> void:
 		elif bool(pose.ranged.active):
 			_draw_ranged_actor(player, pose)
 		else:
+			_draw_weapon_arm(player,world_to_screen(pose.shoulder),world_to_screen(pose.grip),facing)
 			draw_set_transform(world_to_screen(pose.shoulder), aim.angle(), Vector2(1.0, facing))
 			_draw_weapon(weapon)
 		draw_set_transform(Vector2.ZERO)
@@ -1603,11 +1605,7 @@ func _draw_players() -> void:
 				draw_line(p+tick_dir*30.0,p+tick_dir*35.0,Color("89dbec"),1.5,true)
 		if float(player.get("shield", 0.0)) > 0.0:
 			var shield_alpha: float = 0.45 if float(player.get("shield_timer", 5.0)) > 1.5 else 0.2 + absf(sin(_clock * 8.0)) * 0.3
-			draw_arc(p, 29.0, _clock * 0.3, _clock * 0.3 + TAU - 0.4, 42, Color(0.45, 0.82, 1.0, shield_alpha), 1.4, true)
-			for panel: int in range(3):
-				var angle: float = float(panel) * TAU / 3.0 + _clock * 0.3
-				var panel_p: Vector2 = p + Vector2.from_angle(angle) * 26.0
-				draw_arc(panel_p, 4.0, angle - 1.0, angle + 1.0, 7, Color(0.65, 0.9, 1.0, shield_alpha * 0.6), 1.0, true)
+			IllustratedFX.shield(self,p,29.0,_clock*.18,IllustratedFX.ICE,shield_alpha)
 		if float(player.get("invuln", 0.0)) > 0.0:
 			_glow(p, 31.0, Color(color_value, 0.08 + sin(_clock * 36.0) * 0.03), 2)
 		if players.size() > 1:
@@ -1622,13 +1620,9 @@ func _draw_movement_ability(player: Dictionary, p: Vector2) -> void:
 		return
 	var charge: float = clampf(float(player.get("guard_absorbed", 0.0)) / 40.0, 0.0, 1.0)
 	var radius: float = 30.0 + charge * 4.0
-	var rim := PackedVector2Array()
-	for index: int in range(7):
-		rim.append(p + Vector2.from_angle(PI / 6.0 + index * TAU / 6.0) * radius)
-	draw_colored_polygon(rim, Color(GOLD, 0.045 + charge * 0.06))
-	draw_polyline(rim, Color(GOLD, 0.8), 1.6 + charge, false)
+	IllustratedFX.shield(self,p,radius,PI/6.0,IllustratedFX.GOLD,.8)
 	var progress: float = clampf(1.0 - float(player.guard_timer) / 0.8, 0.0, 1.0)
-	draw_arc(p, radius + 5, -PI/2, -PI/2 + maxf(0.01, TAU * progress), 32, Color(CREAM,0.75), 1.5, true)
+	IllustratedFX.ribbon(self,p,radius+4,-PI/2,-PI/2+maxf(.01,TAU*progress),1.5,Color(CREAM,.75))
 	for index: int in range(4):
 		var tick: Vector2 = p + Vector2((index - 1.5) * 6.0, -radius - 8.0)
 		draw_rect(Rect2(tick, Vector2(4, 3)), GOLD if charge >= float(index+1)*0.25 else Color(GOLD,0.22))
@@ -1644,8 +1638,8 @@ func _draw_melee_actor(player: Dictionary, pose: Dictionary) -> void:
 	if bool(motion.trail):
 		# A short ribbon follows the physical sword, and only during the fast cut.
 		var trailing: float = angle - 0.85 * facing
-		draw_arc(shoulder, 68.0, minf(trailing, angle), maxf(trailing, angle), 18, Color(GOLD, 0.22), 7.0, true)
-		draw_arc(shoulder, 72.0, minf(trailing + facing * 0.24, angle), maxf(trailing + facing * 0.24, angle), 14, Color(CREAM, 0.8), 1.8, true)
+		IllustratedFX.ribbon(self,shoulder,68.0,minf(trailing,angle),maxf(trailing,angle),7.0,Color("d9b785",.8))
+		IllustratedFX.ribbon(self,shoulder,70.0,minf(trailing+facing*.24,angle),maxf(trailing+facing*.24,angle),1.8,Color("eee7c7",.9))
 	_draw_weapon_arm(player, shoulder, grip, facing, float(motion.arm_alpha))
 	draw_set_transform(world_to_screen(pose.weapon_origin), angle, Vector2(float(pose.weapon_scale), facing))
 	_draw_weapon("arc_blade")
@@ -1668,15 +1662,15 @@ func _draw_ranged_actor(player: Dictionary, pose: Dictionary) -> void:
 func _draw_weapon_arm(player: Dictionary, shoulder: Vector2, grip: Vector2, facing: float, opacity: float = 1.0) -> void:
 	var direction: Vector2 = (grip - shoulder).normalized()
 	var elbow: Vector2 = shoulder.lerp(grip, 0.5) + direction.orthogonal() * facing * 5.5 + Vector2(0, 2)
-	var armor: Color = Color("be9156") if str(player.get("character", "ranger")) == "vanguard" else Color("a4b4a4")
+	var armor: Color = Color("b4a798") if str(player.get("character", "ranger")) == "vanguard" else Color("c6c7aa")
 	armor.a = opacity
-	var outline: Color = Color(INK,opacity)
-	draw_polyline(PackedVector2Array([shoulder, elbow, grip]), outline, 7.0, false)
-	draw_line(shoulder, elbow, armor, 4.8, false)
-	draw_line(elbow, grip, armor.darkened(0.15), 4.2, false)
+	var outline: Color = Color("424e55",opacity)
+	draw_polyline(PackedVector2Array([shoulder, elbow, grip]), outline, 7.0, true)
+	draw_line(shoulder, elbow, armor, 4.8, true)
+	draw_line(elbow, grip, armor.darkened(0.15), 4.2, true)
 	draw_circle(elbow, 2.6, outline)
 	draw_circle(elbow, 1.6, armor.lightened(0.15))
-	draw_line(shoulder + Vector2(0,-1), elbow + Vector2(0,-1), Color(Color("e5d7b5"),opacity), 1.0, false)
+	draw_line(shoulder + Vector2(0,-1), elbow + Vector2(0,-1), Color(Color("e5d7b5"),opacity), 1.0, true)
 
 
 func _draw_enemies() -> void:
@@ -1833,164 +1827,20 @@ func _draw_effects() -> void:
 		if str(effect.get("kind", "")) == "proc_activation":
 			ProcFeedback.draw(self, ProcFeedback.activation_sample(effect), p, fx_scale)
 			continue
+		if IllustratedFX.effect(self,effect,p,effect_angle,t,strength,color_value,world_to_screen(effect.get("from",Vector2.ZERO))): continue
 		match str(effect.get("kind", "spark")):
-			"flame":
-				var angle: float = effect_angle
-				var reach: float = maxf(20.0, float(effect.get("radius",170.0)) - WeaponPose.muzzle_length("flamethrower")) * (0.8+t*0.2)
-				draw_set_transform(p,angle)
-				for ribbon: int in range(5):
-					var side: float = float(ribbon-2)
-					var points: PackedVector2Array = PackedVector2Array([Vector2(0,side*1.3),Vector2(reach*0.4,side*6.0+sin(_clock*17+ribbon)*3),Vector2(reach*0.75,side*11.0+sin(_clock*23+ribbon)*5),Vector2(reach,side*15.0)])
-					draw_polyline(points,Color(color_value,0.22*(1-t)),5.0+strength,true)
-					draw_polyline(points,Color(CREAM,0.35*(1-t)) if ribbon==2 else Color(color_value,0.55*(1-t)),1.5,true)
-				draw_set_transform(Vector2.ZERO)
-			"gravity":
-				var radius: float = float(effect.get("radius",200.0))
-				for arm: int in range(5):
-					var points: PackedVector2Array = PackedVector2Array()
-					for segment: int in range(9):
-						var f: float = float(segment)/8.0
-						var angle: float = float(arm)*TAU/5.0+f*1.2+t*2.0
-						points.append(p+Vector2.from_angle(angle)*radius*(0.12+f*0.82)*(1-t*0.5))
-					draw_polyline(points,Color(color_value,0.45*(1-t)),1.3,true)
-				draw_arc(p,12.0+8.0*(1-t),0,TAU,24,color_value,2.0,true)
-			"meteor":
-				var origin: Vector2 = p+Vector2(-90,-220)*(1-t)
-				draw_line(origin,p,Color(color_value,0.16*(1-t)),18.0+strength*2.0,true)
-				draw_line(origin,p,Color(color_value,0.65*(1-t)),4.0+strength,true)
-				draw_line(origin.lerp(p,0.6),p,Color(CREAM,0.8*(1-t)),2.0,true)
-			"muzzle":
-				var angle: float = effect_angle
-				var length: float = (11.0 + strength * 8.0) * (1.0 - t * 0.6)
-				draw_set_transform(p, angle)
-				var style: String=str(effect.get("style",effect.get("weapon","pulse_rifle")))
-				match style:
-					"scattergun":
-						for ray: int in range(3):
-							var tip: Vector2=Vector2(length*(1.3 if ray==1 else 0.85),float(ray-1)*(9.0+strength*2.0))
-							draw_colored_polygon(PackedVector2Array([Vector2(-2,-3),tip,Vector2(3,3)]),color_value)
-						draw_line(Vector2.ZERO,Vector2(length*0.7,0),Color(CREAM,color_value.a),3.0,false)
-					"railgun", "rail":
-						for side: float in [-1.0,1.0]:
-							draw_line(Vector2(0,side*3),Vector2(length*1.5,side*1),color_value,2.0,false)
-							draw_line(Vector2(length*0.45,side*3),Vector2(length*0.22,side*8),Color(color_value,0.55*(1-t)),1.0,false)
-						draw_line(Vector2.ZERO,Vector2(length*1.2,0),Color(CREAM,color_value.a),1.0,false)
-					"storm_staff", "storm":
-						for fork: int in range(3):
-							var y: float=float(fork-1)*9.0
-							draw_polyline(PackedVector2Array([Vector2.ZERO,Vector2(7,y*0.25+3),Vector2(13,y*0.45-3),Vector2(length,y)]),color_value,1.0,false)
-						draw_rect(Rect2(-2,-2,5,5),Color(CREAM,color_value.a))
-					"sun_lance", "lance":
-						draw_colored_polygon(PackedVector2Array([Vector2(-1,-2),Vector2(length*1.65,0),Vector2(-1,2)]),Color(CREAM,color_value.a))
-						draw_line(Vector2(3,-9),Vector2(3,9),color_value,2.0,false)
-						draw_line(Vector2(-3,-5),Vector2(9,5),Color(color_value,0.65*(1-t)),1.0,false)
-					"boomerang":
-						for side: float in [-1.0,1.0]:
-							draw_polyline(PackedVector2Array([Vector2(0,side*3),Vector2(9,side*10),Vector2(length,side*4)]),color_value,2.0,false)
-						draw_rect(Rect2(-1,-1,4,3),Color(CREAM,color_value.a))
-					_:
-						draw_colored_polygon(PackedVector2Array([Vector2(-2,-2),Vector2(6,-4),Vector2(9,-2),Vector2(length,0),Vector2(9,2),Vector2(6,4),Vector2(-2,2)]),color_value)
-						draw_line(Vector2.ZERO,Vector2(length*0.65,0),Color(CREAM,color_value.a),2.0,false)
-				draw_set_transform(Vector2.ZERO)
-			"impact":
-				var radius: float = (5.0 + strength * 4.0) * (1.0 - t * 0.55)
-				var direction: Vector2=Vector2.from_angle(effect_angle)
-				var side: Vector2=direction.orthogonal()
-				draw_line(p-direction*radius*0.45,p+direction*radius*1.6,color_value,2.0,false)
-				draw_line(p-side*radius*0.7,p+side*radius*0.7,color_value,1.0,false)
-				if t<0.42: draw_rect(Rect2(p-Vector2(2,2),Vector2(4,4)),Color(CREAM,color_value.a))
-				if bool(effect.get("crit",false)):
-					draw_arc(p,radius*1.1,effect_angle-0.8,effect_angle+0.8,8,Color(GOLD,color_value.a),2.0,false)
-			"shatter":
-				var spread: float=float(effect.get("radius",33.0))*(0.3+0.7*(1.0-pow(1.0-t,2.0)))
-				var rays: PackedVector2Array=PackedVector2Array()
-				var chips: PackedVector2Array=PackedVector2Array()
-				for shard: int in range(6):
-					var angle: float=float(shard)*TAU/6.0+0.2
-					var direction: Vector2=Vector2.from_angle(angle)
-					var center: Vector2=p+direction*spread
-					rays.append(center-direction*6.0*(1-t))
-					rays.append(center)
-					chips.append(p+direction*spread*0.72)
-					chips.append(p+direction.rotated(0.27)*spread*0.72)
-				draw_multiline(rays,color_value,2.0,false)
-				draw_multiline(chips,Color(color_value,0.35*(1-t)),1.0,false)
-			"blast":
-				var radius: float = float(effect.get("radius",90.0))
-				var spread: float = radius * (1.0 - pow(1.0-t,3.0))
-				var bands: int = 1 + mini(3,int(strength))
-				for band: int in range(bands):
-					var r: float = spread * (0.88 - float(band)*0.11)
-					draw_arc(p,maxf(r,0.1),float(band)*0.7,float(band)*0.7+TAU-0.12,48,Color(color_value,0.4*(1-t)),1.0+strength*0.45,true)
-				for ray: int in range(12 + mini(8,int(strength*3))):
-					var direction: Vector2 = Vector2.from_angle(float(ray)*2.399)
-					draw_line(p+direction*spread*0.7,p+direction*spread,Color(color_value,0.65*(1-t)),1.4,true)
-				if t < 0.3:
-					_glow(p,25.0+strength*5.0,Color(color_value,0.04*(1-t/0.3)),3)
-			"guard_release":
-				var radius: float = float(effect.get("radius",145.0)) * (1.0-pow(1.0-t,3.0))
-				for index: int in range(6):
-					var angle: float = index * TAU / 6.0 + PI / 6.0
-					var a: Vector2 = p + Vector2.from_angle(angle) * radius
-					var b: Vector2 = p + Vector2.from_angle(angle+TAU/6.0) * radius
-					draw_line(a, b, Color(GOLD,0.85*(1-t)), 2.5, false)
-					draw_line(a, p + Vector2.from_angle(angle)*radius*0.73, Color(CREAM,0.7*(1-t)), 1.5, false)
 			"coin_collect":
 				for index: int in range(4):
 					var angle: float = index * PI/2.0 + PI/4.0
 					var direction: Vector2 = Vector2.from_angle(angle)
 					draw_line(p+direction*(5+t*12),p+direction*(14+t*17),Color(GOLD,0.8*(1-t)),2.0,false)
-			"rush", "rush_hit":
-				var angle: float = float(effect.get("angle", 0.0))
-				var strike: bool = str(effect.kind) == "rush_hit"
-				var radius: float = (10.0 + t * 25.0) if strike else (10.0 + t * 14.0)
-				draw_arc(p, radius, angle-1.15, angle+1.15, 15, Color(color_value,0.85*(1-t)), 3.0*(1-t)+0.6, true)
-				if strike:
-					draw_arc(p, radius+5.0, angle-0.75, angle+0.75, 12, Color(CREAM,0.55*(1-t)), 1.0, true)
-			"dash":
-				var direction: Vector2 = Vector2.from_angle(float(effect.get("angle",0.0)))
-				var side: Vector2 = direction.orthogonal()
-				for streak: int in range(3):
-					var center: Vector2 = p + side * float(streak-1)*7.0
-					var length: float = (42.0+strength*15.0)*(1-t)
-					draw_line(center-direction*length,center,Color(color_value,0.4*(1-t)),1.6,true)
-			"heal":
-				var radius: float = float(effect.get("radius", 260.0))
-				for index: int in range(10):
-					var angle: float = float(index) * TAU / 10.0
-					var cross_p: Vector2 = p + Vector2.from_angle(angle) * radius * 0.65 + Vector2(0.0, -age * 25.0)
-					draw_line(cross_p + Vector2(-3.0, 0.0), cross_p + Vector2(3.0, 0.0), color_value, 2.0, true)
-					draw_line(cross_p + Vector2(0.0, -3.0), cross_p + Vector2(0.0, 3.0), color_value, 2.0, true)
-			"arc":
-				var origin: Vector2 = world_to_screen(effect.get("from", Vector2.ZERO))
-				var points: PackedVector2Array = PackedVector2Array()
-				for segment: int in range(9):
-					var fraction: float = float(segment) / 8.0
-					var offset: Vector2 = Vector2.ZERO if segment == 0 or segment == 8 else Vector2(sin(float(segment) * 21.0 + _clock * 50.0) * 8.0, cos(float(segment) * 13.0 + _clock * 40.0) * 8.0)
-					points.append(origin.lerp(p, fraction) + offset)
-				draw_polyline(points, Color(color_value, color_value.a * 0.14), minf(13.0, 5.0 + strength * 3.0), true)
-				draw_polyline(points, color_value, 1.2 + strength * 0.7, true)
-				draw_polyline(points, Color(CREAM, color_value.a * 0.75), 0.8, true)
-				if strength >= 1.7:
-					for branch: int in range(mini(3,int(strength))):
-						var anchor: Vector2 = points[3+branch]
-						var branch_end: Vector2 = anchor + Vector2(13.0,-18.0).rotated(float(branch)*2.1 + _clock*1.0)
-						draw_polyline(PackedVector2Array([anchor,anchor.lerp(branch_end,0.6)+Vector2(4,3),branch_end]),Color(color_value,color_value.a*0.55),1.0,true)
-			"ring":
-				var radius: float = float(effect.get("radius", 40.0)) * (1.0 - pow(1.0 - t, 3.0))
-				draw_arc(p, maxf(0.1, radius), 0.0, TAU, 48, color_value, 2.5 * (1.0 - t) + 0.5, true)
-				if t < 0.2:
-					_glow(p, radius, Color(color_value, 0.09 * (1.0 - t * 5.0)), 3)
 			"slash":
 				var angle: float = effect_angle
 				if effect.has("weapon"):
 					p -= Vector2(pose.aim) * WeaponPose.muzzle_length(str(effect.weapon))
 				var radius: float = float(effect.get("radius",85.0)) * (0.6+t*0.35)
-				draw_arc(p, radius, angle - 1.25 + t * 0.5, angle + 1.25 + t * 0.5, 36, Color(color_value, (1.0 - t) * 0.1), (9.0+strength*4.0) * (1.0 - t), true)
-				draw_arc(p, radius + 5.0, angle - 1.1 + t * 0.5, angle + 0.8 + t * 0.5, 36, color_value, (2.0+strength*0.9) * (1.0 - t) + 0.5, true)
-				draw_arc(p, radius + 6.0, angle - 0.8 + t * 0.5, angle + 0.4 + t * 0.5, 24, Color(CREAM,color_value.a*0.85),1.1,true)
-				for band: int in range(mini(3,int(strength))):
-					draw_arc(p,maxf(radius-8.0-float(band)*7.0,1.0),angle-0.9+t*0.6,angle+0.8+t*0.6,24,Color(color_value,color_value.a*0.3),1.0,true)
+				IllustratedFX.ribbon(self,p,radius,angle-1.1+t*.5,angle+.85+t*.5,5*(1-t),color_value)
+				IllustratedFX.ribbon(self,p,radius+2,angle-.7+t*.5,angle+.5+t*.5,1.2,Color(CREAM,color_value.a*.8))
 	for number: Dictionary in _numbers:
 		var age: float = number.get("age", 0.0)
 		var p: Vector2 = world_to_screen(number.get("pos", Vector2.ZERO)) + Vector2(0.0, -age * 34.0)

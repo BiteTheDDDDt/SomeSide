@@ -5,7 +5,7 @@ extends RefCounted
 ## local limbs/wing motion and pins the firing organ to the real launch point.
 const Geometry=preload("res://scripts/combat_geometry.gd")
 const Attack=preload("res://scripts/enemy_attack_visual.gd")
-const TEXTURE_PATH="res://assets/art/enemy-design-v3/cast-flat.png"
+const TEXTURE_PATH="res://assets/art/unified-v0206/enemies-grey.png"
 const GRID: int=10
 const MAX_MESHES: int=384
 # Pixel regions are measured from the alpha silhouettes, not equal grid cells.
@@ -75,6 +75,7 @@ static func vertices(data: Dictionary) -> Dictionary:
 			if str(data.id)=="burrower":
 				if pixel.y<530: pixel.x=maxf(pixel.x,405)
 				if pixel.y>635: pixel.x=minf(pixel.x,750)
+			if str(data.id)=="charger" and pixel.y>545: pixel.x=minf(pixel.x,368)
 			var local_uv: Vector2=(pixel-source.position)/source.size
 			var point: Vector2=target.position+local_uv*target.size
 			var base: Vector2=point

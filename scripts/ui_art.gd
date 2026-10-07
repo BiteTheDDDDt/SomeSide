@@ -1,21 +1,15 @@
 class_name SideUIArt
 extends Control
 
+const IllustratedPlayers = preload("res://scripts/illustrated_player_renderer.gd")
+const Weapons = preload("res://scripts/weapon_art.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const Icons = preload("res://scripts/item_icons.gd")
-const TEAL := Color("6cd6bd")
-const GOLD := Color("f2b96d")
+const TEAL := Color("94cabb")
+const GOLD := Color("d2b787")
 const PAPER := Color("e8ede5")
 const EDGE := Color("3d6064")
-const DARK := Color("08191f")
-const GLYPHS: Dictionary = {
-	"S": ["11111", "10000", "10000", "11111", "00001", "00001", "11111"],
-	"O": ["01110", "11011", "10001", "10001", "10001", "11011", "01110"],
-	"M": ["10001", "11011", "11111", "10101", "10001", "10001", "10001"],
-	"E": ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
-	"I": ["111", "010", "010", "010", "010", "010", "111"],
-	"D": ["11110", "10011", "10001", "10001", "10001", "10011", "11110"]}
-
+const DARK := Color("263941")
 var mode: String = "frame"
 var character: String = "ranger"
 var stage: int = 1
@@ -25,7 +19,7 @@ var button: Button
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	resized.connect(queue_redraw)
 	if is_instance_valid(button):
 		button.mouse_entered.connect(queue_redraw)
@@ -47,24 +41,15 @@ func _draw() -> void:
 		"regions": _regions()
 
 func _wordmark() -> void:
-	var unit: int = maxi(2, mini(8, int((size.x - 2.0) / 46.0)))
-	var x: float = 0.0
-	for letter: String in "SOMESIDE":
-		var rows: Array = GLYPHS[letter]
-		var letter_color: Color = PAPER if x < 23 * unit else GOLD
-		for row in range(rows.size()):
-			var cells: String = rows[row]
-			for col in range(cells.length()):
-				if cells[col] == "1":
-					var rect := Rect2(x + col * unit, 7 + row * unit, unit, unit)
-					draw_rect(Rect2(rect.position + Vector2(0, 4), rect.size), Color("031217"))
-					draw_rect(rect, letter_color)
-		x += (str(rows[0]).length() + 1) * unit
-	# A split underline echoes the two sides of the portal without taglines.
-	var y: float = 7 + 8 * unit + 7
-	draw_rect(Rect2(0, y, minf(x - unit, size.x), 2), Color("355153"))
-	draw_rect(Rect2(0, y, 44, 2), TEAL)
-	draw_rect(Rect2(x - 37, y, 30, 2), GOLD)
+	var font: Font=get_theme_font("font","Label")
+	var font_size: int=clampi(int(size.x/5.6),26,76)
+	var text_width: float=font.get_string_size("SOMESIDE",HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+	if text_width>size.x: font_size=int(font_size*size.x/text_width)
+	draw_string(font,Vector2(0,font_size),"SOMESIDE",HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,PAPER)
+	var y: float=font_size+10
+	draw_line(Vector2(0,y),Vector2(size.x,y),Color("52646a"),1,true)
+	draw_line(Vector2(0,y),Vector2(size.x*.28,y),GOLD,3,true)
+
 
 func _frame() -> void:
 	var w: float = size.x
@@ -103,19 +88,17 @@ func _divider() -> void:
 
 func _portrait() -> void:
 	draw_rect(Rect2(0, 0, size.x, size.y), Color("081b22"))
-	for x in range(6, int(size.x), 12): draw_line(Vector2(x, 4), Vector2(x, size.y - 5), Color("102e36"), 1)
+	draw_colored_polygon(PackedVector2Array([Vector2.ZERO,Vector2(size.x*.7,0),Vector2(size.x*.35,size.y),Vector2(0,size.y)]),Color("263b43"))
 	draw_line(Vector2(5, size.y - 7), Vector2(size.x - 5, size.y - 7), tint, 2)
 	draw_rect(Rect2(5, 5, 7, 2), tint)
 	draw_rect(Rect2(size.x - 12, 5, 7, 2), tint)
 
 func _scene() -> void:
-	# Static presentation artwork. No _process, offscreen viewport, shaders,
-	# random state or new raster assets; its commands are cached by CanvasItem.
+	# Static composition shares player and weapon assets with the game.
+	# No continuous redraw or additional offscreen viewport.
 	var scale_value: float = minf(size.x / 500.0, size.y / 610.0)
 	draw_set_transform(Vector2((size.x - 500 * scale_value) / 2, 0), 0, Vector2.ONE * scale_value)
 	draw_colored_polygon(PackedVector2Array([Vector2(22, 0), Vector2(476, 0), Vector2(500, 24), Vector2(500, 580), Vector2(472, 610), Vector2(0, 610), Vector2(0, 22)]), Color(0.026, 0.075, 0.086, 0.88))
-	for x in range(28, 490, 24):
-		for y in range(24, 575, 24): draw_rect(Rect2(x, y, 1, 1), Color("244046"))
 	# Broken architectural ribs frame a luminous, angular rift.
 	for index in range(5):
 		var x: float = 30 + index * 102
@@ -124,19 +107,19 @@ func _scene() -> void:
 		draw_rect(Rect2(x + 4, 452 - h, 4, h - 20), Color("20464b"))
 	var ring := PackedVector2Array()
 	var inside := PackedVector2Array()
-	for index in range(9):
-		var angle: float = TAU * index / 8.0 - PI / 8.0
+	for index in range(65):
+		var angle: float = TAU * index / 64.0 - PI / 8.0
 		ring.append(Vector2(258, 262) + Vector2(cos(angle) * 171, sin(angle) * 205))
 		inside.append(Vector2(258, 262) + Vector2(cos(angle) * 150, sin(angle) * 184))
 	draw_colored_polygon(inside, Color("102d34"))
 	draw_polyline(ring, Color("345758"), 16)
 	draw_polyline(ring, Color("769184"), 2)
 	draw_polyline(inside, Color("347970"), 4)
-	for index in [0, 2, 4, 6]:
+	for index in [0, 16, 32, 48]:
 		var a: Vector2 = inside[index]
-		var b: Vector2 = inside[index + 1]
+		var b: Vector2 = inside[index + 8]
 		draw_line(a.lerp(b, 0.22), a.lerp(b, 0.78), TEAL, 3)
-	# A fractured luminous passage, with hard pixel stepping instead of blur.
+	# A narrow hard-edge passage preserves the directional composition.
 	draw_colored_polygon(PackedVector2Array([Vector2(257, 84), Vector2(274, 160), Vector2(259, 223), Vector2(275, 300), Vector2(258, 408), Vector2(247, 304), Vector2(233, 229), Vector2(250, 174)]), Color("25705f"))
 	draw_polyline(PackedVector2Array([Vector2(257, 90), Vector2(262, 165), Vector2(249, 229), Vector2(262, 300), Vector2(258, 400)]), TEAL, 4)
 	for index in range(7):
@@ -148,7 +131,7 @@ func _scene() -> void:
 	draw_polyline(PackedVector2Array([Vector2(60, 490), Vector2(395, 490), Vector2(448, 522)]), Color("527276"), 3)
 	draw_line(Vector2(66, 529), Vector2(423, 529), Color("29474c"), 2)
 	for index in range(8): draw_line(Vector2(90 + index * 16, 536), Vector2(98 + index * 16, 536), GOLD.darkened(0.4), 3)
-	_draw_hero(Vector2(228, 415), 5.0)
+	_draw_hero(Vector2(185, 415), 5.0)
 	var gear: Array = ["pulse_rifle", "grenade"] if character == "ranger" else ["arc_blade", "shockwave"]
 	for index in range(2):
 		var p := Vector2(376, 365 + index * 58)
@@ -164,10 +147,15 @@ func _scene() -> void:
 	draw_set_transform(Vector2.ZERO)
 
 func _draw_hero(position_value: Vector2, scale_value: float) -> void:
-	var frame: Dictionary = Pixels.frame_for(character, {"grounded": true, "vel": Vector2.ZERO}, 0.0, true)
+	var frame: Dictionary = IllustratedPlayers.frame(character)
 	if frame.is_empty(): return
 	draw_set_transform(position_value * minf(size.x / 500.0, size.y / 610.0) + Vector2((size.x - 500 * minf(size.x / 500.0, size.y / 610.0)) / 2, 0), 0, Vector2.ONE * scale_value * minf(size.x / 500.0, size.y / 610.0))
-	draw_texture_rect(frame.texture, frame.draw_target, false)
+	IllustratedPlayers.portrait(self,character)
+	draw_polyline(PackedVector2Array([Vector2(0,-5),Vector2(3,0),Vector2(8,-5)]),Color("424e55"),5,true)
+	draw_polyline(PackedVector2Array([Vector2(0,-5),Vector2(3,0),Vector2(8,-5)]),Color("b4a798") if character=="vanguard" else Color("c6c7aa"),3,true)
+	var scene_scale: float=minf(size.x/500.0,size.y/610.0)
+	draw_set_transform((position_value+Vector2(0,-5)*scale_value)*scene_scale+Vector2((size.x-500*scene_scale)/2,0),0,Vector2(.68,.72)*scale_value*scene_scale)
+	Weapons.draw(self,"arc_blade" if character=="vanguard" else "pulse_rifle")
 	var scale_scene: float = minf(size.x / 500.0, size.y / 610.0)
 	draw_set_transform(Vector2((size.x - 500 * scale_scene) / 2, 0), 0, Vector2.ONE * scale_scene)
 

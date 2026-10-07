@@ -12,10 +12,11 @@ const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const PlayerInput = preload("res://scripts/player_input.gd")
 const PixelActorRenderer = preload("res://scripts/pixel_actor_renderer.gd")
+const IllustratedPlayers = preload("res://scripts/illustrated_player_renderer.gd")
 const AttackFxSprites = preload("res://scripts/attack_fx_sprites.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.20.5"
+const VERSION: String = "0.20.6"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
 const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "proc", "coin_drop", "equipment", "drop"]
@@ -1277,8 +1278,8 @@ func _show_characters() -> void:
 		portrait.custom_minimum_size = Vector2(76, 88)
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var appearance: Dictionary = PixelActorRenderer.frame_for(str(definition.id), {"grounded": true}, 0.0, true)
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var appearance: Dictionary = IllustratedPlayers.frame(str(definition.id))
 		if not appearance.is_empty(): portrait.texture = appearance.texture
 		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(portrait)

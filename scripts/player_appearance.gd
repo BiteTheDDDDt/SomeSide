@@ -16,7 +16,7 @@ const ITEMS: Dictionary = {
 	"plating":"legs", "moss":"legs", "momentum":"legs", "piercer":"legs",
 	"missile_pod":"shoulder", "landing_coil":"legs", "frost_halo":"chest",
 }
-const INK: Color = Color("07171e")
+const INK: Color = Color("424e55")
 const WHITE: Color = Color("edf4dc")
 static var _definitions: Dictionary = {}
 

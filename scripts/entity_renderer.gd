@@ -4,6 +4,7 @@ extends RefCounted
 ## Silhouettes and material panels, in the actor's local facing transform.
 ## All animation is presentation-only and never changes the supplied snapshot.
 const Atlas = preload("res://scripts/sprite_atlas.gd")
+const IllustratedPlayers = preload("res://scripts/illustrated_player_renderer.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
 const Geometric = preload("res://scripts/geometric_enemies.gd")
 const CACHE_META: StringName = &"someside_enemy_atlas"
@@ -100,6 +101,7 @@ static func _eye(c: Node2D, center: Vector2, radius: float, tint: Color = HOT) -
 	c.draw_circle(center+Vector2(-0.6,-0.9),maxf(0.5,radius*0.22),WHITE,true,-1,true)
 
 static func player_body(c: Node2D, player: Dictionary, clock: float) -> void:
+	if IllustratedPlayers.draw(c,player,clock): return
 	if Pixels.draw_player(c, player, clock):
 		return
 	_player_vector(c, player, clock)

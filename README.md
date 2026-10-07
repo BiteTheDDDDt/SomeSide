@@ -1,14 +1,14 @@
-# SomeSide 0.20.5
+# SomeSide 0.20.6
 
 一款 2D 横版动作 Roguelike：鼠标自由瞄准、两种战斗风格、局内道具叠加、三段关卡；Windows 版支持玩家主机驱动的 2–4 人合作，Web 版提供浏览器单人游戏。
 
-使用 Godot 4.7.2 / GDScript。角色与怪物使用像素风精灵图，攻击特效使用透明多帧贴图与辅助粒子，场景、武器和饰件使用程序绘制与缓存纹理，音效由程序合成；内置 Noto Sans SC 中文字体。
+使用 Godot 4.7.2 / GDScript。角色与怪物使用块面插画素材，配合关节动作；攻击特效使用硬边弧带、线束和几何碎片，场景、武器和饰件使用程序绘制与缓存纹理，音效由程序合成；内置 Noto Sans SC 中文字体。0.20.6 同步更新枪口喷发、刀弧、爆炸、追踪弹、冲击波与护盾，保留现有攻击时机和命中判定。
 
 网页版使用远景和植被缓存降低绘制开销，保持角色与战斗动画；性能仍受浏览器和硬件影响。开发者可用 `tools/test-web-artifacts.py` 检查导出目录或 ZIP，用 `tools/test-web-browser.py` 和 `tools/test-web-loader.py` 做实际浏览器与加载故障验证（需要 Python Playwright 与本机浏览器）。
 
 ## 开始游戏
 
-0.20.5 将九种普通怪与三类首领全部接入透明插画图集与运行时动作，强调清晰剪影和大色块，统一攻击器官、准备、弹丸、范围爆发、折跃与修复效果。红色虚线只在准备阶段出现；激光生效持续0.55秒，近强远弱且不再绘制边界线，同一束仍只命中每名玩家一次。背景和其他攻击时机保持原规则。详见 [构建记录](docs/BUILD_REPORT.md)。
+0.20.6 延续已选定怪物的块面插画风：怪物近黑阴影改为炭灰，两名角色接入新插画姿态；八把主武器、五类设施、43个库存/掉落图标、角色附着物、部署炮台、金币、传送门与菜单统一轮廓和材质。保留原背景、脚步接地系统、独立瞄准和攻击判定。素材、提示词见 [美术记录](assets/art/unified-v0206/ART_NOTES.md)，验证范围见 [构建记录](docs/BUILD_REPORT.md)。
 
 0.20.2 重新区分敌方攻击的准备与伤害状态：地刺从低矮裂石变为刺出的岩峰，孢子从收紧的囊体变为酸液爆开，潜地从土块扰动变为破土；激光先在发射器内蓄能，末段只在源端伸出短小能量舌提示方向，真正生效时出现完整明亮光束。冲锋收掉前方烟尘跑道，使用压低身体与脚下蹬地表现。敌方弹丸、蓄弹、闪现、治疗使用各自一致的像素素材；明亮攻击形态随实际伤害窗口结束，不再额外叠出滞留烟团。新素材与完整提示词见 [v0.20.2 特效记录](assets/fx/v0202/ART_PROMPTS.md)。
 
@@ -30,9 +30,9 @@
 
 **本地浏览器预览：双击根目录 `PlayWeb.cmd`**，它会启动仅本机可访问的 HTTP 服务并自动打开默认浏览器。游玩时保留预览窗口，按 Ctrl+C 关闭服务。本地预览需要 Python 3；itch 玩家不需要安装。不要直接双击导出的 `index.html`。
 
-**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.20.5 独立版本位于 `dist/v0.20.5/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.20.5-windows-x64.zip`。以前的发布包继续保留，方便回退。
+**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.20.6 独立版本位于 `dist/v0.20.6/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.20.6-windows-x64.zip`。以前的发布包继续保留，方便回退。
 
-**浏览器单人版：** 0.13 加入 Web 导出，建议桌面键盘鼠标和全屏游玩。网页导出位于 `dist/v0.20.5-web/index.html`，上传包为 `dist/SomeSide-v0.20.5-web.zip`；需要通过 HTTP(S) 服务或 itch.io 运行，不能直接双击 HTML。在 itch.io 点击开始加载；进入游戏后首次点击或按键启用声音。浏览器不能加入当前 Windows 版的 ENet 合作房间，2–4 人合作请使用 Windows 下载版。已有页面的上传设置与中英说明见 [itch.io Web 发布指南](docs/ITCH_WEB.zh-CN.md)。
+**浏览器单人版：** 0.13 加入 Web 导出，建议桌面键盘鼠标和全屏游玩。网页导出位于 `dist/v0.20.6-web/index.html`，上传包为 `dist/SomeSide-v0.20.6-web.zip`；需要通过 HTTP(S) 服务或 itch.io 运行，不能直接双击 HTML。在 itch.io 点击开始加载；进入游戏后首次点击或按键启用声音。浏览器不能加入当前 Windows 版的 ENet 合作房间，2–4 人合作请使用 Windows 下载版。已有页面的上传设置与中英说明见 [itch.io Web 发布指南](docs/ITCH_WEB.zh-CN.md)。
 
 0.15 为八种主武器加入各自的手臂、上身和武器攻击动作。弧刃包含起势、挥砍和收势，挥刀中段由主机结算一次伤害；其他武器表现后坐、回膛、投掷、举杖或前刺，保持原有射速与弹道。单机暂停会冻结动作，合作中的本地预测不会被服务器回包重复播放。菜单与界面统一为像素工业终端风格：切角面板、自绘字标、裂隙装置、角色和装备展示；战斗 HUD 继续保持紧凑。
 
@@ -193,7 +193,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-network-control
 .\tools\runtime\Godot_v4.7.2-stable_win64_console.exe --path . --script res://tools/perf-v12.gd -- --tag=local-moving --moving
 ```
 
-Windows 导出结果是 `dist/v0.20.5/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 默认生成只含游戏、快速开始说明和许可的 Windows ZIP。`-Platform Web` 则将 Web 导出目录及许可打成网页包，`index.html` 直接位于 ZIP 根目录。打包脚本从 `project.godot` 读取版本，分别写入 `tools/results/package.json` 和 `tools/results/package-web.json`，记录大小与 SHA256。缺少模板时，导出脚本会下载官方模板；首次下载需要网络。
+Windows 导出结果是 `dist/v0.20.6/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 默认生成只含游戏、快速开始说明和许可的 Windows ZIP。`-Platform Web` 则将 Web 导出目录及许可打成网页包，`index.html` 直接位于 ZIP 根目录。打包脚本从 `project.godot` 读取版本，分别写入 `tools/results/package.json` 和 `tools/results/package-web.json`，记录大小与 SHA256。缺少模板时，导出脚本会下载官方模板；首次下载需要网络。
 
 测试覆盖快照深拷贝、随机种子、瞄准预测、单跳与羽翼、手动拾取、多人争抢、装备冷却保留、设施交易和稀有掉落。地图可达性通过真实移动与碰撞验证：两个角色都不带道具、不冲刺，起跳和落点留出余量，并验证起跳位置偏差。压力测试继续检查四人长时间构筑与切关一致性。网络测试启动独立 Godot 进程，要求主机见到完整队伍、收到输入，客户端接收多次快照，并成功退出且没有运行时错误。证据保存在 `tools/results/network-*`。
 

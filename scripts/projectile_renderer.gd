@@ -3,13 +3,15 @@ extends RefCounted
 
 ## Friendly fire keeps a white tapered core. Hostile ammunition is a compact,
 ## opaque spore or coral shard, matching the material forming at its source.
+const WeaponArt = preload("res://scripts/weapon_art.gd")
+const FX = preload("res://scripts/illustrated_fx.gd")
 const Atlas = preload("res://scripts/sprite_atlas.gd")
 const AttackFx = preload("res://scripts/attack_fx_sprites.gd")
 const Geometry = preload("res://scripts/combat_geometry.gd")
 const CACHE_META: StringName = &"someside_projectile_atlas"
 const CACHE_MAX_BYTES: int = 4 * 1024 * 1024
 const ORB_FRAMES: int = 16
-const INK: Color = Color("101b23")
+const INK: Color = Color("424e55")
 const CORE: Color = Color("f4f7df")
 const HOT: Color = Color("ffb180")
 
@@ -74,24 +76,19 @@ static func _friendly(c: Node2D, kind: String, radius: float, strength: float, t
 	elif kind=="storm": tint=Color("a1eaff")
 	if kind=="grenade":
 		var spin: float = clock*6.0
-		var points: Array=[]
-		for i: int in range(6): points.append(Vector2.from_angle(spin+i*TAU/6.0)*(radius+1))
-		_poly(c,points,Color("748c7e"),1.5)
-		c.draw_arc(Vector2.ZERO,radius-1.5,spin,spin+PI*1.1,14,Color("bdcdb0"),1.2,true)
-		c.draw_circle(Vector2.ZERO,2.0,Color("203e42"),true,-1,true)
-		c.draw_circle(Vector2(1,-1),1.0,CORE,true,-1,true)
-		c.draw_line(Vector2(-2,-radius),Vector2(3,-radius-1),Color("b1c39d"),1.7,true)
+		c.draw_circle(Vector2.ZERO,radius,Color("7da6b7"),true,-1,true)
+		FX.ribbon(c,Vector2.ZERO,radius*.68,-2.6,-.4,radius*.6,Color("c5ded8"))
+		FX.shard(c,Vector2(radius*.4,0),0,radius*.55,radius*.3,CORE)
 		return
 	if kind=="boomerang":
 		_taper(c,minf(tail,32.0),2.0,tint)
 		var spin: float = clock*15.0+id
-		for side: int in [-1,1]:
-			var a: Vector2 = Vector2(-9,side*13).rotated(spin)
-			var b: Vector2 = Vector2(8,0).rotated(spin)
-			var d: Vector2 = Vector2(-3,side*4).rotated(spin)
-			_poly(c,[a,b,d],Color("8de2d1"),1.5)
-			c.draw_line(a,b,CORE,1.0,true)
-		c.draw_circle(Vector2.ZERO,2,Color("436b78"),true,-1,true)
+		var texture: Texture2D=WeaponArt._texture("boomerang",WeaponArt._body("boomerang"))
+		var corners:=PackedVector2Array()
+		var rect: Rect2=WeaponArt.BOUNDS
+		for corner: Vector2 in [rect.position,Vector2(rect.end.x,rect.position.y),rect.end,Vector2(rect.position.x,rect.end.y)]:
+			corners.append((corner-Vector2(20,0)).rotated(spin)*.7)
+		c.draw_polygon(corners,PackedColorArray([Color.WHITE]),PackedVector2Array([Vector2.ZERO,Vector2.RIGHT,Vector2.ONE,Vector2.DOWN]),texture)
 		return
 	if kind=="storm":
 		_taper(c,minf(tail,38.0),3.0,tint)

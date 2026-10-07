@@ -4,6 +4,7 @@ extends RefCounted
 ## Presentation samples use replicated lifetimes, never wall-clock time or RNG.
 ## Live damaging bodies remain visible at the lowest cosmetic FX setting.
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
+const IllustratedFX = preload("res://scripts/illustrated_fx.gd")
 const SOURCES: Array[String] = ["missile_pod", "landing_coil", "frost_halo", "pursuit_protocol", "reactive_plating"]
 
 static func projectile_sample(shot: Dictionary) -> Dictionary:
@@ -51,4 +52,4 @@ static func activation_sample(effect: Dictionary) -> Dictionary:
 static func draw(canvas: CanvasItem, sample: Dictionary, origin: Vector2, fx_scale: float = 1.0) -> bool:
 	if sample.is_empty(): return false
 	var opacity: float = float(sample.alpha) * clampf(fx_scale, 0.75, 1.0)
-	return Sprites.draw_oriented(canvas, str(sample.family), origin, sample.size, float(sample.angle), float(sample.phase), Color(1, 1, 1, opacity))
+	return IllustratedFX.proc(canvas,str(sample.family),origin,sample.size,float(sample.angle),float(sample.phase),opacity)

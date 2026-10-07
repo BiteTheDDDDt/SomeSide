@@ -9,8 +9,8 @@ static func panel(fill: Color, edge: Color, cut: int = 6) -> StyleBoxFlat:
 	style.border_color = edge
 	style.set_border_width_all(1 if edge.a > 0.0 else 0)
 	style.set_corner_radius_all(cut)
-	style.corner_detail = 1
-	style.anti_aliasing = false
+	style.corner_detail = 5
+	style.anti_aliasing = true
 	style.content_margin_left = 18.0
 	style.content_margin_right = 18.0
 	style.content_margin_top = 11.0
@@ -23,8 +23,8 @@ static func panel(fill: Color, edge: Color, cut: int = 6) -> StyleBoxFlat:
 
 static func button(fill: Color, edge: Color, primary: bool = false) -> StyleBoxFlat:
 	var style: StyleBoxFlat = panel(fill, edge, 7)
-	style.corner_radius_top_left = 1
-	style.corner_radius_bottom_right = 1
+	style.corner_radius_top_left = 12
+	style.corner_radius_bottom_right = 12
 	style.border_width_bottom = 2
 	style.content_margin_left = 26.0
 	style.content_margin_right = 26.0

@@ -11,7 +11,7 @@ const THIGH: float = 12.5
 const SHIN: float = 12.5
 const CONTACT_TRAVEL: float = 28.0
 const SETTLE_TIME: float = 0.12
-const INK: Color = Color("101d25")
+const INK: Color = Color("424e55")
 
 static func reset(canvas: CanvasItem) -> void:
 	if canvas.has_meta(META): canvas.remove_meta(META)
@@ -144,37 +144,27 @@ static func _local_pose(pose: Dictionary, position_value: Vector2, facing: float
 		leg["knee"] = knee(leg.hip,leg.ankle)
 	return result
 
-# Small code-authored pixel plates, deliberately matching the ivory/teal and
-# bronze/charcoal suits. These contain no complete limb silhouettes: four rigid
-# parts can only be attached to the two explicit hip-knee-ankle chains above.
+# Smooth illustration plates attach only to the two explicit leg chains.
 static var _parts: Dictionary = {}
-const PATTERNS: Dictionary = {
-	"thigh":["  #####  "," ##ddd## "," #tlltd# ","#tlllttd#","#tlltttd#","#tlltttd#","#tlttttd#","#tttttdd#","#tttttdd#","#atttddd#","#aattdd# "," #attdd# "," #dddd#  ","  #####  "],
-	"shin":["  ####  "," #dddd# ","#dahhad#","#aahhad#","#aahadd#","#aaaddd#","#aaaddd#","#aaaddd#","#aaddd# ","#adddd# "," #ddd#  "," #ttd#  "," #ddd#  "," #####  "],
-	"knee":["  ###  "," #hha# ","#hhaaad","#aaaadd","#aaadd#"," #ddd# ","  ###  "],
-	"boot":["  ####   "," ##ttd#  ","#daaadd##","#aaahhaad","#########"]}
-
 static func _part(character: String, kind: String) -> Texture2D:
-	var key: String = character+":"+kind
+	var key: String=character+":"+kind
 	if _parts.has(key): return _parts[key]
-	var gold: bool = character=="vanguard"
-	var palette: Dictionary = {
-		" ":Color.TRANSPARENT,"#":INK,
-		"d":Color("675440") if gold else Color("354e53"),
-		"t":Color("54505a") if gold else Color("50716b"),
-		"l":Color("77716b") if gold else Color("709387"),
-		"a":Color("c19b68") if gold else Color("babda6"),
-		"h":Color("edc588") if gold else Color("e8e1c4")}
-	var rows: Array = PATTERNS[kind]
-	var image := Image.create(str(rows[0]).length(),rows.size(),false,Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	for y: int in range(rows.size()):
-		for x: int in range(str(rows[y]).length()): image.set_pixel(x,y,palette[str(rows[y]).substr(x,1)])
-	var sampler := CanvasTexture.new()
-	sampler.diffuse_texture = ImageTexture.create_from_image(image)
-	sampler.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_parts[key] = sampler
-	return sampler
+	var base: String="b4a798" if character=="vanguard" else "a5af95"
+	var light: String="d0c6b7" if character=="vanguard" else "d8d6b8"
+	var paths: Dictionary={
+		"thigh":'<path d="M2 0Q8-1 9 4L7 13Q4 15 1 12L0 4Z" fill="#424e55"/><path d="M2 1Q7 0 8 4L6 10L2 12L1 5Z" fill="BASE"/><path d="M2 2L5 1L5 5L2 9Z" fill="LIGHT"/>',
+		"shin":'<path d="M1 1Q5-1 8 2L6 11L7 14H1L0 11Z" fill="#424e55"/><path d="M2 2L6 1L7 3L4 12L1 11Z" fill="BASE"/><path d="M2 2L4 2L3 8L1 10Z" fill="LIGHT"/>',
+		"knee":'<path d="M1 1Q4-1 6 1L7 4L5 7H2L0 4Z" fill="BASE"/><path d="M1 1L4 0L4 3L1 5Z" fill="LIGHT"/>',
+		"boot":'<path d="M1 0H5L6 2L9 3V5H0V2Z" fill="#424e55"/><path d="M1 1H4L5 3H8L5 4H0Z" fill="BASE"/>'}
+	var dimensions: Vector2i=Vector2i(9,5) if kind=="boot" else (Vector2i(7,7) if kind=="knee" else Vector2i(9,14))
+	var svg: String='<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">'%[dimensions.x,dimensions.y,dimensions.x,dimensions.y]+str(paths[kind]).replace("BASE","#"+base).replace("LIGHT","#"+light)+'</svg>'
+	var image:=Image.new()
+	if image.load_svg_from_string(svg,4.0)!=OK: return null
+	image.fix_alpha_edges(); image.generate_mipmaps()
+	var result:=CanvasTexture.new(); result.diffuse_texture=ImageTexture.create_from_image(image)
+	result.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_parts[key]=result
+	return result
 
 static func _textured_quad(canvas: Node2D, texture: Texture2D, origin: Vector2, across: Vector2, down: Vector2, tint: Color) -> void:
 	canvas.draw_polygon(PackedVector2Array([origin,origin+across,origin+across+down,origin+down]),PackedColorArray([tint]),PackedVector2Array([Vector2.ZERO,Vector2.RIGHT,Vector2.ONE,Vector2.DOWN]),texture)
@@ -185,10 +175,10 @@ static func _segment(canvas: Node2D, character: String, kind: String, start: Vec
 	_textured_quad(canvas,_part(character,kind),start-along*.7-across*width*.5,across*width,end-start+along*1.4,tint)
 
 static func draw(canvas: Node2D, pose: Dictionary, character: String, tint: Color) -> void:
-	var cloth: Color = Color("54505a") if character=="vanguard" else Color("50716b")
+	var cloth: Color = Color("62616a") if character=="vanguard" else Color("596a65")
 	for index: int in range(2):
 		var leg: Dictionary = pose.legs[index]
-		var shade: float = .64 if index==0 else 1.0
+		var shade: float = .83 if index==0 else 1.0
 		var color_value: Color = Color(shade,shade,shade,1)*tint
 		var hip: Vector2 = leg.hip
 		var joint: Vector2 = leg.knee

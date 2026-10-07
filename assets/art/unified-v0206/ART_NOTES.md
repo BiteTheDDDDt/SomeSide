@@ -1,0 +1,19 @@
+# SomeSide v0.20.6 art
+
+Both RGBA PNGs were made with the built-in image generation tool and copied unchanged into this directory. Source and previous assets are retained. The approved v0.20.5 creature atlas was the style reference for the player sheet and the edit target for the grey-shadow sheet.
+
+- `enemies-grey.png`: same 1448×1086 atlas layout; shadows raised to blue-grey, olive-grey and warm grey. Existing attack anchors retained; neighboring burrower pixels excluded from the charger's UV gutter.
+- `players.png`: two characters, four poses each. Ground locomotion retains the existing two-leg travel/contact rig, with new smooth SVG limb plates. Weapons and forearms remain independent. This is not a complete hand-authored animation sequence.
+- Weapons, facilities, inventory silhouettes, UI, portal and coins remain native code/SVG for scaling and state variants. Shared material rules are in `scripts/art_style.gd`. Warning/rarity colors are intentionally outside material normalization.
+
+## Player sheet prompt (verbatim)
+
+Use case: stylized-concept. Create ONE production transparent sprite atlas for SomeSide matching the attached creature atlas's sophisticated flat illustration: graceful silhouettes, broad olive/stone/blue-grey shapes, exactly 2-3 hard-edge tones, smooth antialiasing, no pixel art, no texture noise, no tiny armor seams. Use medium charcoal blue-grey #414b52 for darkest body areas, NEVER near-black. Exactly 4 equal columns by 2 equal rows, eight separate COMPLETE side-view bodies facing RIGHT, clear wide transparent gutters, no overlapping cells, no floor, shadows, text or grid. Same character scale in every cell, feet same baseline within each row. Top row: the SAME light ranger in muted ivory and sage armor, small cyan visor, curved helmet, short flowing rust scarf, compact backpack. Bottom row: SAME stockier vanguard in muted warm taupe armor, blue-grey cloth, ivory visor, broad shoulder, short dark blue cape. Both have readable human anatomy and exactly TWO legs. Weapons and forearms/hands are separate runtime parts: do NOT draw any weapon, hand, front forearm; show shoulder cap and upper arm only, keep front chest open for an independently aimed weapon. Columns for each row: (1) neutral planted idle, feet comfortably apart; (2) upward jump, one knee bent up and opposite leg extended down; (3) falling, both knees softly bent, boots down; (4) low forward dash, torso leaning 20 degrees right, rear leg extended backward, front knee forward. Preserve helmet, armor shapes, scarf/cape identity through all four poses. Small game-size readability more important than details. Output true transparent alpha.
+
+## Enemy recolor prompt (verbatim)
+
+Edit target image: production transparent 12-creature game atlas. COLOR CORRECTION ONLY. Preserve EXACT original canvas size, each creature's position, scale, pose, silhouette, internal shapes, eyes, all transparent gutters and alpha. Lift the deepest near-black body/shadow regions to muted charcoal grey with subtle blue-grey tint (approximately #414b52 for blue creatures, #454d46 for olive creatures, #514e4d for stone creatures). Keep main olive, taupe and blue-grey colors and ivory eyes unchanged. Gentle compressed contrast, still three clear hard-edge tones. Do not repaint anatomy, add texture, change outlines, add glow, rearrange or resize any creature. No background or labels. This must remain the same sprite atlas with only softer grey shadows.
+
+## Attack effects
+
+scripts/illustrated_fx.gd implements shared tapered ribbons, solid cores and material fragments. Weapon muzzle forms, impact, blast, flame, gravity, meteor, dash, healing, chain lightning, guided missiles, ground waves and shields reuse these shapes. This is native animated geometry, not new generated sprite sheets. Actual attack timing and collision geometry remain in simulation.gd.

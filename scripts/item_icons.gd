@@ -13,6 +13,7 @@ static var _last_use: Dictionary = {}
 static var _cache_bytes: int = 0
 static var _use_order: int = 0
 static var _rasterizations: int = 0
+const Style = preload("res://scripts/art_style.gd")
 const Content = preload("res://scripts/content.gd")
 const WeaponArt = preload("res://scripts/weapon_art.gd")
 
@@ -43,8 +44,8 @@ static func _texture(id: String, size: int, framed: bool) -> Texture2D:
 		return _textures[key]
 	var raster_size: int = mini(pixels * 4, MAX_RASTER_SIZE)
 	var accent: String = color(id).to_html(false)
-	var icon: String = _drawing(id)
-	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="geometricPrecision">' + (_backplate(id) if framed else "") + '<g stroke-linecap="square" stroke-linejoin="miter">' + icon.replace("ACCENT", "#" + accent) + '</g></svg>'
+	var icon: String = Style.svg(_drawing(id))
+	var svg: String = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="geometricPrecision">' + (_backplate(id) if framed else "") + '<g stroke-linecap="square" stroke-linejoin="miter">' + icon.replace("ACCENT", "#" + Style.material(Color(accent)).to_html(false)) + '</g></svg>'
 	var bitmap: Image = Image.new()
 	var error: Error = bitmap.load_svg_from_string(svg, float(raster_size) / 64.0)
 	if error != OK:
