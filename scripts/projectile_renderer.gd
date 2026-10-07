@@ -5,6 +5,7 @@ extends RefCounted
 ## opaque spore or coral shard, matching the material forming at its source.
 const Atlas = preload("res://scripts/sprite_atlas.gd")
 const AttackFx = preload("res://scripts/attack_fx_sprites.gd")
+const Geometry = preload("res://scripts/combat_geometry.gd")
 const CACHE_META: StringName = &"someside_projectile_atlas"
 const CACHE_MAX_BYTES: int = 4 * 1024 * 1024
 const ORB_FRAMES: int = 16
@@ -129,6 +130,9 @@ static func enemy_sample(kind: String, radius: float, age: float) -> Dictionary:
 
 static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
 	var r: float = maxf(4.0,radius)
+	if kind in ["spit","spore","acid","poison"]:
+		Geometry.draw_ammunition(c,Vector2.ZERO,Vector2.RIGHT,r,true)
+		return
 	var sample: Dictionary = enemy_sample(kind,radius,clock)
 	if AttackFx.draw_oriented(c,sample.family,Vector2.ZERO,sample.size,0.0,sample.phase,sample.tint):
 		return

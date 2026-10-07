@@ -90,11 +90,11 @@ func _real_attack(attack: String) -> void:
 				var valid: bool = is_finite(alpha) and size.is_finite() and size.x > 0 and size.y > 0
 				if str(hazard.shape) == "line":
 					valid = valid and float(data.get("source_alpha", 0.0)) >= 0.6
-					valid = valid and (bool(data.material_visible) and alpha == 1.0 if bool(hazard.active) else bool(data.warning_visible) and float(data.warning_alpha) >= 0.85 and data.warning_end == Vector2(hazard.pos) + Vector2(hazard.dir) * float(hazard.length))
+					valid = valid and (bool(data.material_visible) and alpha == 1.0 if bool(hazard.active) else bool(data.warning_visible) and float(data.warning_alpha) >= 0.67 and data.warning_end == Vector2(hazard.pos) + Vector2(hazard.dir) * float(hazard.length))
 				else:
 					valid = valid and alpha == 1.0
 					if not bool(hazard.active):
-						valid = valid and bool(data.warning_visible) and float(data.warning_alpha) >= 0.9 and data.warning_radius == hazard.radius
+						valid = valid and bool(data.warning_visible) and float(data.warning_alpha) >= 0.67 and data.warning_radius == hazard.radius
 						if str(data.family) == "spore_ready": valid = valid and Vector2(data.size).x >= 36.0 and not Beam.Sprites.frame_data("spore_ready", float(data.phase)).is_empty()
 				if tick < 6 and not bool(hazard.active):
 					first_samples += 1
@@ -190,7 +190,7 @@ func _test_distinct_attack_phases() -> void:
 				aligned = aligned and var_to_bytes(hazard) == saved
 			if str(early.shape) == "line":
 				for ready: Dictionary in [data[0], data[1]]:
-					valid = valid and bool(ready.warning_visible) and float(ready.warning_alpha) >= 0.85 and not bool(ready.material_visible)
+					valid = valid and bool(ready.warning_visible) and float(ready.warning_alpha) >= 0.67 and not bool(ready.material_visible)
 					valid = valid and ready.warning_origin == early.pos and ready.warning_end == Vector2(early.pos) + Vector2(early.dir) * float(early.length) and ready.warning_radius == early.radius
 				distinct = distinct and not bool(data[2].warning_visible) and bool(data[2].material_visible) and data[2].material_family == "laser" and float(data[2].material_alpha) == 1.0
 				distinct = distinct and Vector2(data[2].material_size) == Vector2(float(active.length), float(active.radius) * 2.0)
@@ -200,7 +200,7 @@ func _test_distinct_attack_phases() -> void:
 				valid = valid and data[0].family == material + "_ready" and data[1].family == material + "_ready" and data[2].family == material + "_hit"
 				valid = valid and float(data[0].phase) < float(data[1].phase) and float(data[2].phase) >= 0 and float(data[2].phase) <= 1
 				for ready: Dictionary in [data[0], data[1]]:
-					valid = valid and bool(ready.warning_visible) and float(ready.warning_alpha) >= 0.9 and ready.warning_radius == early.radius and float(ready.material_alpha) == 1.0
+					valid = valid and bool(ready.warning_visible) and float(ready.warning_alpha) >= 0.67 and ready.warning_radius == early.radius and float(ready.material_alpha) == 1.0
 				if material == "spore":
 					for ready: Dictionary in [data[0], data[1]]:
 						var seed_size: Vector2 = ready.size
@@ -212,7 +212,7 @@ func _test_distinct_attack_phases() -> void:
 		_check(valid, attack + ": early/late ready signals match the actual attack material and only active selects the hit form")
 		_check(distinct, attack + ": the damaging sprite stays distinct from the harmless range cue at every FX setting")
 		_check(aligned, attack + ": phase selection preserves immutable origins and the correct ground or airborne anchor")
-	for attack: String in ["charge", "stone_charge", "pounce"]:
+	for attack: String in ["charge", "stone_charge"]:
 		var setup: Dictionary = Fixtures.fixture(attack)
 		var enemy: Dictionary = setup.enemy
 		var local: Dictionary = Beam.preparation_sample(enemy, Vector2.ZERO, Vector2.RIGHT, 0.82, 17.0)

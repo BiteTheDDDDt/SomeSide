@@ -753,7 +753,7 @@ func _step_projectiles(dt: float) -> void:
 					nearest_t = hit_t
 					target_player = player
 			if not target_player.is_empty():
-				_damage_player(target_player, float(projectile["damage"]), previous)
+				_damage_player(target_player, float(projectile["damage"]), previous, {"attack_kind":str(projectile.get("kind","")),"enemy_id":int(projectile.get("enemy_id",-1)),"aim":Vector2(projectile.vel).normalized()})
 				removed = true
 		if not removed and kind == "grenade" and velocity.y > 0.0:
 			var platforms: Array = state["platforms"]
@@ -1113,7 +1113,7 @@ func _explode(position: Vector2, radius: float, damage: float, owner: int, team:
 				_damage_player(player, damage, position)
 
 
-func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
+func _damage_player(player: Dictionary, amount: float, source: Vector2, visual: Dictionary = {}) -> void:
 	if bool(player["dead"]) or float(player["invuln"]) > 0.0 or not is_finite(amount) or amount <= 0.0:
 		return
 	amount -= minf(amount * 0.6, float(_stacks(player, "plating")))
@@ -1142,7 +1142,10 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2) -> void:
 		player["jump_rising"] = false
 		_cancel_movement_ability(player)
 		_cancel_guard(player)
-	_emit("hit", player["pos"], {"amount": amount, "crit": false, "player": player["id"], "friendly": true})
+	var feedback: Dictionary = {"amount": amount, "crit": false, "player": player["id"], "friendly": true}
+	# Optional presentation provenance; no damage, RNG, or state changes.
+	feedback.merge(visual)
+	_emit("hit", player["pos"], feedback)
 	if float(player["hp"]) <= 0.0:
 		_cancel_owner_procs(player)
 		Procs.cancel(player)
@@ -1255,7 +1258,7 @@ func _move_enemy(enemy: Dictionary, target: Dictionary, dt: float, target_suppor
 			hit_ids.append(int(player["id"]))
 			enemy["charge_hit_ids"] = hit_ids
 		var damage: float = (17.0 if boss else (14.0 if charging else 10.0)) * elite_scale
-		_damage_player(player, damage * _enemy_damage_scale(), position)
+		_damage_player(player, damage * _enemy_damage_scale(), position, {"attack_kind":str(enemy.get("attack_kind","")),"enemy_id":int(enemy.id),"aim":(Vector2(player.pos)-position).normalized()})
 
 
 func _enemy_navigation_variant(id: int, salt: int) -> float:
@@ -1511,7 +1514,7 @@ func _step_hazards(dt: float, new_hazard_min_id: int = -1) -> void:
 				hit = Vector2(player["pos"]).distance_to(hazard["pos"]) <= float(hazard["radius"]) + 15.0
 			if hit:
 				hazard["hit_ids"].append(int(player["id"]))
-				_damage_player(player, float(hazard["damage"]) * _enemy_damage_scale(), hazard["pos"])
+				_damage_player(player, float(hazard["damage"]) * _enemy_damage_scale(), hazard["pos"], {"attack_kind":str(hazard.kind),"enemy_id":int(hazard.owner),"aim":hazard.dir})
 		if float(hazard["ttl"]) > 0.0:
 			kept.append(hazard)
 	state["hazards"] = kept

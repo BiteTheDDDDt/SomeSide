@@ -13,7 +13,7 @@ class Probe extends Node2D:
 		draw_set_transform(Vector2(100, 100), 0.0, Vector2.ONE * 12.0)
 		Entities.player_body(self, {"character": "ranger", "grounded": true, "vel": Vector2.ZERO}, 0.0)
 		draw_set_transform(Vector2(240, 100), 0.0, Vector2(-12, 12))
-		Entities.enemy(self, {"kind": "crawler", "id": 0, "vel": Vector2.ZERO}, 0.0)
+		Entities.enemy(self, {"kind": "drone", "id": 0, "vel": Vector2.ZERO}, 0.0)
 		draw_set_transform(Vector2.ZERO)
 
 func _initialize() -> void:
@@ -40,7 +40,7 @@ func _run() -> void:
 	image.fill_rect(Rect2i(1, 0, 1, 3), Color.GREEN)
 	image.fill_rect(Rect2i(4, 0, 2, 4), Color.BLUE)
 	var texture: ImageTexture = ImageTexture.create_from_image(image)
-	var manifest: Dictionary = {"version": 1, "actors": {"ranger": _fixture(), "crawler": _fixture(), "boss_stone": _fixture()}}
+	var manifest: Dictionary = {"version": 1, "actors": {"ranger": _fixture(), "drone": _fixture(), "boss_stone": _fixture()}}
 	var before_manifest: PackedByteArray = var_to_bytes(manifest)
 	Pixels.install_manifest(manifest, {"fixture": texture})
 	_check(Pixels.actor_ids().size() == 3 and Pixels.available("ranger"), "Explicit manifest records activate player, enemy and boss sprites")
@@ -63,17 +63,17 @@ func _run() -> void:
 	_check(Pixels.animation_for(player, true) == "fall", "A descending player has a separate animation selector")
 	player.dash_timer = 0.1
 	_check(Pixels.animation_for(player, true) == "dash", "Dash animation is presentation-only and wins over the ordinary airborne selector")
-	var enemy: Dictionary = {"kind": "crawler", "telegraph": 0.6, "vel": Vector2.ZERO}
-	_check(Pixels.frame_for("crawler", enemy, 0.0).index == 1, "A telegraph selects its windup pose without changing the attack timer")
+	var enemy: Dictionary = {"kind": "drone", "telegraph": 0.6, "vel": Vector2.ZERO}
+	_check(Pixels.frame_for("drone", enemy, 0.0).index == 1, "A telegraph selects its windup pose without changing the attack timer")
 	enemy.telegraph = 0.0
 	enemy.attack_kind = "pounce"
 	enemy.attack_cd = 2.8
 	enemy.attack_cooldown = 2.8
 	_check(Pixels.animation_for(enemy) == "attack", "The actual attack cooldown exposes a short release pose after windup")
 	enemy.flash = 0.1
-	_check(Color(Pixels.frame_for("crawler", enemy, 0.0).tint).r > 1.0, "Hit flash brightens the sprite without adding state or allocating variants")
+	_check(Color(Pixels.frame_for("drone", enemy, 0.0).tint).r > 1.0, "Hit flash brightens the sprite without adding state or allocating variants")
 	_check(Pixels.enemy_id({"kind": "boss", "boss_style": "stone"}) == "boss_stone" and Pixels.enemy_id({"kind": "boss", "biome": "ruins"}) == "boss_prism", "Boss styles and biome fallback resolve to their distinct authored actors")
-	_check(Pixels.frame_for("unavailable", {}, 0.0).is_empty() and Entities.enemy_bounds({"kind": "crawler"}) == Pixels.bounds("crawler"), "Unknown art uses fallback while loaded enemies expose actual sprite bounds")
+	_check(Pixels.frame_for("unavailable", {}, 0.0).is_empty() and Entities.enemy_bounds({"kind": "drone"}) == Pixels.bounds("drone"), "Unknown art uses fallback while loaded enemies expose actual sprite bounds")
 	var probe := Probe.new()
 	probe.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	root.content_scale_size = Vector2i.ZERO

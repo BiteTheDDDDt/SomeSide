@@ -36,20 +36,20 @@ func _run() -> void:
 func _test_beam_phases() -> void:
 	var pending: Dictionary = {"id":11,"pos":Vector2(100,250),"dir":Vector2(1,-.4).normalized(),"length":720.0,"radius":12.0,"delay":1.5,"telegraph_max":1.5,"active":false,"ttl":.22}
 	var normal: Dictionary = Art.beam_sample(pending)
-	_check(normal.warning_visible and normal.warning_alpha>=.85 and normal.warning_fill_alpha>=.1,"The first warning frame already shows a high-contrast axis and danger width")
+	_check(normal.warning_visible and normal.warning_alpha>=.67 and normal.warning_fill_alpha==0.0,"The first warning frame already shows a hollow high-contrast boundary and full danger width")
 	_check(normal.warning_origin==normal.origin and normal.warning_end==normal.end and normal.warning_radius==normal.radius,"Warning length and width exactly match the authority-locked beam geometry")
 	_check(not normal.material_visible and normal.material_alpha==0.0 and normal.source_family=="emitter","Preparation uses a readable amber marker and emitter, without showing the damaging purple beam")
 	for progress: float in [0.0,.1,.35,.6,.9,.999]:
 		pending.delay=(1.0-progress)*1.5
 		var phase: Dictionary=Art.beam_sample(pending,0.0,true)
-		_check(phase.warning_visible and phase.warning_alpha>=.85 and phase.warning_fill_alpha>=.1 and not phase.material_visible,"No part of a low-FX windup can hide its warning before the beam fires")
+		_check(phase.warning_visible and phase.warning_alpha>=.67 and phase.warning_fill_alpha==0.0 and not phase.material_visible,"No part of a low-FX windup can hide its warning before the beam fires")
 		_check(phase.warning_origin==normal.origin and phase.warning_end==normal.end and phase.warning_radius==normal.radius,"Early and late preparation preserve the entire locked footprint")
 	pending.delay=.09
 	var late: Dictionary = Art.beam_sample(pending)
 	for settings: Array in [[0.0,false],[.5,false],[1.0,true],[2.0,false]]:
 		var sample: Dictionary = Art.beam_sample(pending,settings[0],settings[1])
 		_check(sample.warning_origin==late.warning_origin and sample.warning_end==late.warning_end and sample.warning_radius==late.warning_radius and sample.warning_alpha==late.warning_alpha and sample.warning_fill_alpha==late.warning_fill_alpha,"FX settings cannot dim, shorten or narrow the essential warning")
-		_check(not Art.Sprites.frame_data(sample.source_family,sample.source_phase).is_empty(),"The optional compact emitter has a loaded authored frame")
+		_check(sample.geometry.size()==50 and sample.warning_fill_alpha==0.0,"The hollow warning uses the complete shared capsule geometry")
 	var saved_pending: PackedByteArray = var_to_bytes(pending)
 	_check(Art.beam_sample(pending)==Art.beam_sample(pending) and var_to_bytes(pending)==saved_pending,"Identical remote or paused snapshots produce identical samples without history")
 	pending.active=true
@@ -61,7 +61,7 @@ func _test_beam_phases() -> void:
 	_check(not first.warning_visible and not last.warning_visible and first.warning_alpha==0.0 and last.warning_fill_alpha==0.0,"The amber warning disappears exactly when the opaque damaging beam becomes active")
 	_check(first.material_size==Vector2(720,24) and first.material_size==last.material_size,"Live damage never shrinks or fades its visible footprint before authority expiry")
 	_check(first.origin==normal.warning_origin and first.end==normal.warning_end and first.radius==normal.warning_radius,"The actual laser occupies the same full footprint promised by its warning")
-	_check(Art.Sprites.frame_index(first.material_family,first.material_phase)<Art.Sprites.frame_index(last.material_family,last.material_phase),"The fired laser advances through authored sustaining frames")
+	_check(first.geometry==last.geometry and first.material_phase<last.material_phase,"The fired laser retains time for source recoil while geometry stays fixed")
 	for ttl: float in [.22,.17,.11,.05,.001]:
 		pending.ttl=ttl
 		var active: Dictionary=Art.beam_sample(pending,0.0,true)
@@ -84,14 +84,14 @@ func _test_beam_capsule() -> void:
 		_check(sim._segment_circle(start,finish,finish+direction*28.0,radius+15.0)<0.0 and not Geometry2D.is_point_in_polygon(finish+direction*13.0,capsule),"A player fully beyond the capsule neither overlaps its fill nor takes endpoint damage")
 
 func _test_source_materials() -> void:
-	for kind: String in ["charge","stone_charge","pounce"]:
+	for kind: String in ["charge","stone_charge"]:
 		var actor: Dictionary={"attack_kind":kind,"radius":23.0}
 		var before: PackedByteArray=var_to_bytes(actor)
 		var right: Dictionary=Art.preparation_sample(actor,Vector2(100,200),Vector2.RIGHT,.8,17)
 		var left: Dictionary=Art.preparation_sample(actor,Vector2(100,200),Vector2.LEFT,.8,17)
 		_check(right.origin==left.origin and right.origin.distance_to(Vector2(100,217))<=4 and right.size.x<=52,"A "+kind+" only disturbs the ground directly beneath its braced feet")
 		_check(right==Art.preparation_sample(actor,Vector2(100,200),Vector2.RIGHT,.8,17) and var_to_bytes(actor)==before,kind+" preparation is stable while paused and cannot change the attack")
-	for kind: String in ["mortar","burrow","stone_spikes","spore_bloom","blink"]:
+	for kind: String in ["pounce","mortar","burrow","stone_spikes","spore_bloom","blink"]:
 		_check(Art.preparation_sample({"attack_kind":kind},Vector2.ZERO,Vector2.RIGHT,.9,17).is_empty(),kind+" does not display an unrelated muzzle flash alongside its own destination material")
 	for pair: Array in [["spit","spit"],["mend","energy"]]:
 		var bud: Dictionary=Art.preparation_sample({"attack_kind":pair[0],"radius":23.0},Vector2.ZERO,Vector2.RIGHT,.95,17)
@@ -140,7 +140,7 @@ func _real_locked_attack() -> void:
 			active_seen=active_seen or bool(sample.active)
 			if not bool(sample.active):
 				warning_frames+=1
-				warning_continuous=warning_continuous and sample.warning_visible and sample.warning_alpha>=.85 and sample.warning_end==locked.end
+				warning_continuous=warning_continuous and sample.warning_visible and sample.warning_alpha>=.67 and sample.warning_end==locked.end
 			else:
 				warning_continuous=warning_continuous and not sample.warning_visible and sample.material_visible
 			samples+=1

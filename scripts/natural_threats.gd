@@ -4,6 +4,7 @@ extends RefCounted
 ## Ready and damaging states have different silhouettes, not just different
 ## opacity. All placement and phase come from the authoritative snapshot.
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
+const Geometry = preload("res://scripts/combat_geometry.gd")
 
 static func area_sample(hazard: Dictionary, _fx_scale: float = 1.0, _reduced_motion: bool = false) -> Dictionary:
 	var active: bool = bool(hazard.get("active", false))
@@ -31,8 +32,8 @@ static func area_sample(hazard: Dictionary, _fx_scale: float = 1.0, _reduced_mot
 		"size": size_value, "draw_offset": offset, "family": area_family(kind, active),
 		"color": material_color,
 		"warning_visible": not active, "warning_origin": hazard.get("pos", Vector2.ZERO),
-		"warning_radius": radius, "warning_alpha": 0.9 + progress * 0.1,
-		"warning_fill_alpha": 0.065, "warning_progress": progress,
+		"warning_radius": radius, "warning_alpha": Geometry.warning_alpha(progress*float(hazard.get("telegraph_max",1.5))),
+		"warning_fill_alpha": 0.0, "warning_progress": progress,
 		"release": release}
 
 static func area_family(kind: String, active: bool) -> String:
@@ -44,17 +45,15 @@ static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary)
 	tint.a = float(sample.material_alpha)
 	var center: Vector2 = position + Vector2(sample.draw_offset)
 	if bool(sample.warning_visible):
-		# A continuous dark-backed amber boundary gives the player useful
+		# A dark-backed red dashed boundary gives the player useful
 		# space/time information even when the terrain sprite blends in.
 		var radius: float = float(sample.warning_radius)
-		var warning: Color = Color("ffcb70")
-		warning.a = float(sample.warning_alpha)
-		canvas.draw_circle(position, radius, Color(warning, float(sample.warning_fill_alpha)), true, -1, true)
-		canvas.draw_arc(position, radius, 0, TAU, 48, Color("071219"), 5.0, true)
-		canvas.draw_arc(position, radius, 0, TAU, 48, warning, 2.0, true)
+		var boundary := PackedVector2Array()
+		for index: int in range(64): boundary.append(position+Vector2.from_angle(index*TAU/64.0)*radius)
+		Geometry.draw_warning(canvas,boundary,float(sample.warning_alpha))
 		var progress: float = float(sample.warning_progress)
 		if progress > 0.001:
-			canvas.draw_arc(position, radius - 4.0, -PI * 0.5, -PI * 0.5 + TAU * progress, 48, Color("fff0b1"), 1.6, true)
+			canvas.draw_arc(position, radius - 4.0, -PI * 0.5, -PI * 0.5 + TAU * progress, 48, Color("e8a7a0"), 1.1, true)
 		if str(sample.family) == "spore_ready":
 			# The seed can coincide with the player's torso. A compact dark
 			# backing and full-opacity seed keep its first frame recognizable.

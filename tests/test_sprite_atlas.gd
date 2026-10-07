@@ -90,12 +90,12 @@ func _test_plans() -> void:
 				all_states = all_states and enemy_plan.regions.has("%s/%d/%d" % [kind, variant, frame])
 	for entry: Dictionary in enemies:
 		var state: Dictionary = entry.data.state
-		all_bounds = all_bounds and entry.bounds.encloses(Entities.enemy_bounds(state))
+		all_bounds = all_bounds and entry.bounds.encloses(Entities._vector_enemy_bounds(state))
 		if state.elite:
-			var crown: Vector2 = Entities.enemy_bounds(state).position + Vector2(28, -7)
+			var crown: Vector2 = Entities._vector_enemy_bounds(state).position + Vector2(28, -7)
 			all_bounds = all_bounds and entry.bounds.has_point(Vector2(0, crown.y))
 	_check(all_states, "Every kind includes normal, elite, flash and combined variants plus all charger crouches")
-	_check(all_bounds, "Body silhouettes and elite crowns remain inside every padded sprite cell")
+	_check(all_bounds, "Legacy cached vector silhouettes and elite crowns remain inside every padded sprite cell")
 	_check(not counts.has("boss"), "Bosses retain their original unrestricted vector animation")
 	var all_projectile_variants: bool = true
 	for radius: int in range(4, 13):

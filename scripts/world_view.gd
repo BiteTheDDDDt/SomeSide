@@ -781,6 +781,12 @@ func push_events(events: Array) -> void:
 				if not enemy_shot and weapon in ["pulse_rifle", "scattergun"]:
 					_burst(position_value-direction*9.0,Color("bba477"),2,55.0,0.48,direction.orthogonal()-direction*0.4,0.35,"fragment")
 			"hit":
+				var family: String = EnemyAttackArt.Geometry.impact_family(str(event.get("attack_kind",""))) if bool(event.get("friendly",false)) else ""
+				if not family.is_empty():
+					_add_effect({"kind":"hostile_contact","family":family,"pos":position_value,"angle":direction.angle(),"age":0.0,"life":.14})
+					if _numbers.size()<MAX_DAMAGE_NUMBERS:
+						_numbers.append({"pos":position_value+Vector2(0,-22),"text":str(int(event.get("amount",0))),"age":0.0,"crit":false})
+					continue
 				var crit: bool = event.get("crit", false)
 				var color_value: Color = (Color("f6987d") if bool(event.get("friendly", false)) else GOLD) if crit else CREAM
 				var impact_direction: Vector2 = _impact_direction(event)
@@ -1678,8 +1684,13 @@ func _draw_enemies() -> void:
 		var enemy: Dictionary = value
 		if float(enemy.get("hp",1.0))<=0.0: continue
 		var p: Vector2 = world_to_screen(_entity_draw_position("e" + str(enemy.get("id", 0)), enemy.get("pos", Vector2.ZERO)))
-		if Pixels.available(Pixels.enemy_id(enemy)):
+		if not Entities.Geometric.supports(str(enemy.get("kind", ""))) and Pixels.available(Pixels.enemy_id(enemy)):
 			p = Pixels.snap_position(self, p)
+		if str(enemy.get("kind", "")) == "sentinel":
+			for hazard: Dictionary in _frame.get("hazards", []):
+				if int(hazard.get("owner",-1)) == int(enemy.get("id",0)) and str(hazard.get("shape", "")) == "line":
+					p = world_to_screen(hazard.pos)
+					break
 		var bounds: Rect2 = Entities.enemy_bounds(enemy)
 		if not Rect2(p+bounds.position,bounds.size).grow(28.0).intersects(Rect2(Vector2.ZERO,screen_size)): continue
 		var kind: String = str(enemy.get("kind", "crawler"))
@@ -1730,10 +1741,12 @@ func _draw_projectiles() -> void:
 
 
 func _draw_threat_overlays() -> void:
-	# Material warnings are drawn last so danger remains readable through fog
-	# and friendly effects. There is no collision-shape/trajectory overlay.
+	# Draw all dangerous material first, then ALL warning boundaries. An active
+	# beam must not erase another enemy's still-harmless warning at a crossing.
 	for value: Variant in _frame.get("hazards", []):
-		_draw_hazard(value)
+		if bool(value.get("active",false)): _draw_hazard(value)
+	for value: Variant in _frame.get("hazards", []):
+		if not bool(value.get("active",false)): _draw_hazard(value)
 	for value: Variant in _frame.get("enemies", []):
 		var enemy: Dictionary = value
 		if float(enemy.get("hp",0.0))<=0.0: continue
@@ -1804,6 +1817,9 @@ func _draw_effects() -> void:
 		var color_value: Color = effect.get("color", TEAL)
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
+		if str(effect.get("kind", "")) == "hostile_contact":
+			EnemyAttackArt.Geometry.draw_impact(self,p,str(effect.family),Vector2.from_angle(float(effect.angle)),t)
+			continue
 		if str(effect.get("kind", "")) == "hostile_natural":
 			var tint: Color = effect.get("color",Color.WHITE)
 			tint.a *= 1.0 - smoothstep(0.6,1.0,t)

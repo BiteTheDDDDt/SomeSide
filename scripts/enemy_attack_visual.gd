@@ -5,6 +5,7 @@ extends RefCounted
 ## wobble, simulation writes, runtime textures, or unbounded particle queues.
 const Pose = preload("res://scripts/weapon_pose.gd")
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
+const Geometry = preload("res://scripts/combat_geometry.gd")
 const ACTIVE_LIFETIME: float = 0.22
 
 static func attack_sample(enemy: Dictionary) -> Dictionary:
@@ -43,12 +44,13 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 	var progress: float = clampf(1.0-float(hazard.get("delay",0.0))/maxf(.01,float(hazard.get("telegraph_max",.8))),0,1)
 	var release: float = clampf(1.0-float(hazard.get("ttl",ACTIVE_LIFETIME))/ACTIVE_LIFETIME,0,1) if active else 0.0
 	# Warning geometry is visible from the first replicated windup frame.
-	# Its amber outlined footprint is intentionally distinct from the opaque
-	# purple laser that exists only while the authority marks damage active.
+	# Its hollow red dashed footprint is distinct from filled geometric bands
+	# that exist only while authority marks damage active.
 	return {"origin":position,"end":position+direction*length,"direction":direction,"radius":radius,"active":active,"progress":progress,"release":release,
 		"warning_visible":not active,"warning_origin":position,"warning_end":position+direction*length,"warning_radius":radius,
-		"warning_alpha":0.0 if active else .86+.14*progress,
-		"warning_fill_alpha":0.0 if active else .10+.08*progress,
+		"warning_alpha":0.0 if active else Geometry.warning_alpha(progress*float(hazard.get("telegraph_max",1.5))),
+		"warning_fill_alpha":0.0,
+		"geometry":Geometry.capsule(position,position+direction*length,radius),
 		"material_family":"laser","material_phase":release if active else 0.0,
 		"material_visible":active,"material_size":Vector2(length,radius*2.0),
 		"material_center":position+direction*length*.5,
@@ -60,14 +62,20 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 		"detail":not reduced_motion and fx_scale>=.6}
 
 static func draw_source(canvas: CanvasItem, origin: Vector2, direction: Vector2, progress: float, _detail: bool, active: bool = false, _release: float = 0.0) -> void:
-	var phase: float = 1.0 if active else clampf(progress,0,1)
-	var extent: float = 26.0 if active else 12.0+12.0*phase
-	Sprites.draw_oriented(canvas,"emitter",origin,Vector2.ONE*extent,direction.angle(),phase,Color(1,1,1,1.0 if active else .6+.3*phase))
+	var phase: float = clampf(progress,0,1)
+	var color: Color = Geometry.palette("crystal").attack
+	Geometry.diamond(canvas,origin,direction,6.0 if active else 2.0+phase*3.0,4.5 if active else 1.5+phase*2.0,Geometry.CORE if active else color,1.2)
+	if not active and _detail:
+		# Paired facets converge into the aperture, never paint a second path.
+		for side: float in [-1.0,1.0]:
+			var from: Vector2 = origin-direction*(10.0-phase*4.0)+direction.orthogonal()*side*(7.0-phase*3.0)
+			canvas.draw_line(from,from+direction*3.0-direction.orthogonal()*side*2.0,color,Geometry.DETAIL,true)
 
 static func preparation_sample(enemy: Dictionary, center: Vector2, direction: Vector2, progress: float, foot: float) -> Dictionary:
 	var kind: String = str(enemy.get("attack_kind",""))
 	var phase: float = clampf(progress,0,1)
-	if kind in ["charge","stone_charge","pounce"]:
+	if kind == "pounce": return {}
+	if kind in ["charge","stone_charge"]:
 		var width: float = 52.0 if kind=="stone_charge" else 30.0
 		# Clods collect directly under braced feet. They do not paint a runway
 		# across safe ground or pretend the charge has already happened.
@@ -76,7 +84,7 @@ static func preparation_sample(enemy: Dictionary, center: Vector2, direction: Ve
 			"angle":0.0,"phase":phase,"tint":Color(.78,.78,.78,.48+.2*phase)}
 	if kind in ["spit","mend"]:
 		var extent: float = 7.0+6.0*phase
-		var origin: Vector2 = center+direction*(float(enemy.get("radius",19.0))+3.0)
+		var origin: Vector2 = center+Geometry.source_offset(enemy,direction)
 		# The seed/crystal forming at the muzzle becomes the actual ammunition.
 		# A conductor's harmful crystal remains coral; its healing uses mint.
 		return {"family":"spore_shot" if kind=="spit" else "crystal_shot","origin":origin,
@@ -89,42 +97,39 @@ static func preparation_sample(enemy: Dictionary, center: Vector2, direction: Ve
 static func draw_preparation(canvas: CanvasItem, enemy: Dictionary, center: Vector2, direction: Vector2, progress: float, foot: float, _detail: bool) -> void:
 	var sample: Dictionary = preparation_sample(enemy,center,direction,progress,foot)
 	if sample.is_empty(): return
+	if str(enemy.get("attack_kind","")) in ["spit","mend"]:
+		Geometry.draw_ammunition(canvas,sample.origin,direction,Vector2(sample.size).y*.35,str(enemy.get("attack_kind",""))=="spit",true,progress)
+		return
 	Sprites.draw_oriented(canvas,sample.family,sample.origin,sample.size,sample.angle,sample.phase,sample.tint)
 
 static func warning_capsule(start: Vector2, finish: Vector2, radius: float) -> PackedVector2Array:
-	var angle: float = Pose.normalized_aim(finish-start).angle()
-	var points := PackedVector2Array()
-	# Sample the same two semicircles used by the outline, including endpoints.
-	# The intervening polygon edges are the straight sides of the capsule.
-	for cap: Dictionary in [{"center":finish,"angle":angle-PI*.5},{"center":start,"angle":angle+PI*.5}]:
-		for step: int in range(25):
-			points.append(Vector2(cap.center)+Vector2.from_angle(float(cap.angle)+PI*float(step)/24.0)*radius)
-	return points
+	return Geometry.capsule(start,finish,radius)
 
 static func draw_beam_warning(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
 	if not bool(sample.warning_visible): return
-	var perpendicular: Vector2 = Vector2(sample.direction).orthogonal()*float(sample.warning_radius)
-	var amber := Color("ffcb70")
-	var outline := Color("071219")
-	var foreground: Color = Color(amber,float(sample.warning_alpha))
-	canvas.draw_colored_polygon(warning_capsule(start,finish,float(sample.warning_radius)),Color(amber,float(sample.warning_fill_alpha)))
-	# The dark under-stroke separates these cues from both pale rock and dark
-	# foliage. The rounded ends are part of the real segment-circle hit shape;
-	# both fill and outline must include them, not just the center rectangle.
-	canvas.draw_line(start,finish,outline,4.5,true)
-	canvas.draw_line(start,finish,foreground,1.7,true)
-	for side: float in [-1.0,1.0]:
-		var offset: Vector2 = perpendicular*side
-		canvas.draw_line(start+offset,finish+offset,outline,2.8,true)
-		canvas.draw_line(start+offset,finish+offset,Color(amber,float(sample.warning_alpha)*.8),.9,true)
-	var angle: float = Vector2(sample.direction).angle()
-	for cap: Dictionary in [{"center":start,"angle":angle+PI*.5},{"center":finish,"angle":angle-PI*.5}]:
-		canvas.draw_arc(cap.center,float(sample.warning_radius),float(cap.angle),float(cap.angle)+PI,25,outline,2.8,true)
-		canvas.draw_arc(cap.center,float(sample.warning_radius),float(cap.angle),float(cap.angle)+PI,25,Color(amber,float(sample.warning_alpha)*.8),.9,true)
+	var outline: PackedVector2Array = warning_capsule(start,finish,float(sample.radius))
+	Geometry.draw_warning(canvas,outline,float(sample.warning_alpha))
+	if bool(sample.detail):
+		# Two small inward-facing crystal facets are subordinate to the intact
+		# boundary. Nothing extends beyond the announced danger silhouette.
+		var direction: Vector2 = sample.direction
+		for side: float in [-1.0,1.0]:
+			var point: Vector2 = start.lerp(finish,.18)+direction.orthogonal()*side*(float(sample.radius)-3.0)
+			Geometry.diamond(canvas,point,direction,4.0,1.4,Geometry.WARNING)
 
 static func draw_beam(canvas: CanvasItem, start: Vector2, finish: Vector2, sample: Dictionary) -> void:
 	var direction: Vector2 = sample.direction
 	draw_beam_warning(canvas,start,finish,sample)
 	if bool(sample.material_visible):
-		Sprites.draw_oriented(canvas,sample.material_family,start+direction*Vector2(sample.material_size).x*.5,sample.material_size,direction.angle(),sample.material_phase,Color(1,1,1,sample.material_alpha))
+		# Both phases consume exactly the same capsule, including both end caps.
+		# Damage fills it with hard bands fading along distance; no texture/bloom/taper can
+		# imply a different width or an early fade during the authority window.
+		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)),start,finish,Color("e59485"),.14)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,float(sample.radius)*.55),start,finish,Color("f4d1b4"),.24)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,finish,maxf(1.5,float(sample.radius)*.15)),start,finish,Geometry.CORE,.38)
+		# Fading is spatial, never a fade-out before damage expires. Keep the
+		# full distant width readable with a restrained continuous active edge.
+		var edge: PackedVector2Array=warning_capsule(start,finish,float(sample.radius))
+		edge.append(edge[0])
+		canvas.draw_polyline(edge,Color("e9b7a7",.38),1.1,true)
 	draw_source(canvas,start,direction,1.0 if bool(sample.active) else float(sample.progress),bool(sample.detail),bool(sample.active),float(sample.release))

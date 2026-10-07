@@ -5,6 +5,7 @@ extends RefCounted
 ## All animation is presentation-only and never changes the supplied snapshot.
 const Atlas = preload("res://scripts/sprite_atlas.gd")
 const Pixels = preload("res://scripts/pixel_actor_renderer.gd")
+const Geometric = preload("res://scripts/geometric_enemies.gd")
 const CACHE_META: StringName = &"someside_enemy_atlas"
 const CACHE_MAX_BYTES: int = 28 * 1024 * 1024
 const ANIMATION_FRAMES: int = 16
@@ -51,6 +52,7 @@ static func enemy_kinds() -> Array[String]:
 	return KINDS.duplicate()
 
 static func enemy_bounds(enemy: Dictionary) -> Rect2:
+	if Geometric.supports(str(enemy.get("kind", ""))): return Geometric.bounds(enemy)
 	var pixel_bounds: Rect2 = Pixels.bounds(Pixels.enemy_id(enemy))
 	if pixel_bounds.size != Vector2.ZERO:
 		return pixel_bounds
@@ -167,6 +169,11 @@ static func _player_vector(c: Node2D, player: Dictionary, clock: float) -> void:
 		c.draw_circle(Vector2(-10,-28),1.1,signal_color,true,-1,true)
 
 static func enemy(c: Node2D, state: Dictionary, clock: float) -> void:
+	if Geometric.draw(c,state,clock):
+		if bool(state.get("elite", false)):
+			var top: float = enemy_bounds(state).position.y - 3.0
+			_poly(c,[Vector2(-5,top),Vector2(0,top-4),Vector2(5,top)],Color("ffc77c"),false)
+		return
 	if Pixels.draw_enemy(c, state, clock):
 		if bool(state.get("elite", false)) and str(state.get("kind", "")) != "boss":
 			var top: float = enemy_bounds(state).position.y - 3.0
