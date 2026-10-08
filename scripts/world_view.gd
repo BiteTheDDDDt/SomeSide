@@ -56,6 +56,7 @@ var _weapon_tracks: Dictionary = {}
 var _weapon_predictions: Dictionary = {}
 var _camera_ready: bool = false
 var _effects: Array[Dictionary] = []
+var _area_visual_history: Dictionary = {}
 var _numbers: Array[Dictionary] = []
 var _particle_batches: int = 0
 var _particle_segments: int = 0
@@ -145,6 +146,18 @@ func _ready() -> void:
 	set_process(true)
 
 
+func _track_area_recovery() -> void:
+	var current: Dictionary={}
+	for hazard: Dictionary in _frame.get("hazards",[]):
+		if str(hazard.get("shape","circle"))!="line":
+			current[int(hazard.id)]={"pos":hazard.pos,"radius":hazard.radius,"kind":hazard.kind,"active":hazard.active,"ttl":hazard.ttl}
+	for id: int in _area_visual_history:
+		var old: Dictionary=_area_visual_history[id]
+		if not current.has(id) and bool(old.active) and float(old.ttl)<.06:
+			_add_effect({"kind":"area_recovery","pos":old.pos,"radius":old.radius,"family":"spore" if NaturalThreats.area_family(old.kind,true).begins_with("spore") else "stone","age":0.0,"life":.20})
+	_area_visual_history=current
+
+
 func set_frame(snapshot: Dictionary, local_id: int, delta: float) -> void:
 	_frame = snapshot
 	_local_id = local_id
@@ -158,8 +171,10 @@ func set_frame(snapshot: Dictionary, local_id: int, delta: float) -> void:
 		_camera_ready = false
 		_camera_stage = stage
 		_effects.clear()
+		_area_visual_history.clear()
 		_numbers.clear()
 		_clear_scenery_cache()
+	_track_area_recovery()
 	_update_render_positions(maxf(delta, 0.0))
 	var target: Vector2 = camera_position
 	var players: Dictionary = _frame.get("players", {})
@@ -865,7 +880,9 @@ func push_events(events: Array) -> void:
 					# add a second effect that outlives its damage window.
 					if not burrowing:
 						_add_effect({"kind":"hostile_natural", "family":"rift", "pos":position_value,
-							"size":Vector2(22,44), "color":Color.WHITE, "age":0.0, "life":0.14})
+							"departing":false,"color":Color.WHITE, "age":0.0, "life":0.24})
+						if event.has("from"):
+							_add_effect({"kind":"hostile_natural","family":"rift","pos":event.from,"departing":true,"color":Color.WHITE,"age":0.0,"life":0.24})
 					continue
 				var rushing: bool = str(event.get("ability", "")) == "shoulder_rush"
 				var dash_color: Color = GOLD if rushing else (Color("eea27c") if bool(event.get("enemy",false)) else TEAL)
@@ -1814,6 +1831,9 @@ func _draw_effects() -> void:
 		var color_value: Color = effect.get("color", TEAL)
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
+		if str(effect.get("kind",""))=="area_recovery":
+			NaturalThreats.SelectedFX.draw_frame(self,str(effect.family),7,p,float(effect.radius),1.0-smoothstep(.25,1.0,t))
+			continue
 		if str(effect.get("kind", "")) == "hostile_contact":
 			EnemyAttackArt.Geometry.draw_impact(self,p,str(effect.family),Vector2.from_angle(float(effect.angle)),t)
 			continue
@@ -1821,7 +1841,7 @@ func _draw_effects() -> void:
 			var tint: Color = effect.get("color",Color.WHITE)
 			tint.a *= 1.0 - smoothstep(0.6,1.0,t)
 			if str(effect.get("family",""))=="rift":
-				EnemyAttackArt.Geometry.draw_rift(self,p,30,t,true)
+				NaturalThreats.SelectedFX.draw_blink(self,p,t,true,bool(effect.get("departing",false)))
 			elif str(effect.get("family",""))=="repair":
 				EnemyAttackArt.Geometry.diamond(self,p,Vector2.UP,5*(1-t),3*(1-t),Color("9ac7ad"))
 			else:

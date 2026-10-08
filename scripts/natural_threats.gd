@@ -5,6 +5,7 @@ extends RefCounted
 ## opacity. All placement and phase come from the authoritative snapshot.
 const Sprites = preload("res://scripts/attack_fx_sprites.gd")
 const Geometry = preload("res://scripts/combat_geometry.gd")
+const SelectedFX = preload("res://scripts/selected_enemy_fx.gd")
 
 static func area_sample(hazard: Dictionary, _fx_scale: float = 1.0, _reduced_motion: bool = false) -> Dictionary:
 	var active: bool = bool(hazard.get("active", false))
@@ -60,11 +61,11 @@ static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary)
 		if progress>0.0:
 			var boundary: PackedVector2Array=warning_points(position,radius,progress)
 			Geometry.draw_warning(canvas,boundary,float(sample.warning_alpha),false)
-	Geometry.draw_area_material(canvas,position,sample)
+	SelectedFX.draw_area(canvas,position,sample)
 
 static func draw_blink(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float) -> void:
-	Geometry.draw_rift(canvas,source,36.0,progress)
-	Geometry.draw_rift(canvas,destination,42.0,progress)
+	SelectedFX.draw_blink(canvas,source,progress)
+	SelectedFX.draw_blink(canvas,destination,progress*.85)
 
 static func draw_mending(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float, detail: bool) -> void:
 	var direction: Vector2 = (destination - source).normalized()

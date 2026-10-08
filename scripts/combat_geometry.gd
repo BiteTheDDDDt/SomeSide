@@ -5,6 +5,7 @@ extends RefCounted
 ## never chooses a target, advances a timer, or changes a collision shape.
 const INK := Color("424e55")
 const FX = preload("res://scripts/illustrated_fx.gd")
+const SelectedFX = preload("res://scripts/selected_enemy_fx.gd")
 const WARNING := Color("f16b78")
 const CORE := Color("fff0cf")
 const EDGE: float = 2.0
@@ -39,6 +40,9 @@ static func polygon(c: CanvasItem, points: PackedVector2Array, color: Color, edg
 		c.draw_polyline(outline, Color(INK, color.a), edge, true)
 
 static func diamond(c: CanvasItem, center: Vector2, direction: Vector2, length: float, width: float, color: Color, edge: float = 0.0) -> void:
+	# Late laser contraction and spent chips can fall below a world pixel.
+	# Discard them before native triangulation loses their nonzero area.
+	if length<.35 or width<.25 or color.a<.01: return
 	var across: Vector2 = direction.orthogonal()
 	polygon(c, PackedVector2Array([center+direction*length,center+across*width,center-direction*length,center-across*width]),color,edge)
 
@@ -110,37 +114,21 @@ static func impact_family(kind: String) -> String:
 	return ""
 
 static func draw_ammunition(c: CanvasItem, origin: Vector2, direction: Vector2, radius: float, organic: bool, preparing: bool = false, progress: float = 1.0) -> void:
+	if organic:
+		SelectedFX.draw_seed(c,origin,direction,radius)
+		return
 	var colors: Dictionary=palette("spore" if organic else "crystal")
 	var across: Vector2=direction.orthogonal()
-	if organic:
-		# A seed with a fleshy forward lobe and a tapered rear, matching the
-		# inflated spitter abdomen; broad hard highlights instead of a ring.
-		var shell:=PackedVector2Array()
-		var inset:=PackedVector2Array()
-		for i: int in range(32):
-			var angle: float=TAU*i/32.0
-			var x: float=cos(angle)
-			var y: float=sin(angle)*(.62+.35*(x+1.0)*.5)
-			shell.append(origin+direction*x*radius+across*y*radius)
-			inset.append(origin+direction*(x*.68+.12)*radius+across*(y*.60-.18)*radius)
-		polygon(c,shell,Color("788653"),0)
-		polygon(c,inset,colors.base,0)
-		FX.ribbon(c,origin-across*radius*.13,radius*.64,direction.angle()-2.35,direction.angle()-.6,radius*.27,colors.light)
-		if not preparing:
-			for i: int in range(2):
-				var point: Vector2=origin-direction*radius*(1.25+i*.65)+across*radius*(.18 if i==0 else -.23)
-				FX.shard(c,point,direction.angle(),radius*(.45-i*.12),radius*.18,Color(colors.base,.8-i*.2))
-	else:
-		# Unequal facets form a physical crystal dart, rather than a hollow
-		# diamond glyph. The preparation grows the same object at the port.
-		var points:=PackedVector2Array()
-		for point: Vector2 in [Vector2(1.3,0),Vector2(.15,-.72),Vector2(-.9,-.36),Vector2(-1.15,.18),Vector2(-.18,.72)]:
-			points.append(origin+(direction*point.x+across*point.y)*radius)
-		polygon(c,points,Color("b87679"),.8)
-		polygon(c,PackedVector2Array([points[0],points[1],origin-direction*radius*.6,origin+across*radius*.13]),Color("ead0b7"),0)
-		polygon(c,PackedVector2Array([points[0],origin+across*radius*.13,points[4]]),Color("cd9391"),0)
-		if not preparing:
-			FX.shard(c,origin-direction*radius*1.5,direction.angle(),radius*.7,radius*.18,Color("d7b8ac",.6))
+	# Unequal facets form a physical crystal dart, rather than a hollow
+	# diamond glyph. The preparation grows the same object at the port.
+	var points:=PackedVector2Array()
+	for point: Vector2 in [Vector2(1.3,0),Vector2(.15,-.72),Vector2(-.9,-.36),Vector2(-1.15,.18),Vector2(-.18,.72)]:
+		points.append(origin+(direction*point.x+across*point.y)*radius)
+	polygon(c,points,Color("b87679"),.8)
+	polygon(c,PackedVector2Array([points[0],points[1],origin-direction*radius*.6,origin+across*radius*.13]),Color("ead0b7"),0)
+	polygon(c,PackedVector2Array([points[0],origin+across*radius*.13,points[4]]),Color("cd9391"),0)
+	if not preparing:
+		FX.shard(c,origin-direction*radius*1.5,direction.angle(),radius*.7,radius*.18,Color("d7b8ac",.6))
 	if preparing:
 		for side: float in [-1.0,1.0]:
 			var point: Vector2=origin-direction*(radius*.4)+across*side*(radius+3.0-progress*2.0)

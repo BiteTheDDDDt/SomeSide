@@ -1433,6 +1433,7 @@ func _release_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 			enemy["vel"] = Vector2.ZERO
 			_emit("dash", enemy["pos"], {"aim": Vector2.UP, "enemy": true, "kind": "burrow"})
 		"blink":
+			var departure: Vector2=enemy["pos"]
 			enemy["pos"] = enemy["blink_target"]
 			enemy["vel"] = Vector2.ZERO
 			enemy["telegraph"] = 0.7
@@ -1440,7 +1441,7 @@ func _release_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 			enemy["attack_kind"] = "salvo"
 			enemy["attack_target"] = Vector2(target["pos"])
 			enemy["attack_dir"] = WeaponPose.normalized_aim(Vector2(target["pos"]) - Vector2(enemy["pos"]))
-			_emit("dash", enemy["pos"], {"aim": enemy["attack_dir"], "enemy": true, "kind": "blink"})
+			_emit("dash", enemy["pos"], {"aim": enemy["attack_dir"], "enemy": true, "kind": "blink", "from":departure})
 		"mend":
 			var healed: int = 0
 			var budget: float = float(enemy.get("heal_budget", 0.0))
