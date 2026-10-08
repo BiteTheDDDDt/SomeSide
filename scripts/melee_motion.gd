@@ -43,6 +43,7 @@ static func sample(elapsed: float, length: float, aim: Vector2) -> Dictionary:
 	var blade_angle: float = direction.angle() + angle * facing
 	return {"active": true, "phase": phase, "progress": t, "elapsed": elapsed, "duration": length,
 		"aim": direction, "facing": facing, "angle": blade_angle, "body_angle": lean,
+		"body_shift":Vector2(sin(lean)*10,absf(lean)*2), "elbow_follow":-lean*6,
 		"extension": extension, "weapon_scale":1.0+0.25*sin(PI*t),
 		"arm_alpha":smoothstep(0.0,0.08,t)*(1.0-smoothstep(0.86,1.0,t)),
 		"trail": phase == "swing", "impact": t + 0.000001 >= IMPACT}

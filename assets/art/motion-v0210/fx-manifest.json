@@ -1,0 +1,78 @@
+{
+  "spore": [
+    {
+      "region": [
+        223,
+        129,
+        404,
+        354
+      ],
+      "anchor": [
+        202.0,
+        352
+      ],
+      "path": "res://assets/art/motion-v0210/fx-inbetweens.png",
+      "source_size": [
+        1536,
+        1024
+      ],
+      "scale": 0.7357798165137615
+    },
+    {
+      "region": [
+        853,
+        335,
+        545,
+        153
+      ],
+      "anchor": [
+        272.5,
+        151
+      ],
+      "path": "res://assets/art/motion-v0210/fx-inbetweens.png",
+      "source_size": [
+        1536,
+        1024
+      ],
+      "scale": 0.7357798165137615
+    }
+  ],
+  "stone": [
+    {
+      "region": [
+        177,
+        612,
+        531,
+        347
+      ],
+      "anchor": [
+        265.5,
+        345
+      ],
+      "path": "res://assets/art/motion-v0210/fx-inbetweens.png",
+      "source_size": [
+        1536,
+        1024
+      ],
+      "scale": 0.6202945990180033
+    },
+    {
+      "region": [
+        829,
+        798,
+        611,
+        168
+      ],
+      "anchor": [
+        305.5,
+        166
+      ],
+      "path": "res://assets/art/motion-v0210/fx-inbetweens.png",
+      "source_size": [
+        1536,
+        1024
+      ],
+      "scale": 0.6202945990180033
+    }
+  ]
+}

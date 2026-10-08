@@ -6,9 +6,15 @@ extends RefCounted
 const MANIFEST: String="res://assets/fx/v0209/manifest.json"
 static var _data: Dictionary={}
 static var _textures: Dictionary={}
+static var _extra: Dictionary={}
+static var _supplement: CanvasTexture
 static func prepare() -> void:
 	if not _data.is_empty(): return
 	_data=JSON.parse_string(FileAccess.get_file_as_string(MANIFEST))
+	_extra=JSON.parse_string(FileAccess.get_file_as_string("res://assets/art/motion-v0210/fx-manifest.json"))
+	_supplement=CanvasTexture.new()
+	_supplement.diffuse_texture=load("res://assets/art/motion-v0210/fx-inbetweens.png")
+	_supplement.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR
 	for family: String in _data:
 		var texture: Texture2D=load(str(_data[family].path))
 		var sampled:=CanvasTexture.new()
@@ -23,14 +29,15 @@ static func frame_index(active: bool, progress: float, ending: bool=false) -> in
 static func placement(family: String, index: int, origin: Vector2, radius: float, ground_offset: float=17.0) -> Dictionary:
 	prepare()
 	var data: Dictionary=_data[family]
-	var frame: Dictionary=data.frames[clampi(index,0,7)]
+	var frame: Dictionary=data.frames[clampi(index,0,7)] if index<8 else _extra[family][clampi(index-8,0,1)]
 	var values: Array=frame.region
 	var region:=Rect2(values[0],values[1],values[2],values[3])
 	var reference:=Vector2(data.reference[0],data.reference[1])
 	var scale_value: float=minf(radius*2/reference.x,(radius+ground_offset)/reference.y) if family!="blink" else radius/reference.y
+	scale_value*=float(frame.get("scale",1.0))
 	var anchor:=Vector2(frame.anchor[0],frame.anchor[1])
 	var base: Vector2=origin+(Vector2(0,ground_offset) if family!="blink" else Vector2.ZERO)
-	return {"region":region,"rect":Rect2(base-anchor*scale_value,region.size*scale_value),"source":Vector2(data.source_size[0],data.source_size[1]),"texture":_textures[family],"anchor":base}
+	return {"region":region,"rect":Rect2(base-anchor*scale_value,region.size*scale_value),"source":Vector2(frame.source_size[0],frame.source_size[1]) if frame.has("source_size") else Vector2(data.source_size[0],data.source_size[1]),"texture":_supplement if index>=8 else _textures[family],"anchor":base}
 
 static func draw_frame(canvas: CanvasItem, family: String, index: int, origin: Vector2, radius: float, alpha: float=1.0, ground_offset: float=17.0) -> void:
 	if alpha<.005: return
@@ -49,26 +56,44 @@ static func draw_frame(canvas: CanvasItem, family: String, index: int, origin: V
 		uv.append((Vector2(pose.region.position)+(point-rect.position)/rect.size*Vector2(pose.region.size))/Vector2(pose.source))
 	canvas.draw_polygon(points,PackedColorArray([Color(1,1,1,alpha)]),uv,pose.texture)
 
+static func timeline(active: bool, progress: float, ending: bool=false) -> Dictionary:
+	var frames: Array=[9,7] if ending else ([8,4,5,6] if active else [0,1,2,3])
+	var ends: Array=[.48,1.0] if ending else ([.10,.27,.68,1.0] if active else [.15,.50,.88,1.0])
+	var p: float=clampf(progress,0,1)
+	var index: int=0
+	while index<ends.size()-1 and p>=float(ends[index]): index+=1
+	var start: float=0.0 if index==0 else float(ends[index-1])
+	var local: float=(p-start)/maxf(.001,float(ends[index])-start)
+	return {"index":frames[index],"next":frames[mini(index+1,frames.size()-1)],"blend":smoothstep(.80,1.0,local) if index<frames.size()-1 else 0.0}
+
+static func _draw_timeline(canvas: CanvasItem,family: String,origin: Vector2,radius: float,sample: Dictionary,alpha: float=1.0) -> void:
+	draw_frame(canvas,family,int(sample.index),origin,radius,alpha*(1.0-float(sample.blend)))
+	if float(sample.blend)>.005: draw_frame(canvas,family,int(sample.next),origin,radius,alpha*float(sample.blend))
+
 static func draw_area(canvas: CanvasItem, origin: Vector2, sample: Dictionary) -> void:
 	var family: String="spore" if str(sample.family).begins_with("spore") else "stone"
 	var progress: float=clampf(float(sample.phase),0,1)
 	var active: bool=bool(sample.active)
 	var radius: float=float(sample.radius)
-	if active:
-		# Filled footprint exists only during damage; no orange/red boundary.
-		canvas.draw_circle(origin,radius,Color("8e9b5f",.12) if family=="spore" else Color("a18c72",.12),true,-1,true)
-	var count: int=3 if active else 4
-	var phase: float=progress*count
-	var index: int=frame_index(active,progress)
-	var next: int=mini(index+1,6 if active else 3)
-	var blend: float=smoothstep(.35,.85,fposmod(phase,1.0)) if next!=index else 0.0
-	draw_frame(canvas,family,index,origin,radius,1.0-blend)
-	if blend>0: draw_frame(canvas,family,next,origin,radius,blend)
+	if active: canvas.draw_circle(origin,radius,Color("8e9b5f",.12) if family=="spore" else Color("a18c72",.12),true,-1,true)
+	_draw_timeline(canvas,family,origin,radius,timeline(active,progress))
+
+static func draw_recovery(canvas: CanvasItem,family: String,origin: Vector2,radius: float,progress: float) -> void:
+	_draw_timeline(canvas,family,origin,radius,timeline(false,progress,true),1.0-smoothstep(.55,1,progress))
+
+static func blink_timeline(progress: float, ending: bool=false, departing: bool=false) -> Dictionary:
+	var p: float=clampf(progress,0,1)
+	# Departure snaps shut early; arrival opens quickly, holds briefly and
+	# leaves a short collapse. Both retain the approved eight source poses.
+	var frames: Array=[0,1,2,3] if not ending else ([4,5,6,7] if departing else [1,3,4,5,6,7])
+	var ends: Array=[.20,.52,.82,1.0] if not ending else ([.12,.28,.48,1.0] if departing else [.12,.26,.54,.72,.90,1.0])
+	var i: int=0
+	while i<frames.size()-1 and p>=float(ends[i]): i+=1
+	return {"index":frames[i],"alpha":1.0 if not ending else 1.0-smoothstep(.48 if departing else .72,1.0,p)}
 
 static func draw_blink(canvas: CanvasItem, origin: Vector2, progress: float, ending: bool=false, departing: bool=false) -> void:
-	var phase: float=clampf(progress,0,1)
-	var index: int=clampi(int(phase*4),0,3) if not ending else (clampi(4+int(phase*4),4,7) if departing else clampi(4+int(phase*3),4,6))
-	draw_frame(canvas,"blink",index,origin,58.0,1.0 if not ending else 1.0-smoothstep(.65,1,phase))
+	var sample: Dictionary=blink_timeline(progress,ending,departing)
+	draw_frame(canvas,"blink",int(sample.index),origin,58.0,float(sample.alpha))
 
 static func draw_seed(canvas: CanvasItem, origin: Vector2, direction: Vector2, radius: float) -> void:
 	prepare()
@@ -88,4 +113,5 @@ static func cache_stats() -> Dictionary:
 	prepare()
 	var bytes: int=0
 	for texture: CanvasTexture in _textures.values(): bytes+=texture.get_width()*texture.get_height()*4
-	return {"textures":_textures.size(),"bytes":bytes,"max_bytes":7*1024*1024}
+	bytes+=_supplement.get_width()*_supplement.get_height()*4
+	return {"textures":_textures.size()+1,"bytes":bytes,"max_bytes":10*1024*1024}

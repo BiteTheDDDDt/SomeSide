@@ -642,16 +642,14 @@ func weapon_draw_pose(player: Dictionary) -> Dictionary:
 	var displayed: Dictionary = player.duplicate(false)
 	displayed.pos = position_value
 	displayed.aim = aim
-	var frame: Dictionary = Pixels.tracked_frame_for(self, str(player.get("character", "ranger")), displayed, _clock, true)
-	var offset: Vector2 = frame.get("shoulder", Vector2(0.0, -5.0))
+	Pixels.tracked_frame_for(self,str(player.get("character","ranger")),displayed,_clock,true)
 	var body_motion: Dictionary = melee if bool(melee.active) else ranged
-	if bool(body_motion.active):
-		var pivot := Vector2(0.0, 5.0)
-		offset = pivot + (offset - pivot).rotated(float(body_motion.body_angle))
+	var body: Dictionary = Entities.IllustratedPlayers.sample_pose(self,displayed,_clock,body_motion)
+	var offset: Vector2 = body.shoulder
 	offset.x *= 1.0 if aim.x >= 0.0 else -1.0
 	var shoulder: Vector2 = position_value + offset
 	var result: Dictionary = {"position":position_value, "shoulder":shoulder,
-		"muzzle":shoulder + aim * WeaponPose.muzzle_length(str(player.get("weapon", "pulse_rifle"))), "aim":aim, "melee":melee, "ranged":ranged,
+		"muzzle":shoulder + aim * WeaponPose.muzzle_length(str(player.get("weapon", "pulse_rifle"))), "aim":aim, "melee":melee, "ranged":ranged, "body":body,
 		"weapon_origin":shoulder, "weapon_angle":aim.angle(), "weapon_scale":1.0,
 		"grip":shoulder+aim*7.5, "tip":shoulder+aim*WeaponPose.muzzle_length(str(player.get("weapon","pulse_rifle")))}
 	if bool(melee.active):
@@ -1594,6 +1592,7 @@ func _draw_players() -> void:
 		var displayed: Dictionary = player.duplicate(false)
 		displayed.pos = pose.position
 		displayed.aim = aim
+		displayed["_body_pose"] = pose.body
 		if bool(pose.melee.active) or bool(pose.ranged.active):
 			var body_motion: Dictionary = (pose.melee if bool(pose.melee.active) else pose.ranged).duplicate(false)
 			body_motion["draw_origin"] = p
@@ -1679,7 +1678,10 @@ func _draw_ranged_actor(player: Dictionary, pose: Dictionary) -> void:
 
 func _draw_weapon_arm(player: Dictionary, shoulder: Vector2, grip: Vector2, facing: float, opacity: float = 1.0) -> void:
 	var direction: Vector2 = (grip - shoulder).normalized()
-	var elbow: Vector2 = shoulder.lerp(grip, 0.5) + direction.orthogonal() * facing * 5.5 + Vector2(0, 2)
+	var action: Dictionary = melee_pose(player)
+	if not bool(action.get("active",false)): action=weapon_action_pose(player)
+	var follow: float = float(action.get("elbow_follow",0.0))
+	var elbow: Vector2 = shoulder.lerp(grip, 0.5) + direction.orthogonal() * facing * (5.5+follow) + Vector2(0, 2)
 	var armor: Color = Color("b4a798") if str(player.get("character", "ranger")) == "vanguard" else Color("c6c7aa")
 	armor.a = opacity
 	var outline: Color = Color("424e55",opacity)
@@ -1832,7 +1834,7 @@ func _draw_effects() -> void:
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
 		if str(effect.get("kind",""))=="area_recovery":
-			NaturalThreats.SelectedFX.draw_frame(self,str(effect.family),7,p,float(effect.radius),1.0-smoothstep(.25,1.0,t))
+			NaturalThreats.SelectedFX.draw_recovery(self,str(effect.family),p,float(effect.radius),t)
 			continue
 		if str(effect.get("kind", "")) == "hostile_contact":
 			EnemyAttackArt.Geometry.draw_impact(self,p,str(effect.family),Vector2.from_angle(float(effect.angle)),t)

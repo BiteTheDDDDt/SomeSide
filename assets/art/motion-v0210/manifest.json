@@ -1,0 +1,367 @@
+{
+  "sheets": [
+    "res://assets/art/motion-v0210/player-keys.png",
+    "res://assets/art/motion-v0210/enemy-keys.png"
+  ],
+  "actors": {
+    "ranger": {
+      "path": "res://assets/art/motion-v0210/player-keys.png",
+      "scale": 0.095,
+      "baseline": 21,
+      "frames": [
+        {
+          "region": [
+            77,
+            39,
+            347,
+            456
+          ],
+          "anchor": [
+            234,
+            453
+          ],
+          "socket": [
+            208,
+            102
+          ]
+        },
+        {
+          "region": [
+            599,
+            60,
+            339,
+            429
+          ],
+          "anchor": [
+            234,
+            426
+          ],
+          "socket": [
+            208,
+            115
+          ]
+        },
+        {
+          "region": [
+            1129,
+            146,
+            359,
+            347
+          ],
+          "anchor": [
+            244,
+            344
+          ],
+          "socket": [
+            232,
+            95
+          ]
+        }
+      ],
+      "source_size": [
+        1536,
+        1024
+      ]
+    },
+    "vanguard": {
+      "path": "res://assets/art/motion-v0210/player-keys.png",
+      "scale": 0.096,
+      "baseline": 21,
+      "frames": [
+        {
+          "region": [
+            53,
+            526,
+            414,
+            464
+          ],
+          "anchor": [
+            268,
+            461
+          ],
+          "socket": [
+            219,
+            101
+          ]
+        },
+        {
+          "region": [
+            585,
+            539,
+            397,
+            408
+          ],
+          "anchor": [
+            252,
+            405
+          ],
+          "socket": [
+            228,
+            112
+          ]
+        },
+        {
+          "region": [
+            1082,
+            617,
+            427,
+            366
+          ],
+          "anchor": [
+            301,
+            363
+          ],
+          "socket": [
+            272,
+            106
+          ]
+        }
+      ],
+      "source_size": [
+        1536,
+        1024
+      ]
+    },
+    "crawler": {
+      "path": "res://assets/art/motion-v0210/enemy-keys.png",
+      "scale": 0.2,
+      "baseline": 17,
+      "frames": [
+        {
+          "region": [
+            20,
+            94,
+            314,
+            267
+          ],
+          "anchor": [
+            197,
+            264
+          ],
+          "socket": [
+            280,
+            181
+          ],
+          "claw": [
+            294,
+            240
+          ]
+        },
+        {
+          "region": [
+            360,
+            90,
+            415,
+            251
+          ],
+          "anchor": [
+            202,
+            248
+          ],
+          "socket": [
+            343,
+            178
+          ],
+          "claw": [
+            388,
+            226
+          ]
+        },
+        {
+          "region": [
+            784,
+            128,
+            323,
+            233
+          ],
+          "anchor": [
+            198,
+            230
+          ],
+          "socket": [
+            289,
+            153
+          ],
+          "claw": [
+            304,
+            211
+          ]
+        },
+        {
+          "region": [
+            1122,
+            100,
+            310,
+            262
+          ],
+          "anchor": [
+            198,
+            259
+          ],
+          "socket": [
+            280,
+            180
+          ],
+          "claw": [
+            289,
+            239
+          ]
+        }
+      ],
+      "source_size": [
+        1448,
+        1086
+      ]
+    },
+    "spitter": {
+      "path": "res://assets/art/motion-v0210/enemy-keys.png",
+      "scale": 0.18,
+      "baseline": 17,
+      "frames": [
+        {
+          "region": [
+            55,
+            399,
+            253,
+            262
+          ],
+          "anchor": [
+            123,
+            257
+          ],
+          "socket": [
+            230,
+            114
+          ]
+        },
+        {
+          "region": [
+            376,
+            433,
+            361,
+            227
+          ],
+          "anchor": [
+            124,
+            222
+          ],
+          "socket": [
+            328,
+            79
+          ]
+        },
+        {
+          "region": [
+            814,
+            406,
+            254,
+            255
+          ],
+          "anchor": [
+            132,
+            250
+          ],
+          "socket": [
+            234,
+            109
+          ]
+        },
+        {
+          "region": [
+            1160,
+            399,
+            264,
+            262
+          ],
+          "anchor": [
+            132,
+            257
+          ],
+          "socket": [
+            236,
+            113
+          ]
+        }
+      ],
+      "source_size": [
+        1448,
+        1086
+      ]
+    },
+    "boss_stone": {
+      "path": "res://assets/art/motion-v0210/enemy-keys.png",
+      "scale": 0.34,
+      "baseline": 44,
+      "frames": [
+        {
+          "region": [
+            22,
+            680,
+            315,
+            346
+          ],
+          "anchor": [
+            158,
+            341
+          ],
+          "socket": [
+            278,
+            166
+          ]
+        },
+        {
+          "region": [
+            367,
+            745,
+            373,
+            281
+          ],
+          "anchor": [
+            185,
+            276
+          ],
+          "socket": [
+            283,
+            107
+          ]
+        },
+        {
+          "region": [
+            763,
+            745,
+            337,
+            282
+          ],
+          "anchor": [
+            175,
+            277
+          ],
+          "socket": [
+            233,
+            103
+          ]
+        },
+        {
+          "region": [
+            1125,
+            729,
+            318,
+            299
+          ],
+          "anchor": [
+            156,
+            295
+          ],
+          "socket": [
+            258,
+            104
+          ]
+        }
+      ],
+      "source_size": [
+        1448,
+        1086
+      ]
+    }
+  }
+}

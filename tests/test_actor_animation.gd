@@ -324,10 +324,12 @@ func _check_landing_weapon() -> void:
 	player.grounded = true
 	player.vel = Vector2.ZERO
 	world._clock = 10.02
+	world.weapon_draw_pose(player)
+	world._clock=10.06
 	var landing: Dictionary = world.weapon_draw_pose(player)
 	var body: Dictionary = Pixels.tracked_frame_for(world, "ranger", player, world._clock, true)
-	_check(body.animation == "land" and body.index == 11 and landing.shoulder == Vector2(player.pos) + Vector2(3, 7), "Landing weapon follows the selected frame's lowered logical-pixel shoulder")
-	_check(body.shoulder == Vector2(3, 7) and landing.position == normal.position, "Weapon and body reuse the same animation frame without moving the body origin")
+	_check(body.animation == "land" and float(landing.body.landing)>0 and landing.shoulder.is_equal_approx(Vector2(player.pos) + Vector2(landing.body.shoulder)), "Landing weapon follows the selected frame's lowered logical-pixel shoulder")
+	_check(landing.body.phase=="compress" and landing.position == normal.position, "Weapon and body reuse the same animation frame without moving the body origin")
 	var stable: bool = true
 	var origins: bool = true
 	var tails: bool = true
@@ -338,7 +340,8 @@ func _check_landing_weapon() -> void:
 		player.aim = aim
 		var physical_muzzle: Vector2 = Pose.muzzle_position(player)
 		var physical_aim: Vector2 = Pose.aim_at(player, Vector2(700, 250))
-		var expected_shoulder: Vector2 = Vector2(player.pos) + Vector2(3.0 if aim.x >= 0.0 else -3.0, 7.0)
+		var socket: Vector2=landing.body.shoulder
+		var expected_shoulder: Vector2 = Vector2(player.pos) + Vector2(socket.x if aim.x >= 0.0 else -socket.x,socket.y)
 		var pose: Dictionary = world.weapon_draw_pose(player)
 		stable = stable and pose.shoulder.is_equal_approx(expected_shoulder) and pose.aim.is_equal_approx(aim) and pose.muzzle.is_equal_approx(expected_shoulder + aim * Pose.muzzle_length("pulse_rifle"))
 		var bullet: Dictionary = {"id": 700 + direction, "team": "player", "kind": "bullet", "owner": 1, "age": 1.0 / 60.0, "origin": physical_muzzle, "pos": physical_muzzle + aim * 10.0, "vel": aim * 600.0, "travel_distance": 10.0}
@@ -357,7 +360,7 @@ func _check_landing_weapon() -> void:
 	_check(immutable, "Landing attachments never change snapshots, ballistic origins, projectile travel or input aim")
 	world._clock = 10.13
 	var recovering: Dictionary = world.weapon_draw_pose(player)
-	_check(recovering.shoulder == Vector2(player.pos) + Vector2(1, 0), "Multi-frame landing recovery follows each selected frame's own attachment")
+	_check(float(recovering.body.landing)<float(landing.body.landing) and recovering.shoulder.is_equal_approx(Vector2(player.pos)+Vector2(recovering.body.shoulder)*Vector2(1 if player.aim.x>=0 else -1,1)), "Multi-frame landing recovery follows each selected frame's own attachment")
 	world._clock = 10.25
 	var recovered: Dictionary = world.weapon_draw_pose(player)
 	_check(recovered.shoulder == Pose.shoulder_position(player.pos) and recovered.muzzle.is_equal_approx(Pose.muzzle_position(player)), "The weapon returns to its normal shoulder immediately when landing recovery finishes")

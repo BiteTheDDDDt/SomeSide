@@ -3,6 +3,8 @@ extends RefCounted
 
 const Pixels=preload("res://scripts/pixel_actor_renderer.gd")
 const Gait=preload("res://scripts/player_gait.gd")
+const Keys=preload("res://scripts/actor_key_poses.gd")
+const Body=preload("res://scripts/player_body_motion.gd")
 const PATH="res://assets/art/unified-v0206/players.png"
 const REGIONS: Dictionary={
 	"ranger":[Rect2(77,53,298,371),Rect2(481,20,309,408),Rect2(895,59,290,374),Rect2(1371,120,326,303)],
@@ -30,34 +32,64 @@ static func portrait(c: CanvasItem,character: String) -> void:
 	var f: Dictionary=frame(character)
 	if not f.is_empty(): c.draw_texture_rect(f.texture,f.target,false)
 
+static func pose_frame(character: String, index: int) -> Dictionary:
+	return frame(character,index) if index<4 else Keys.frame(character,index-4)
+
+static func sample_pose(c: CanvasItem, player: Dictionary, clock: float, action: Dictionary={}) -> Dictionary:
+	var animation: String=Pixels.animation_for(player,true)
+	var gait: Dictionary=Gait.sample(c,player,clock,animation)
+	var pose: Dictionary=Body.sample(c,player,clock,gait,action)
+	var shoulder := Vector2.ZERO
+	for index: int in pose.weights:
+		var f: Dictionary=pose_frame(str(player.get("character","ranger")),index)
+		shoulder+=Vector2(f.get("shoulder",Vector2(0,-5)))*float(pose.weights[index])
+	pose["socket"]=shoulder
+	pose["shoulder"]=Body.transform_point(shoulder,pose)
+	if float(pose.landing)>.005 and not bool(gait.get("active",false)):
+		pose.gait=Gait.landing_pose(float(pose.landing))
+	return pose
+
+static func _draw_plate(c: CanvasItem, f: Dictionary, pose: Dictionary, tint: Color, upper_only: bool) -> void:
+	var target: Rect2=f.target
+	var socket_shift: Vector2=Vector2(pose.socket)-Vector2(f.get("shoulder",Vector2(0,-5)))
+	if not upper_only and socket_shift.is_zero_approx() and Vector2(pose.offset).is_zero_approx() and is_zero_approx(float(pose.angle)):
+		c.draw_texture_rect(f.texture,target,false,tint)
+		return
+	var fraction: float=clampf((1.0+float(pose.landing)*3.0-target.position.y)/target.size.y,0,1) if upper_only else 1.0
+	# A short strip mesh moves shoulders and hips, while ground soles remain
+	# exactly on their authored baseline. No whole-image squash/stretch.
+	var strips: int=1 if upper_only and socket_shift.is_zero_approx() else 6
+	for row: int in range(strips):
+		var points:=PackedVector2Array()
+		var uv:=PackedVector2Array()
+		for corner: Vector2 in [Vector2(0,row/float(strips)),Vector2(1,row/float(strips)),Vector2(1,(row+1)/float(strips)),Vector2(0,(row+1)/float(strips))]:
+			var v: float=corner.y*fraction
+			var point: Vector2=target.position+Vector2(corner.x,v)*target.size
+			point+=socket_shift*(1.0-smoothstep(0.0,5.0,point.y))
+			var influence: float=1.0 if upper_only else 1.0-smoothstep(3.0,21.0,point.y)
+			points.append(point.lerp(Body.transform_point(point,pose),influence))
+			uv.append(Vector2(corner.x,v))
+		c.draw_polygon(points,PackedColorArray([tint]),uv,f.texture)
+
 static func draw(c: Node2D,player: Dictionary,clock: float) -> bool:
 	var character: String=str(player.get("character","ranger"))
 	if not REGIONS.has(character): return false
 	var tracked: Dictionary=Pixels.tracked_frame_for(c,character,player,clock,true)
-	var animation: String=str(tracked.get("animation","idle"))
-	var index: int=1 if animation in ["jump","rise"] else (2 if animation=="fall" else (3 if animation=="dash" else 0))
-	var f: Dictionary=frame(character,index)
 	var tint: Color=tracked.get("tint",Color.WHITE)
-	var gait: Dictionary=Gait.sample(c,player,clock,animation)
-	var motion: Dictionary=player.get("_melee_pose",{})
-	var split: bool=bool(gait.active) or bool(motion.get("active",false))
-	if not split:
-		c.draw_texture_rect(f.texture,f.target,false,tint)
-		return true
-	var target: Rect2=f.target
-	var source: Rect2=Rect2(Vector2.ZERO,Rect2(f.region).size)
-	var cut: float=1.0
-	var fraction: float=clampf((cut-target.position.y)/target.size.y,0,1)
-	var upper_source:=Rect2(Vector2.ZERO,Vector2(source.size.x,source.size.y*fraction))
-	var upper_target:=Rect2(target.position,Vector2(target.size.x,cut-target.position.y))
-	if bool(gait.active): Gait.draw(c,gait,character,tint)
-	else:
-		c.draw_texture_rect_region(f.texture,Rect2(Vector2(target.position.x,cut),Vector2(target.size.x,target.end.y-cut)),Rect2(Vector2(0,upper_source.size.y),Vector2(source.size.x,source.size.y-upper_source.size.y)),tint)
-	if bool(motion.get("active",false)) and motion.has("draw_origin"):
-		var facing: float=float(motion.facing)
-		c.draw_set_transform(Vector2(motion.draw_origin)+Vector2(0,5),float(motion.body_angle)*facing,Vector2(facing,1))
-		upper_target.position-=Vector2(0,5)
-		c.draw_texture_rect_region(f.texture,upper_target,upper_source,tint)
-		c.draw_set_transform(motion.draw_origin,0,Vector2(facing,1))
-	else: c.draw_texture_rect_region(f.texture,upper_target,upper_source,tint)
+	var action: Dictionary=player.get("_melee_pose",{})
+	var pose: Dictionary=player.get("_body_pose",{})
+	if pose.is_empty(): pose=sample_pose(c,player,clock,action)
+	var gait: Dictionary=pose.gait
+	if bool(gait.get("active",false)):
+		var legs: Dictionary=gait.duplicate(true)
+		var shifted: Vector2=Body.transform_point(Vector2(0,2)+(Vector2(legs.hip_shift) if bool(legs.get("landing",false)) else Vector2.ZERO),pose)-Vector2(0,2)
+		legs.hip_shift=shifted
+		for index: int in range(2):
+			legs.legs[index].hip=Vector2(-1.5 if index==0 else 1.5,2)+shifted
+			legs.legs[index].knee=Gait.knee(legs.legs[index].hip,legs.legs[index].ankle)
+		Gait.draw(c,legs,character,tint)
+	for index: int in pose.weights:
+		var weight: float=pose.weights[index]
+		if weight<.005: continue
+		_draw_plate(c,pose_frame(character,index),pose,Color(tint,tint.a*weight),bool(gait.get("active",false)))
 	return true

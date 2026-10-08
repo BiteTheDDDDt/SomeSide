@@ -91,4 +91,9 @@ static func sample(weapon: String, elapsed: float, length: float) -> Dictionary:
 			pose.grip_distance = 7.0 + 2.0 * thrust
 			pose.energy = thrust
 			pose.phase = "thrust" if t < 0.44 else "recover"
+	# Shoulder reaction and elbow lag derive from the existing kick/cycle;
+	# repeated firing replaces the pose instead of adding another impulse.
+	var reaction: float = clampf(float(pose.offset.x),-13,14)
+	pose["body_shift"] = Vector2(reaction*.12,absf(float(pose.body_angle))*2)
+	pose["elbow_follow"] = clampf(-reaction*.11+float(pose.mechanism)*.7,-1.4,1.8)
 	return pose

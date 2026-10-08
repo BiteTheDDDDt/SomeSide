@@ -5,6 +5,8 @@ extends RefCounted
 ## local limbs/wing motion and pins the firing organ to the real launch point.
 const Geometry=preload("res://scripts/combat_geometry.gd")
 const Attack=preload("res://scripts/enemy_attack_visual.gd")
+const Motion=preload("res://scripts/enemy_body_motion.gd")
+const Keys=preload("res://scripts/actor_key_poses.gd")
 const TEXTURE_PATH="res://assets/art/unified-v0206/enemies-grey.png"
 const GRID: int=10
 const MAX_MESHES: int=384
@@ -45,11 +47,60 @@ static func sample(e: Dictionary, clock: float) -> Dictionary:
 	# Subpixel-sized quantization keeps a bounded reusable mesh cache without
 	# moving the whole sprite or tying its position to rounded animation frames.
 	phase=snappedf(phase,TAU/32.0)
-	var amount: float=snappedf(float(action.amount),.05)
+	var rhythm: Dictionary=Motion.sample(e,id)
+	var amount: float=snappedf(float(rhythm.amount),.05)
 	var direction: Vector2=Geometry.local_direction(e)
 	return {"id":id,"phase":phase,"moving":snappedf(moving,.25),"amount":amount,"aim":direction,
 		"charged":float(e.get("charge_timer",0))>0,"organ":Geometry.source_offset(e,direction),
-		"flash":float(e.get("flash",0))>0}
+		"flash":float(e.get("flash",0))>0,"rhythm":rhythm}
+
+static func key_vertices(data: Dictionary, index: int) -> Dictionary:
+	var f: Dictionary=Keys.frame(data.id,index)
+	var target: Rect2=f.target
+	var source: Rect2=f.region
+	var positions:=PackedVector2Array()
+	var uv:=PackedVector2Array()
+	var indices:=PackedInt32Array()
+	var mouth: Vector2=target.position+Vector2(f.socket)*float(Keys._data.actors[data.id].scale)
+	var aim: Vector2=data.aim
+	var xs: Array[float]=[]
+	var ys: Array[float]=[]
+	for i: int in range(9): xs.append(i/8.0); ys.append(i/8.0)
+	var organ: Vector2=Vector2(f.socket)/source.size
+	if data.id=="spitter": xs.append(organ.x); ys.append(organ.y); xs.sort(); ys.sort()
+	for v: float in ys:
+		for u: float in xs:
+			var point: Vector2=target.position+Vector2(u,v)*target.size
+			if data.id=="spitter":
+				# Each authored mouth has its own socket. Its rigid front patch
+				# stays on the unchanged authoritative projectile launch point.
+				var relative: Vector2=point-mouth
+				var pinned: Vector2=Vector2(data.organ)+aim*relative.x+Vector2(-aim.y,aim.x)*relative.y
+				var weight: float=smoothstep(organ.x-.32,organ.x-.08,u)*(1.0-smoothstep(organ.y+.18,organ.y+.38,v))
+				point=point.lerp(pinned,weight)
+			positions.append(point)
+			uv.append((source.position+Vector2(u,v)*source.size)/Vector2(1448,1086))
+	var width: int=xs.size()
+	for y: int in range(ys.size()-1):
+		for x: int in range(width-1):
+			var i: int=y*width+x
+			indices.append_array(PackedInt32Array([i,i+1,i+width,i+1,i+width+1,i+width]))
+	return {"positions":positions,"uv":uv,"indices":indices}
+
+static func _mesh(shape: Dictionary) -> ArrayMesh:
+	var arrays: Array=[]; arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX]=shape.positions
+	arrays[Mesh.ARRAY_TEX_UV]=shape.uv
+	arrays[Mesh.ARRAY_INDEX]=shape.indices
+	var mesh:=ArrayMesh.new(); mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+	return mesh
+
+static func _remember(key: String, shape: Dictionary) -> ArrayMesh:
+	if _meshes.has(key): return _meshes[key]
+	var mesh: ArrayMesh=_mesh(shape)
+	if _order.size()>=MAX_MESHES: _meshes.erase(_order.pop_front())
+	_order.append(key); _meshes[key]=mesh
+	return mesh
 
 static func vertices(data: Dictionary) -> Dictionary:
 	var def: Dictionary=DEFINITIONS[data.id]
@@ -120,16 +171,23 @@ static func draw(c: CanvasItem,e: Dictionary,clock: float) -> bool:
 	if data.is_empty(): return false
 	if _texture==null: _texture=load(TEXTURE_PATH) as Texture2D
 	if _texture==null: return false
+	var weights: Dictionary=data.rhythm.weights if Motion.PROFILES.has(data.id) else {}
+	var total: float=0.0
+	var tint: Color=Color(1.25,1.25,1.25) if bool(data.flash) else Color.WHITE
+	for index: int in weights:
+		var weight: float=weights[index]
+		if weight<.005: continue
+		total+=weight
+		var pose_key: String="key/%s/%d/%s/%s"%[data.id,index,str(data.aim),str(data.organ)]
+		var pose_mesh: ArrayMesh=_meshes.get(pose_key)
+		if pose_mesh==null: pose_mesh=_remember(pose_key,key_vertices(data,index))
+		var pose: Dictionary=Keys.frame(data.id,index)
+		c.draw_mesh(pose_mesh,pose.texture.atlas,Transform2D.IDENTITY,Color(tint,weight))
+	if total>=.995: return true
 	var key: String="%s/%.4f/%.2f/%.2f/%.4f/%s/%s"%[data.id,data.phase,data.moving,data.amount,Vector2(data.aim).angle(),str(data.charged),str(data.organ)]
 	var mesh: ArrayMesh=_meshes.get(key)
 	if mesh==null:
 		var shape: Dictionary=vertices(data)
-		var arrays: Array=[]; arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX]=shape.positions
-		arrays[Mesh.ARRAY_TEX_UV]=shape.uv
-		arrays[Mesh.ARRAY_INDEX]=shape.indices
-		mesh=ArrayMesh.new(); mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-		if _order.size()>=MAX_MESHES: _meshes.erase(_order.pop_front())
-		_order.append(key); _meshes[key]=mesh
-	c.draw_mesh(mesh,_texture,Transform2D.IDENTITY,Color(1.25,1.25,1.25) if bool(data.flash) else Color.WHITE)
+		mesh=_remember(key,shape)
+	c.draw_mesh(mesh,_texture,Transform2D.IDENTITY,Color(tint,1-total))
 	return true

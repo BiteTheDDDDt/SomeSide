@@ -339,6 +339,7 @@ static func reset_tracks(canvas: CanvasItem) -> void:
 	if canvas.has_meta(TRACK_META):
 		canvas.remove_meta(TRACK_META)
 	Gait.reset(canvas)
+	preload("res://scripts/player_body_motion.gd").reset(canvas)
 
 ## Tracks belong to the drawing canvas, not to snapshots or static global
 ## identities. A new world/preview gets its own clock and frees its own history.

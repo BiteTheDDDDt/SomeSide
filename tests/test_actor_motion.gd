@@ -178,7 +178,7 @@ func _run() -> void:
 			world.set_frame(snapshot,1,1.0/rate)
 			var pose: Dictionary=world.weapon_draw_pose(snapshot.players[2])
 			monotonic=monotonic and Vector2(pose.position).x>=previous_remote.x-.001
-			coherent=coherent and Vector2(pose.shoulder).is_equal_approx(Vector2(pose.position)+Vector2(0,-5)) and Vector2(pose.muzzle).is_equal_approx(Vector2(pose.shoulder)+Vector2(36,0))
+			coherent=coherent and Vector2(pose.shoulder).is_equal_approx(Vector2(pose.position)+Vector2(pose.body.shoulder)) and Vector2(pose.muzzle).is_equal_approx(Vector2(pose.shoulder)+Vector2(36,0))
 			readonly=readonly and before==var_to_bytes(snapshot)
 			previous_remote=pose.position
 		_check(monotonic and not world._fixed_samples.has("p2"),"20 Hz remote snapshots at %d Hz draw smoothly without adding local interpolation twice"%rate)

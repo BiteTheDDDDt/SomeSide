@@ -127,7 +127,7 @@ static func sample(canvas: CanvasItem, state: Dictionary, clock: float, animatio
 		foot["world"] = target
 		foot["phase"] = leg_phase
 		legs.append(foot)
-	var pose: Dictionary = {"active":true,"phase":phase,"legs":legs,"backwards":backwards,"profile":description,"settle":settle,"hip_shift":Vector2(sin(TAU*phase)*0.45,0.6 if backwards else 0.0)}
+	var pose: Dictionary = {"active":true,"phase":phase,"legs":legs,"backwards":backwards,"profile":description,"settle":settle,"hip_shift":Vector2(sin(TAU*phase)*0.45,-absf(sin(TAU*phase))*.65+(0.6 if backwards else 0.0))*(1.0-smoothstep(0,SETTLE_TIME,settle)),"torso_angle":(-sin(TAU*phase)*.024+clampf(velocity.x*facing/240.0,-1,1)*.025)*(1.0-smoothstep(0,SETTLE_TIME,settle))}
 	track = {"clock":clock,"pos":position_value,"phase":phase,"direction":direction,"legs":legs,"pose":pose,"settle":settle,"turn":turn}
 	if cache.size() >= MAX_TRACKS and not cache.has(key): cache.erase(cache.keys()[0])
 	cache[key] = track
@@ -143,6 +143,15 @@ static func _local_pose(pose: Dictionary, position_value: Vector2, facing: float
 		leg["hip"] = Vector2(-1.5 if index==0 else 1.5,2.0)+Vector2(result.hip_shift)
 		leg["knee"] = knee(leg.hip,leg.ankle)
 	return result
+
+static func landing_pose(compression: float) -> Dictionary:
+	var shift:=Vector2(0,clampf(compression,0,1)*3.0)
+	var legs: Array=[]
+	for index: int in range(2):
+		var ankle:=Vector2(-5 if index==0 else 2,SOLE_Y-3)
+		var hip:=Vector2(-1.5 if index==0 else 1.5,2)+shift
+		legs.append({"ankle":ankle,"hip":hip,"knee":knee(hip,ankle),"angle":0.0,"planted":true})
+	return {"active":true,"landing":true,"hip_shift":shift,"legs":legs}
 
 # Smooth illustration plates attach only to the two explicit leg chains.
 static var _parts: Dictionary = {}

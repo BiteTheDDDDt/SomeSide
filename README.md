@@ -1,4 +1,4 @@
-# SomeSide 0.20.9
+# SomeSide 0.21.0
 
 一款 2D 横版动作 Roguelike：鼠标自由瞄准、两种战斗风格、局内道具叠加、三段关卡；Windows 版支持玩家主机驱动的 2–4 人合作，Web 版提供浏览器单人游戏。
 
@@ -7,6 +7,8 @@
 网页版使用远景和植被缓存降低绘制开销，保持角色与战斗动画；性能仍受浏览器和硬件影响。开发者可用 `tools/test-web-artifacts.py` 检查导出目录或 ZIP，用 `tools/test-web-browser.py` 和 `tools/test-web-loader.py` 做实际浏览器与加载故障验证（需要 Python Playwright 与本机浏览器）。
 
 ## 开始游戏
+
+0.21.0 保留现有造型，补两名角色的起跳、最高点与落地关键姿态，以及扑击怪、喷吐怪、石头首领各四个动作姿态。跑步保留位移和支撑脚约束，髋肩反向运动、后坐与肘部跟随均为视觉层。孢子/地刺各十张原画，爆发和破碎收尾按非均匀节奏播放，不延长伤害窗口。瞬移沿用原素材，区分离开与到达节奏。见 [动作素材和完整提示词](assets/art/motion-v0210/ART_NOTES.md)。
 
 0.20.9 接入选定的孢子A、地刺C透明动画图集：囊体破裂和层叠岩片替换原几何占位，准备/攻击/残留分别采样，红色虚线绘制与原伤害阶段保留。孢子弹与口部蓄力共用新囊体图形；怪物瞬移改用蓝灰裂隙，同时播放原位收拢和目标端展开。详见 [素材及提示词](assets/fx/v0209/ART_NOTES.md)。
 
@@ -36,9 +38,9 @@
 
 **本地浏览器预览：双击根目录 `PlayWeb.cmd`**，它会启动仅本机可访问的 HTTP 服务并自动打开默认浏览器。游玩时保留预览窗口，按 Ctrl+C 关闭服务。本地预览需要 Python 3；itch 玩家不需要安装。不要直接双击导出的 `index.html`。
 
-**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.20.9 独立版本位于 `dist/v0.20.9/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.20.9-windows-x64.zip`。以前的发布包继续保留，方便回退。
+**双击根目录 `Play.cmd`**。这会使用项目内的便携 Godot 运行最新源码，不需要提前安装引擎。0.21.0 独立版本位于 `dist/v0.21.0/SomeSide.exe`，无需编辑器；发布包为 `dist/SomeSide-v0.21.0-windows-x64.zip`。以前的发布包继续保留，方便回退。
 
-**浏览器单人版：** 0.13 加入 Web 导出，建议桌面键盘鼠标和全屏游玩。网页导出位于 `dist/v0.20.9-web/index.html`，上传包为 `dist/SomeSide-v0.20.9-web.zip`；需要通过 HTTP(S) 服务或 itch.io 运行，不能直接双击 HTML。在 itch.io 点击开始加载；进入游戏后首次点击或按键启用声音。浏览器不能加入当前 Windows 版的 ENet 合作房间，2–4 人合作请使用 Windows 下载版。已有页面的上传设置与中英说明见 [itch.io Web 发布指南](docs/ITCH_WEB.zh-CN.md)。
+**浏览器单人版：** 0.13 加入 Web 导出，建议桌面键盘鼠标和全屏游玩。网页导出位于 `dist/v0.21.0-web/index.html`，上传包为 `dist/SomeSide-v0.21.0-web.zip`；需要通过 HTTP(S) 服务或 itch.io 运行，不能直接双击 HTML。在 itch.io 点击开始加载；进入游戏后首次点击或按键启用声音。浏览器不能加入当前 Windows 版的 ENet 合作房间，2–4 人合作请使用 Windows 下载版。已有页面的上传设置与中英说明见 [itch.io Web 发布指南](docs/ITCH_WEB.zh-CN.md)。
 
 0.15 为八种主武器加入各自的手臂、上身和武器攻击动作。弧刃包含起势、挥砍和收势，挥刀中段由主机结算一次伤害；其他武器表现后坐、回膛、投掷、举杖或前刺，保持原有射速与弹道。单机暂停会冻结动作，合作中的本地预测不会被服务器回包重复播放。菜单与界面统一为像素工业终端风格：切角面板、自绘字标、裂隙装置、角色和装备展示；战斗 HUD 继续保持紧凑。
 
@@ -199,7 +201,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-network-control
 .\tools\runtime\Godot_v4.7.2-stable_win64_console.exe --path . --script res://tools/perf-v12.gd -- --tag=local-moving --moving
 ```
 
-Windows 导出结果是 `dist/v0.20.9/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 默认生成只含游戏、快速开始说明和许可的 Windows ZIP。`-Platform Web` 则将 Web 导出目录及许可打成网页包，`index.html` 直接位于 ZIP 根目录。打包脚本从 `project.godot` 读取版本，分别写入 `tools/results/package.json` 和 `tools/results/package-web.json`，记录大小与 SHA256。缺少模板时，导出脚本会下载官方模板；首次下载需要网络。
+Windows 导出结果是 `dist/v0.21.0/SomeSide.exe`，游戏资源嵌入可执行文件。导出脚本会把引擎和字体许可一并复制到该目录，分发时保留这些许可文件；`package.ps1` 默认生成只含游戏、快速开始说明和许可的 Windows ZIP。`-Platform Web` 则将 Web 导出目录及许可打成网页包，`index.html` 直接位于 ZIP 根目录。打包脚本从 `project.godot` 读取版本，分别写入 `tools/results/package.json` 和 `tools/results/package-web.json`，记录大小与 SHA256。缺少模板时，导出脚本会下载官方模板；首次下载需要网络。
 
 测试覆盖快照深拷贝、随机种子、瞄准预测、单跳与羽翼、手动拾取、多人争抢、装备冷却保留、设施交易和稀有掉落。地图可达性通过真实移动与碰撞验证：两个角色都不带道具、不冲刺，起跳和落点留出余量，并验证起跳位置偏差。压力测试继续检查四人长时间构筑与切关一致性。网络测试启动独立 Godot 进程，要求主机见到完整队伍、收到输入，客户端接收多次快照，并成功退出且没有运行时错误。证据保存在 `tools/results/network-*`。
 

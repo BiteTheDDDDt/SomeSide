@@ -127,7 +127,9 @@ static func draw_lunge(canvas: CanvasItem, enemy: Dictionary, center: Vector2) -
 		# Two short claw sweeps travel with the forelimbs, never a detached
 		# complete circle or a warning corridor in front of the creature.
 		for i: int in range(2):
-			var origin: Vector2=center+direction*radius*.36+Vector2(0,4+i*4)
+			var claw: Vector2=preload("res://scripts/enemy_body_motion.gd").claw_origin(enemy)
+			claw.x*=1.0 if direction.x>=0 else -1.0
+			var origin: Vector2=center+claw+Vector2(0,i*3)
 			FX.ribbon(canvas,origin,radius*.65,direction.angle()-1.1+phase*.6,direction.angle()+.5+phase*.6,2.8*(1-phase),Color("c5c797",1-phase*.5))
 	elif kind in ["charge","stone_charge"]:
 		# Broad kicked-up chips follow the feet; avoid speed-line runways.

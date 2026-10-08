@@ -11,7 +11,7 @@ func _initialize() -> void: run.call_deferred()
 func run() -> void:
 	FX.prepare()
 	var stat: Dictionary=FX.cache_stats()
-	check(stat.textures==3 and stat.bytes<=stat.max_bytes,"Three selected sheets import within 7MiB")
+	check(stat.textures==4 and stat.bytes<=stat.max_bytes,"Selected sheets and supplements fit their 10MiB budget")
 	for family: String in ["spore","stone","blink"]:
 		for i: int in range(8):
 			var pose: Dictionary=FX.placement(family,i,Vector2(400,200),48)
