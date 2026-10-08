@@ -24,7 +24,7 @@ static func field_sample(field: Dictionary) -> Dictionary:
 	if str(field.get("kind", "")) != "frost_halo" or ttl <= 0.0: return {}
 	var elapsed: float = maxf(0.0, float(field.get("duration", 1.5)) - ttl)
 	var radius: float = clampf(float(field.get("radius", 105.0)), 105.0, 130.0)
-	# A full eight-frame cycle per damage pulse: crystal arcs gather, then crack.
+	# A full 24-pose cycle per damage pulse: crystal arcs gather, then crack.
 	return {"family": "aura", "size": Vector2.ONE * radius * 2.0,
 		"phase": fposmod(elapsed / 0.5, 1.0), "angle": 0.0, "alpha": 0.76}
 

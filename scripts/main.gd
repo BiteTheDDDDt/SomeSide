@@ -16,7 +16,7 @@ const IllustratedPlayers = preload("res://scripts/illustrated_player_renderer.gd
 const AttackFxSprites = preload("res://scripts/attack_fx_sprites.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.21.0"
+const VERSION: String = "0.22.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
 const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "proc", "coin_drop", "equipment", "drop"]
@@ -1035,6 +1035,7 @@ func _finish_automation() -> void:
 	report["profile_language"] = str(profile.get("language", ""))
 	report["pixel_actors"] = PixelActorRenderer.stats()
 	report["attack_fx"] = AttackFxSprites.cache_stats()
+	report["motion_clips_24"] = WeaponActionMotion.Clips.stats()
 	report["fps"] = {"visible": is_instance_valid(_fps_label) and _fps_label.is_visible_in_tree(), "value": _fps_value}
 	report["performance"] = {"process_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, "physics_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, "draw_calls": Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), "scenery": world.scenery_cache_stats()}
 	report["advanced"] = _options.has("smoke-advanced")
@@ -1213,9 +1214,7 @@ func _show_menu(message: String = "") -> void:
 	if sim.state.is_empty() or sim.state.get("phase", "playing") != "playing":
 		sim.start_run([{"id": 1, "name": "SomeSide", "character": "ranger"}], 73021)
 	var column: VBoxContainer = _page("SomeSide", "探索、战斗，抵达另一边。" if _is_web() else "探索、战斗，与朋友一起抵达另一边。")
-	var character: String = "游侠 · RANGER" if profile.character == "ranger" else "先锋 · VANGUARD"
-	_label(column, Locale.format("当前角色：%s", [Locale.text(character)]), 14, MUTED)
-	_button(column, "单人游戏", _start_solo, true)
+	_button(column, "单人游戏", _show_characters, true)
 	if _is_web():
 		var web_note: Label = _label(column, WEB_COOP_MESSAGE, 14, MUTED)
 		web_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1227,7 +1226,6 @@ func _show_menu(message: String = "") -> void:
 		column.add_child(row)
 		_button(row, "创建合作房间", _host_lobby)
 		_button(row, "加入房间", _show_join)
-	_button(column, "选择角色", _show_characters)
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 12)
 	column.add_child(row2)
@@ -1262,7 +1260,7 @@ func _show_menu(message: String = "") -> void:
 func _show_characters() -> void:
 	screen = "characters"
 	var page_width: float = 670
-	var column: VBoxContainer = _page("选择角色", "选择初始武器与技能；遗物会改变你的战斗方式。", page_width)
+	var column: VBoxContainer = _page("选择职业", "选择本次出发的职业，然后开始游戏。", page_width)
 	column.add_theme_constant_override("separation", 8)
 	for definition in Simulation.character_catalog():
 		var selected: bool = str(profile.character) == str(definition.id)
@@ -1308,7 +1306,11 @@ func _show_characters() -> void:
 		select.custom_minimum_size.y = 38
 		select.disabled = selected
 	_gap(column, 2)
-	_button(column, "返回", _show_menu)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	column.add_child(actions)
+	_button(actions, "开始游戏", _start_solo, true)
+	_button(actions, "返回", _show_menu)
 
 func _text_field(parent: Node, value: String, placeholder: String = "") -> LineEdit:
 	var field := LineEdit.new()
@@ -1398,7 +1400,10 @@ func _show_lobby() -> void:
 	var change_row := HBoxContainer.new()
 	change_row.add_theme_constant_override("separation", 10)
 	column.add_child(change_row)
-	_button(change_row, "切换角色", _lobby_change_character)
+	for definition in Simulation.character_catalog():
+		var character_id: String = str(definition.id)
+		var choice: Button = _button(change_row, str(definition.name), func(): _lobby_choose_character(character_id), str(profile.character) == character_id)
+		choice.disabled = str(profile.character) == character_id
 	if hosting:
 		var all_ready: bool = true
 		for member in roster:
@@ -1411,8 +1416,9 @@ func _show_lobby() -> void:
 	_button(column, "离开房间", func(): _disconnect(); _show_menu())
 	_label(column, "每人独立镜头 · 合作救援 · 三段远征", 13, MUTED)
 
-func _lobby_change_character() -> void:
-	profile.character = "vanguard" if profile.character == "ranger" else "ranger"
+func _lobby_choose_character(character_id: String) -> void:
+	if not character_id in ["ranger", "vanguard"]: return
+	profile.character = character_id
 	_save_profile()
 	if hosting:
 		roster[0].character = profile.character
@@ -2345,7 +2351,7 @@ func _show_results() -> void:
 		else:
 			_label(column, "等待房主返回大厅，可再次出发。", 15, TEAL)
 	else:
-		_button(column, "再玩一次", _start_solo, true)
+		_button(column, "再玩一次", _show_characters, true)
 	_button(column, "返回主菜单", func(): _disconnect(); _show_menu())
 
 func _return_to_lobby() -> void:

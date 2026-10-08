@@ -1,4 +1,7 @@
-SomeSide 0.21.0 - Windows x64
+SomeSide 0.22.0 - Windows x64
+
+点击单人游戏，选择职业，再点击开始游戏；合作模式在大厅直接选择职业。
+Click Single Player, choose your class, then Start Game. Choose co-op classes in the lobby.
 
 开始游戏
 解压到一个文件夹，双击 SomeSide.exe 即可。无需安装 Godot。
@@ -30,7 +33,7 @@ SomeSide 0.21.0 - Windows x64
 难度按实际局内时间增长，包括停留；后续敌人生命与攻击更强。
 三张扩大后的地图具有不同地形与支路，按 M 查看关卡地图。
 三关重绘了各自背景、平台材质与地标，角色、怪物和弹道也已细化。
-两名角色、九种怪物和三种首领使用像素精灵图与多帧姿态。
+两名角色、九种怪物和三种首领使用块面插画与24帧动作数据。
 角色使用多帧姿态与双腿关节步态，前跑和后退都有清楚的抬脚、落脚；
 九种怪物与三种首领各有8帧，移动动画的节奏随实际速度变化。
 雨林敌人擅长跳扑、吐弹与落点孢子；峡谷擅长冲锋、钻地与散射；
@@ -78,7 +81,7 @@ F3：显示 / 隐藏实际帧率
 
 关于此版本
 本版本包含两名角色、三张关卡地图及单人 / 2–4 人合作模式。
-角色与敌人使用像素精灵图，场景、武器、特效和音效由程序生成。
+角色与敌人使用块面插画配合关节动作，攻击效果沿用硬边几何风格。
 引擎为 Godot 4.7.2，中文字体为 Noto Sans SC。
 请随游戏保留 GODOT-LICENSE.txt 和 FONT-OFL.txt。
 
@@ -92,7 +95,7 @@ system languages default to English. Change the language in Settings.
 Your saved preference is used on later launches. Co-op players can use
 different languages. Your gold balance is shown in gold at the top right.
 Actual FPS appears below it by default. F3 or Settings toggles the display;
-your choice is saved. Characters and enemies now use animated pixel sprites.
+your choice is saved. Characters and enemies use illustrated art with 24-pose animation clips.
 Heroes combine animated poses with planted, articulated legs for running and retreating.
 Each enemy and boss has 8 frames; movement animation follows actual speed.
 

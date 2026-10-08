@@ -2,6 +2,7 @@ class_name SideEnemyBodyMotion
 extends RefCounted
 
 ## Distinct visual rhythms sampled from authority timers, not render ticks.
+const Rig=preload("res://scripts/enemy_rig_24.gd")
 const Keys=preload("res://scripts/actor_key_poses.gd")
 const PROFILES: Dictionary = {
 	"crawler":{"release":.055,"recover":.22},
@@ -52,10 +53,11 @@ static func sample(enemy: Dictionary, id: String) -> Dictionary:
 	if winding: amount=smoothstep(0,1,progress)
 	elif not weights.is_empty():
 		amount=lerpf(1,-.35,smoothstep(0,float(profile.release),elapsed)) if elapsed<float(profile.release) else -.35*(1-smoothstep(float(profile.release),float(profile.recover),elapsed))
-	return {"weights":weights,"phase":phase,"winding":winding,"progress":progress,"amount":amount,"elapsed":elapsed}
+	return {"weights":weights,"phase":phase,"winding":winding,"progress":progress,"amount":amount,"elapsed":elapsed,"rig_stage":"coil" if winding else ("release" if phase in ["release","brace"] else ("recover" if not weights.is_empty() else "idle")),"rig_progress":progress if winding else (clampf(1-charging/(.35 if kind=="pounce" else (.72 if kind=="stone_charge" else .58)),0,1) if charging>0 else (clampf(elapsed/float(profile.release),0,1) if elapsed<float(profile.release) else clampf((elapsed-float(profile.release))/(float(profile.recover)-float(profile.release)),0,1)))}
 
 static func claw_origin(enemy: Dictionary) -> Vector2:
 	var rhythm: Dictionary=sample(enemy,"crawler")
+	var rig: Dictionary=Rig.sample("crawler",str(enemy.get("attack_kind","pounce")),str(rhythm.get("rig_stage","idle")),float(rhythm.get("rig_progress",0)),false)
 	var anchor:=Vector2(27,11)
 	var total: float=0.0
 	var result:=Vector2.ZERO
@@ -64,6 +66,8 @@ static func claw_origin(enemy: Dictionary) -> Vector2:
 		var weight: float=rhythm.weights[index]
 		var description: Dictionary=Keys._data.actors.crawler.frames[index]
 		var f: Dictionary=Keys.frame("crawler",index)
-		var point: Vector2=Rect2(f.target).position+Vector2(description.claw[0],description.claw[1])*.20
+		var pixel:=Vector2(description.claw[0],description.claw[1])
+		var point: Vector2=Rect2(f.target).position+pixel*.20
+		point=Rig.bend(point,pixel/Rect2(f.region).size,Rect2(f.target),rig)
 		result+=point*weight; total+=weight
 	return result+anchor*(1.0-total)

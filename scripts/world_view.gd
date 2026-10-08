@@ -1829,7 +1829,7 @@ func _draw_effects() -> void:
 		var effect_angle: float = Vector2(pose.aim).angle()
 		var age: float = effect.get("age", 0.0)
 		var life: float = effect.get("life", 0.5)
-		var t: float = clampf(age / life, 0.0, 1.0)
+		var t: float = float(IllustratedFX.motion("world/"+str(effect.get("kind","spark")),clampf(age/life,0.0,1.0)).progress)
 		var color_value: Color = effect.get("color", TEAL)
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)

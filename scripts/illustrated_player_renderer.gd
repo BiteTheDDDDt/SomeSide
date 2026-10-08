@@ -52,19 +52,20 @@ static func sample_pose(c: CanvasItem, player: Dictionary, clock: float, action:
 static func _draw_plate(c: CanvasItem, f: Dictionary, pose: Dictionary, tint: Color, upper_only: bool) -> void:
 	var target: Rect2=f.target
 	var socket_shift: Vector2=Vector2(pose.socket)-Vector2(f.get("shoulder",Vector2(0,-5)))
-	if not upper_only and socket_shift.is_zero_approx() and Vector2(pose.offset).is_zero_approx() and is_zero_approx(float(pose.angle)):
+	if not upper_only and socket_shift.is_zero_approx() and Vector2(pose.offset).is_zero_approx() and is_zero_approx(float(pose.angle)) and is_zero_approx(float(pose.get("cloth",0))):
 		c.draw_texture_rect(f.texture,target,false,tint)
 		return
 	var fraction: float=clampf((1.0+float(pose.landing)*3.0-target.position.y)/target.size.y,0,1) if upper_only else 1.0
 	# A short strip mesh moves shoulders and hips, while ground soles remain
 	# exactly on their authored baseline. No whole-image squash/stretch.
-	var strips: int=1 if upper_only and socket_shift.is_zero_approx() else 6
+	var strips: int=6
 	for row: int in range(strips):
 		var points:=PackedVector2Array()
 		var uv:=PackedVector2Array()
 		for corner: Vector2 in [Vector2(0,row/float(strips)),Vector2(1,row/float(strips)),Vector2(1,(row+1)/float(strips)),Vector2(0,(row+1)/float(strips))]:
 			var v: float=corner.y*fraction
 			var point: Vector2=target.position+Vector2(corner.x,v)*target.size
+			point.x+=float(pose.get("cloth",0))*(1.0-smoothstep(.16,.40,corner.x))*smoothstep(.15,.48,v)*(1.0-smoothstep(.65,.85,v))
 			point+=socket_shift*(1.0-smoothstep(0.0,5.0,point.y))
 			var influence: float=1.0 if upper_only else 1.0-smoothstep(3.0,21.0,point.y)
 			points.append(point.lerp(Body.transform_point(point,pose),influence))

@@ -115,8 +115,9 @@ static func impact_family(kind: String) -> String:
 
 static func draw_ammunition(c: CanvasItem, origin: Vector2, direction: Vector2, radius: float, organic: bool, preparing: bool = false, progress: float = 1.0) -> void:
 	if organic:
-		SelectedFX.draw_seed(c,origin,direction,radius)
+		SelectedFX.draw_seed(c,origin,direction,radius,progress)
 		return
+	var frame: Dictionary=FX.motion("spore_seed" if organic else "crystal_seed",progress)
 	var colors: Dictionary=palette("spore" if organic else "crystal")
 	var across: Vector2=direction.orthogonal()
 	# Unequal facets form a physical crystal dart, rather than a hollow
@@ -131,10 +132,12 @@ static func draw_ammunition(c: CanvasItem, origin: Vector2, direction: Vector2, 
 		FX.shard(c,origin-direction*radius*1.5,direction.angle(),radius*.7,radius*.18,Color("d7b8ac",.6))
 	if preparing:
 		for side: float in [-1.0,1.0]:
-			var point: Vector2=origin-direction*(radius*.4)+across*side*(radius+3.0-progress*2.0)
+			var point: Vector2=origin-direction*(radius*.4)+across*side*(radius+3.0-float(frame.drift)*2.0)
 			FX.shard(c,point,direction.angle()-side*.4,2.0,1.0,colors.light)
 
 static func draw_impact(c: CanvasItem, position: Vector2, family_name: String, direction: Vector2, phase: float) -> void:
+	var frame: Dictionary=FX.motion("enemy_impact/"+family_name,phase)
+	phase=float(frame.drift)
 	var tint: Color = palette(family_name).attack
 	tint.a = 1.0-phase
 	var side: Vector2 = direction.orthogonal()
@@ -157,6 +160,8 @@ static func draw_impact(c: CanvasItem, position: Vector2, family_name: String, d
 			FX.ribbon(c,center,6.0+phase*6.0,direction.angle()-1.0,direction.angle()+.45,3.0*(1.0-phase),tint)
 
 static func draw_ground_charge(c: CanvasItem, center: Vector2, width: float, progress: float) -> void:
+	var frame: Dictionary=FX.motion("ground_charge",progress)
+	progress=float(frame.drift)
 	var colors: Dictionary=palette("stone")
 	for i: int in range(3):
 		var point:=center+Vector2((i-1)*width*.24,-1-progress*2)

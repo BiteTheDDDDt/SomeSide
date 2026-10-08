@@ -10,7 +10,7 @@ const AttackFx = preload("res://scripts/attack_fx_sprites.gd")
 const Geometry = preload("res://scripts/combat_geometry.gd")
 const CACHE_META: StringName = &"someside_projectile_atlas"
 const CACHE_MAX_BYTES: int = 4 * 1024 * 1024
-const ORB_FRAMES: int = 16
+const ORB_FRAMES: int = 24
 const INK: Color = Color("424e55")
 const CORE: Color = Color("f4f7df")
 const HOT: Color = Color("ffb180")
@@ -69,20 +69,22 @@ static func _taper(c: Node2D, tail: float, width: float, tint: Color) -> void:
 	c.draw_line(Vector2(-tail*0.28,0),Vector2.ZERO,CORE,1.0,true)
 
 static func _friendly(c: Node2D, kind: String, radius: float, strength: float, tail: float, clock: float, id: float) -> void:
+	var flight: Dictionary=flight_pose(kind,fposmod(clock*(1.6 if kind=="boomerang" else 2.0)+id*.13,1.0))
+	tail*=float(flight.tail)
 	var tint: Color = Color("8ff0d8")
 	if kind=="pellet": tint=Color("edcc97")
 	elif kind=="rail": tint=Color("a9daff")
 	elif kind=="lance": tint=Color("ffe0a0")
 	elif kind=="storm": tint=Color("a1eaff")
 	if kind=="grenade":
-		var spin: float = clock*6.0
+		var spin: float = float(flight.spin)
 		c.draw_circle(Vector2.ZERO,radius,Color("7da6b7"),true,-1,true)
-		FX.ribbon(c,Vector2.ZERO,radius*.68,-2.6,-.4,radius*.6,Color("c5ded8"))
+		FX.ribbon(c,Vector2.ZERO,radius*.68,-2.6+spin,-.4+spin,radius*.6,Color("c5ded8"))
 		FX.shard(c,Vector2(radius*.4,0),0,radius*.55,radius*.3,CORE)
 		return
 	if kind=="boomerang":
 		_taper(c,minf(tail,32.0),2.0,tint)
-		var spin: float = clock*15.0+id
+		var spin: float = float(flight.spin)
 		var texture: Texture2D=WeaponArt._texture("boomerang",WeaponArt._body("boomerang"))
 		var corners:=PackedVector2Array()
 		var rect: Rect2=WeaponArt.BOUNDS
@@ -93,7 +95,7 @@ static func _friendly(c: Node2D, kind: String, radius: float, strength: float, t
 	if kind=="storm":
 		_taper(c,minf(tail,38.0),3.0,tint)
 		var points: Array=[]
-		for i: int in range(8): points.append(Vector2.from_angle(i*PI*0.25+clock*2.0)*(radius if i%2==0 else radius*0.46))
+		for i: int in range(8): points.append(Vector2.from_angle(i*PI*0.25+float(flight.spin))*(radius if i%2==0 else radius*0.46))
 		_poly(c,points,Color("a5dcf4"),1.0)
 		_poly(c,[Vector2(-3,0),Vector2(0,-5),Vector2(5,0),Vector2(0,5)],CORE)
 		for side: int in [-1,1]:
@@ -118,6 +120,10 @@ static func _friendly(c: Node2D, kind: String, radius: float, strength: float, t
 	elif strength>=1.7:
 		c.draw_line(Vector2(-length*0.8,-3),Vector2(-length*0.2,-2),Color(tint,0.45),0.8,true)
 
+static func flight_pose(kind: String,p: float) -> Dictionary:
+	return FX.Clips.sample("projectile/"+kind,p,func(t: float):
+		return {"spin":TAU*t,"tail":1.0+.035*sin(TAU*t),"width":1.0+.045*sin(TAU*t-.6)},true)
+
 static func enemy_sample(kind: String, radius: float, age: float) -> Dictionary:
 	var r: float = maxf(4.0,radius)
 	var organic: bool = kind in ["spit","spore","acid","poison","boss_spore_orb","boss_orb"]
@@ -127,7 +133,8 @@ static func enemy_sample(kind: String, radius: float, age: float) -> Dictionary:
 
 static func _enemy(c: Node2D, kind: String, radius: float, clock: float) -> void:
 	var organic: bool = kind in ["spit","spore","acid","poison","boss_spore_orb","boss_orb"]
-	Geometry.draw_ammunition(c,Vector2.ZERO,Vector2.RIGHT,maxf(4.0,radius),organic)
+	var flight: Dictionary=flight_pose(kind,fposmod(clock*2,1.0))
+	Geometry.draw_ammunition(c,Vector2.ZERO,Vector2.RIGHT,maxf(4.0,radius)*float(flight.width),organic,false,fposmod(clock*2,1.0))
 
 static func _enemy_vector(c: Node2D, kind: String, radius: float, clock: float) -> void:
 	var r: float = maxf(4.0,radius)

@@ -120,7 +120,7 @@ def main() -> None:
                 check(frame.locator('#status').is_hidden(), 'Loading screen dismisses after startup')
                 report['renderer'] = frame.evaluate("""() => {const gl=document.querySelector('canvas').getContext('webgl2'); const ext=gl.getExtension('WEBGL_debug_renderer_info'); return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)}""")
                 shot('menu-en')
-                page.mouse.click(427, 462)
+                page.mouse.click(427, 376)
                 page.wait_for_timeout(400)
                 page.mouse.click(312, 194)  # Chinese language; the setting must survive reload.
                 page.wait_for_timeout(500)
@@ -146,9 +146,15 @@ def main() -> None:
                 check(frame.evaluate(READ_PROFILE) == profile, 'Saved preferences survive page reload')
                 check(not frame.evaluate('!!document.fullscreenElement'), 'Reload does not automatically enter fullscreen')
                 shot('menu-zh-restored')
-                page.mouse.click(300, 238)
+                page.mouse.click(300, 211)
+                page.wait_for_timeout(500)
+                check(not any('SOMESIDE_RUN_STARTED' in row['text'] for row in report['logs']), 'Single Player opens class choice before starting gameplay')
+                shot('choose-class')
+                page.mouse.click(446, 577)  # Choose Vanguard for this run.
+                page.wait_for_timeout(300)
+                page.mouse.click(228, 649)  # Confirm class and start.
                 page.wait_for_timeout(800)
-                check(any('SOMESIDE_RUN_STARTED' in row['text'] for row in report['logs']), 'Real Single Player click starts a run')
+                check(any('SOMESIDE_RUN_STARTED' in row['text'] for row in report['logs']), 'Real class confirmation starts a run')
                 page.keyboard.down('d')
                 page.mouse.move(900, 390)
                 page.mouse.down()
@@ -203,6 +209,8 @@ def main() -> None:
             check(sim['language'] == 'zh', 'First launch detects the browser Chinese locale')
             check(sim['pixel_actors']['actors'] == 14, 'All 14 pixel actor definitions load')
             check(sim.get('attack_fx', {}).get('textures') == 8 and sim['attack_fx']['families'] == 18 and sim['attack_fx']['bytes'] <= sim['attack_fx']['max_bytes'], 'All 18 attack families share 8 sheets within the texture budget')
+            motion = sim['motion_clips_24']
+            check(motion['clips'] > 5 and motion['frames'] == motion['clips'] * 24 and motion['clips'] <= motion['max_clips'], 'Live browser animation clips contain 24 reusable poses each')
             check(not report['errors'], 'No browser, network or Godot runtime errors')
             browser.close()
     finally:

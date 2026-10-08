@@ -2,6 +2,7 @@ class_name SidePlayerBodyMotion
 extends RefCounted
 
 ## Canvas-owned visual history; never writes physics or replicated state.
+const Clips=preload("res://scripts/motion_clips_24.gd")
 const META: StringName = &"someside_body_motion"
 const LAND_TIME: float = .22
 const MAX_TRACKS: int = 64
@@ -55,6 +56,25 @@ static func sample(canvas: CanvasItem, player: Dictionary, clock: float, gait: D
 			phase="compress" if elapsed<.065 else "settle"
 		weights[6]=landing
 		weights[0]=1.0-landing
+	var clip_name: String="idle"
+	var clip_progress: float=fposmod(clock*.65,1.0)
+	if bool(player.get("dead",false)):
+		clip_name="death"; clip_progress=clampf(float(player.get("dead_timer",0))/.3,0,1)
+	elif dash:
+		clip_name="dash"; clip_progress=clampf(1-float(player.get("dash_timer",0))/.18,0,1)
+	elif not grounded:
+		clip_name=phase
+		match phase:
+			"takeoff": clip_progress=clampf((clock-launch_at)/.11,0,1)
+			"rise": clip_progress=clampf(1-absf(velocity.y)/500,0,1)
+			"apex": clip_progress=clampf((velocity.y+105)/210,0,1)
+			"fall": clip_progress=clampf(velocity.y/700,0,1)
+	elif clock-land_at>=0 and clock-land_at<LAND_TIME:
+		clip_name="land"; clip_progress=(clock-land_at)/LAND_TIME
+	elif bool(gait.get("active",false)):
+		clip_name="stop" if float(gait.get("settle",0))>0 else ("backpedal" if bool(gait.get("backwards",false)) else "run")
+		clip_progress=float(gait.get("settle",0))/0.12 if clip_name=="stop" else float(gait.get("phase",0))
+	var clip: Dictionary=Clips.player(clip_name,clip_progress)
 	var offset := Vector2.ZERO
 	var angle: float = 0.0
 	if bool(gait.get("active",false)):
@@ -65,10 +85,13 @@ static func sample(canvas: CanvasItem, player: Dictionary, clock: float, gait: D
 	if bool(action.get("active",false)):
 		angle+=float(action.get("body_angle",0))
 		offset+=Vector2(action.get("body_shift",Vector2.ZERO))
+	if not bool(gait.get("active",false)):
+		offset+=Vector2(clip.shift)*(strength if clip_name=="land" else 1.0)
+		angle+=float(clip.angle)
 	angle=clampf(angle,-.19,.19)
 	# Everything is recomputed from bounded poses, never cumulatively added.
 	offset=offset.clamp(Vector2(-3,-2),Vector2(3,2))
-	var result: Dictionary = {"weights":weights,"phase":phase,"offset":offset,"angle":angle,"landing":landing,"strength":strength,"gait":gait}
+	var result: Dictionary = {"weights":weights,"phase":phase,"offset":offset,"angle":angle,"landing":landing,"strength":strength,"gait":gait,"clip":clip_name,"frame":clip.frame,"frame_count":24,"cloth":float(clip.cloth)}
 	if tracks.size()>=MAX_TRACKS and not tracks.has(key): tracks.erase(tracks.keys()[0])
 	tracks[key]={"clock":clock,"pos":pos,"grounded":grounded,"vy":velocity.y,"land_at":land_at,"launch_at":launch_at,"strength":strength,"pose":result}
 	canvas.set_meta(META,tracks)

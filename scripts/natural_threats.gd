@@ -68,6 +68,8 @@ static func draw_blink(canvas: CanvasItem, source: Vector2, destination: Vector2
 	SelectedFX.draw_blink(canvas,destination,progress*.85)
 
 static func draw_mending(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float, detail: bool) -> void:
+	var motion: Dictionary=Geometry.FX.motion("mending",progress)
+	progress=float(motion.progress)
 	var direction: Vector2 = (destination - source).normalized()
 	# Sparse, curved motes travel to the actual recipient. They have no tether,
 	# evenly-spaced dots, endpoint reticle, or extra target selection on clients.

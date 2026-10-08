@@ -423,6 +423,8 @@ const TEXTS: Dictionary = {
 	"探索、战斗，与朋友一起抵达另一边。": "Explore, fight, and reach the other side together.",
 	"当前角色：%s": "Character: %s",
 	"单人游戏": "Single Player",
+	"选择职业": "Choose Class",
+	"选择本次出发的职业，然后开始游戏。": "Choose a class for this run, then set out.",
 	"选择角色": "Choose Character",
 	"选择初始武器与技能；遗物会改变你的战斗方式。": "Choose your starting weapon and skill. Relics shape your build.",
 	"输入朋友的房间地址。房主需要先创建房间。": "Enter your friend's address after they create a room.",

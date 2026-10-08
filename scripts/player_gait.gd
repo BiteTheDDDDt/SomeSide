@@ -3,6 +3,7 @@ extends RefCounted
 
 ## Presentation-only two-link legs. A stride is world travel, not a sprite clock.
 ## Only these two chains draw below the waist during locomotion.
+const Clips=preload("res://scripts/motion_clips_24.gd")
 const META: StringName = &"someside_player_gait"
 const MAX_TRACKS: int = 64
 const SOLE_Y: float = 21.0
@@ -31,9 +32,10 @@ static func _foot(phase: float, description: Dictionary, direction: float) -> Di
 	# Begin/end the swing traveling backward relative to the body. Bounding the
 	# tangent keeps very high movement bonuses within a human leg's reach.
 	var tangent: float = -minf(72.0,float(description.stride)*(1.0-contact))
-	var x: float = (2*t*t*t-3*t*t+1)*(-reach) + (t*t*t-2*t*t+t)*tangent + (-2*t*t*t+3*t*t)*reach + (t*t*t-t*t)*tangent
-	var lift: float = sin(PI*t)*float(description.lift)
-	return {"offset":Vector2(direction*x,SOLE_Y-3.0-lift),"planted":false,"angle":-0.3*sin(TAU*t)}
+	var frame: Dictionary=Clips.swing(t)
+	var x: float = float(frame.h00)*(-reach)+float(frame.h10)*tangent+float(frame.h01)*reach+float(frame.h11)*tangent
+	var lift: float = float(frame.lift)*float(description.lift)
+	return {"offset":Vector2(direction*x,SOLE_Y-3.0-lift),"planted":false,"angle":float(frame.angle)}
 
 static func knee(hip: Vector2, ankle: Vector2) -> Vector2:
 	var delta: Vector2 = ankle-hip
@@ -127,7 +129,8 @@ static func sample(canvas: CanvasItem, state: Dictionary, clock: float, animatio
 		foot["world"] = target
 		foot["phase"] = leg_phase
 		legs.append(foot)
-	var pose: Dictionary = {"active":true,"phase":phase,"legs":legs,"backwards":backwards,"profile":description,"settle":settle,"hip_shift":Vector2(sin(TAU*phase)*0.45,-absf(sin(TAU*phase))*.65+(0.6 if backwards else 0.0))*(1.0-smoothstep(0,SETTLE_TIME,settle)),"torso_angle":(-sin(TAU*phase)*.024+clampf(velocity.x*facing/240.0,-1,1)*.025)*(1.0-smoothstep(0,SETTLE_TIME,settle))}
+	var cycle: Dictionary=Clips.player("backpedal" if backwards else "run",phase)
+	var pose: Dictionary = {"active":true,"phase":phase,"legs":legs,"backwards":backwards,"profile":description,"settle":settle,"frame":cycle.frame,"frame_count":24,"hip_shift":Vector2(cycle.shift)*(1.0-smoothstep(0,SETTLE_TIME,settle)),"torso_angle":(float(cycle.angle)+clampf(velocity.x*facing/240.0,-1,1)*.025)*(1.0-smoothstep(0,SETTLE_TIME,settle)),"cloth":float(cycle.cloth)}
 	track = {"clock":clock,"pos":position_value,"phase":phase,"direction":direction,"legs":legs,"pose":pose,"settle":settle,"turn":turn}
 	if cache.size() >= MAX_TRACKS and not cache.has(key): cache.erase(cache.keys()[0])
 	cache[key] = track

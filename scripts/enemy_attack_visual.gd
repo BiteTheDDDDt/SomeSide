@@ -68,13 +68,14 @@ static func beam_sample(hazard: Dictionary, fx_scale: float = 1.0, reduced_motio
 		"detail":not reduced_motion and fx_scale>=.6}
 
 static func draw_source(canvas: CanvasItem, origin: Vector2, direction: Vector2, progress: float, detail: bool, active: bool = false, release: float = 0.0) -> void:
+	var frame: Dictionary=FX.motion("laser_source",release if active else progress)
 	var phase: float = clampf(progress,0,1)
 	var scale_value: float = Envelope.sample((1.0-release)*BEAM_LIFETIME).y if active else .3+.7*phase
 	if scale_value<.015: return
 	var across: Vector2 = direction.orthogonal()
 	# Nested solid facets sit inside the actual eye. Separate curved jaws
 	# close into its aperture, instead of a floating star or target reticle.
-	Geometry.diamond(canvas,origin,direction,5.5*scale_value,4.0*scale_value,Color("b1c6cd"),.8)
+	Geometry.diamond(canvas,origin,direction,5.5*scale_value,4.0*scale_value*(.98+float(frame.pulse)*.02),Color("b1c6cd"),.8)
 	Geometry.diamond(canvas,origin-direction, direction,3.2*scale_value,2.0*scale_value,Geometry.CORE)
 	if not active and detail:
 		for side: float in [-1.0,1.0]:
@@ -121,6 +122,8 @@ static func draw_lunge(canvas: CanvasItem, enemy: Dictionary, center: Vector2) -
 	var kind: String=str(enemy.get("attack_kind",""))
 	var duration: float=.35 if kind=="pounce" else (.72 if kind=="stone_charge" else .58)
 	var phase: float=clampf(1.0-remaining/duration,0,1)
+	var frame: Dictionary=FX.motion("lunge/"+kind,phase)
+	phase=float(frame.progress)
 	var direction: Vector2=Pose.normalized_aim(enemy.get("attack_dir",Vector2.RIGHT))
 	var radius: float=float(enemy.get("radius",19.0))
 	if kind=="pounce":
@@ -158,9 +161,10 @@ static func draw_beam(canvas: CanvasItem, start: Vector2, finish: Vector2, sampl
 	if bool(sample.material_visible) and envelope.y>.005 and envelope.x>.001:
 		var end: Vector2=start.lerp(finish,envelope.x)
 		var width: float=float(sample.radius)*envelope.y
+		var material: Dictionary=FX.motion("laser_release",float(sample.release))
 		# The same temporal envelope controls the actual collider. The beam
 		# shoots out, holds, then contracts to a hairline before disappearing.
 		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width),start,end,Color("ce8987"),.08)
-		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width*.57),start,end,Color("e9bfaf"),.15)
-		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width*.16),start,end,Geometry.CORE,.27)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width*.57*clampf(float(material.push),.75,1.05)),start,end,Color("e9bfaf"),.15)
+		Geometry.draw_beam_band(canvas,warning_capsule(start,end,width*.16*(.9+.1*float(material.pulse))),start,end,Geometry.CORE,.27)
 	draw_source(canvas,start,direction,1.0 if bool(sample.active) else float(sample.progress),bool(sample.detail),bool(sample.active),float(sample.release))

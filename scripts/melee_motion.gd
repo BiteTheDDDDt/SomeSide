@@ -2,9 +2,11 @@ class_name SideMeleeMotion
 extends RefCounted
 
 ## Shared deterministic timeline. The drawing pose never owns damage or input.
+const Clips=preload("res://scripts/motion_clips_24.gd")
 const WINDUP_END: float = 0.22
 const IMPACT: float = 0.40
 const SWING_END: float = 0.58
+static var SAMPLE_TIMES: PackedFloat64Array=Clips.times_at([WINDUP_END,IMPACT,SWING_END])
 
 static func duration(interval: float) -> float:
 	return clampf(interval * 0.8 if is_finite(interval) else 0.36, 0.04, 0.36)
@@ -13,6 +15,15 @@ static func impact_time(length: float) -> float:
 	return length * IMPACT
 
 static func sample(elapsed: float, length: float, aim: Vector2) -> Dictionary:
+	if not is_finite(elapsed) or not is_finite(length) or length<=0 or elapsed<0 or elapsed>=length: return {"active":false}
+	var t: float=elapsed/length
+	var frame: Dictionary=Clips.sample("weapon/melee",t,func(p: float): return _pose(minf(p,.999999),1.0,Vector2.RIGHT),false,SAMPLE_TIMES)
+	var exact: Dictionary=_pose(elapsed,length,aim)
+	frame.angle=Vector2(exact.aim).angle()+float(frame.angle)*float(exact.facing)
+	for key: String in ["aim","facing","phase","progress","elapsed","duration","impact","trail","active"]: frame[key]=exact[key]
+	return frame
+
+static func _pose(elapsed: float, length: float, aim: Vector2) -> Dictionary:
 	if not is_finite(elapsed) or not is_finite(length) or length <= 0.0 or elapsed < 0.0 or elapsed >= length:
 		return {"active": false}
 	var direction: Vector2 = aim.normalized() if aim.is_finite() and aim.length_squared() > 0.0001 else Vector2.RIGHT

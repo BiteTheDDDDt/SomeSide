@@ -3,6 +3,7 @@ extends RefCounted
 
 ## Presentation only. Ranged fire still happens immediately in Simulation;
 ## these profiles describe follow-through and recovery in local weapon space.
+const Clips=preload("res://scripts/motion_clips_24.gd")
 const WEAPONS: Array[String] = ["pulse_rifle", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance"]
 const CAPS: Dictionary = {"pulse_rifle":0.17, "scattergun":0.52, "railgun":0.64,
 	"flamethrower":0.14, "boomerang":0.55, "storm_staff":0.42, "sun_lance":0.56}
@@ -15,7 +16,7 @@ static func duration(weapon: String, interval: float) -> float:
 
 static func rest() -> Dictionary:
 	return {"active":false, "phase":"ready", "offset":Vector2.ZERO, "angle_offset":0.0,
-		"body_angle":0.0, "grip_distance":7.0, "mechanism":0.0, "energy":0.0, "weapon_alpha":1.0}
+		"body_angle":0.0, "grip_distance":7.0, "mechanism":0.0, "energy":0.0, "weapon_alpha":1.0,"body_shift":Vector2.ZERO,"elbow_follow":0.0}
 
 static func _pulse(t: float, peak: float, end: float) -> float:
 	if t < 0.0 or t >= end:
@@ -25,6 +26,15 @@ static func _pulse(t: float, peak: float, end: float) -> float:
 	return 1.0 - smoothstep(peak, end, t)
 
 static func sample(weapon: String, elapsed: float, length: float) -> Dictionary:
+	if not CAPS.has(weapon) or not is_finite(elapsed) or not is_finite(length) or length<=0 or elapsed<0 or elapsed>=length: return rest()
+	var result: Dictionary=Clips.sample("weapon/"+weapon,elapsed/length,func(t: float): return _pose(weapon,t))
+	result.phase=_pose(weapon,elapsed/length).phase
+	result.active=true
+	return result
+
+static func _pose(weapon: String,progress: float) -> Dictionary:
+	var elapsed: float=progress
+	var length: float=1.0
 	var pose: Dictionary = rest()
 	if not CAPS.has(weapon) or not is_finite(elapsed) or not is_finite(length) or length <= 0.0 or elapsed < 0.0 or elapsed >= length:
 		return pose

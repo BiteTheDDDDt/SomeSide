@@ -34,8 +34,11 @@ func _run() -> void:
 	await _layout()
 	_check(str(game.get("screen")) == "menu", "Main scene opens the title menu")
 	_check_page_bounds("menu")
-	await _press("选择角色")
-	_check(str(game.get("screen")) == "characters", "Character button opens character selection")
+	var standalone: bool=false
+	for button in _find_type(game.get("ui"), "Button"): standalone = standalone or button.text == "选择角色"
+	_check(not standalone, "Title menu has no standalone character settings entry")
+	await _press("单人游戏")
+	_check(str(game.get("screen")) == "characters", "Single player opens the pre-run class selection")
 	_check_page_bounds("characters")
 	var portraits: Array = _find_type(game.get("ui"), "TextureRect")
 	_check(portraits.size() == 2 and portraits[0].texture != null and portraits[1].texture != null, "Character selection shows both actual packaged character portraits")
@@ -43,6 +46,21 @@ func _run() -> void:
 	_check(str(Dictionary(game.get("profile")).character) == "vanguard", "Selecting the second character changes the local profile")
 	await _press("返回", true)
 	_check(str(game.get("screen")) == "menu", "Character selection returns to the menu")
+	game.hosting=true
+	game.local_id=1
+	game.roster=[{"id":1,"name":"Host","character":"vanguard","ready":true},{"id":2,"name":"Friend","character":"ranger","ready":false}]
+	game.call("_show_lobby")
+	await _layout()
+	_check_page_bounds("class choice in lobby")
+	await _press("游侠",true)
+	_check(str(game.roster[0].character)=="ranger" and str(game.screen)=="lobby", "Host chooses a named class directly inside the lobby")
+	_check(str(game.roster[1].character)=="ranger" and not game.roster[1].ready, "Class choice leaves the other member and readiness untouched")
+	await _press("先锋",true)
+	_check(str(game.roster[0].character)=="vanguard" and str(game.profile.character)=="vanguard", "Lobby choice updates both roster and saved local choice")
+	game.hosting=false
+	game.roster=[]
+	game.call("_show_menu")
+	await _layout()
 	await _press("操作指南")
 	_check(str(game.get("screen")) == "guide", "The operation guide opens")
 	_check_page_bounds("guide")
@@ -80,7 +98,9 @@ func _run() -> void:
 	_check_page_bounds("join")
 	await _press("返回", true)
 	await _press("单人游戏")
-	_check(str(game.get("screen")) == "playing", "Starting solo creates a playable run")
+	_check(str(game.get("screen")) == "characters", "Every new run prompts for a class")
+	await _press("开始游戏")
+	_check(str(game.get("screen")) == "playing", "Confirming the class creates a playable run")
 	var simulation = game.get("sim")
 	_check(str(simulation.state.players[1].character) == "vanguard" and str(simulation.state.players[1].name) == "UI Pilot", "The run uses the selected character and edited name")
 	_check(str(simulation.state.phase) == "playing" and not bool(game.get("paused")), "A new run is active and unpaused")
@@ -177,6 +197,8 @@ func _run() -> void:
 	game.call("_process", 1.0 / 60.0)
 	_check(int(Dictionary(game.get("profile")).runs) == 1, "Repeated result frames do not duplicate the run record")
 	await _press("再玩一次")
+	_check(str(game.get("screen")) == "characters", "Retry also chooses a class before starting")
+	await _press("开始游戏")
 	_check(str(game.get("screen")) == "playing" and str(simulation.state.phase) == "playing" and int(simulation.state.stage) == 1, "Restart creates a fresh stage-one run")
 	_check(simulation.state.players[1].items.is_empty() and int(simulation.state.kills) == 0, "Restart resets run inventory and kill counts")
 	game.call("_show_pause")

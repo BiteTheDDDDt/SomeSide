@@ -70,7 +70,7 @@ func _test_plans() -> void:
 	var enemies: Array = Entities.atlas_entries()
 	var projectiles: Array = Projectiles.atlas_entries()
 	_check(enemies.size() == 580, "The enemy atlas has a fixed finite set of 580 authored animation/state cells")
-	_check(projectiles.size() == 171, "The projectile atlas has a fixed finite set of hostile cores")
+	_check(projectiles.size() == 243, "The projectile atlas has 243 fixed hostile cores, including a full 24-frame orb cycle")
 	var enemy_plan: Dictionary = _check_plan(enemies, Entities.CACHE_MAX_BYTES, 4096, "Enemy")
 	var projectile_plan: Dictionary = _check_plan(projectiles, Projectiles.CACHE_MAX_BYTES, 1024, "Projectile")
 	_check(int(enemy_plan.bytes) + int(projectile_plan.bytes) <= 32 * 1024 * 1024, "Both complete sprite atlases stay within the 32 MiB combined color-texture budget")

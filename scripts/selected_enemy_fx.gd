@@ -3,6 +3,7 @@ extends RefCounted
 
 ## User-selected spore A / stone C. Original PNGs remain unmodified; source
 ## rectangles and fixed baseline anchors are authored metadata, not new images.
+const Clips=preload("res://scripts/motion_clips_24.gd")
 const MANIFEST: String="res://assets/fx/v0209/manifest.json"
 static var _data: Dictionary={}
 static var _textures: Dictionary={}
@@ -39,11 +40,15 @@ static func placement(family: String, index: int, origin: Vector2, radius: float
 	var base: Vector2=origin+(Vector2(0,ground_offset) if family!="blink" else Vector2.ZERO)
 	return {"region":region,"rect":Rect2(base-anchor*scale_value,region.size*scale_value),"source":Vector2(frame.source_size[0],frame.source_size[1]) if frame.has("source_size") else Vector2(data.source_size[0],data.source_size[1]),"texture":_supplement if index>=8 else _textures[family],"anchor":base}
 
-static func draw_frame(canvas: CanvasItem, family: String, index: int, origin: Vector2, radius: float, alpha: float=1.0, ground_offset: float=17.0) -> void:
+static func draw_frame(canvas: CanvasItem, family: String, index: int, origin: Vector2, radius: float, alpha: float=1.0, ground_offset: float=17.0, motion: Dictionary={}) -> void:
 	if alpha<.005: return
 	var pose: Dictionary=placement(family,index,origin,radius,ground_offset)
 	var rect: Rect2=pose.rect
-	var points:=PackedVector2Array([rect.position,Vector2(rect.end.x,rect.position.y),rect.end,Vector2(rect.position.x,rect.end.y)])
+	var anchor: Vector2=pose.anchor
+	var transform:=Transform2D(Vector2(1.0+float(motion.get("spread",0)),0),Vector2(float(motion.get("bend",0)),float(motion.get("scale_y",1))),anchor)
+	var inverse: Transform2D=transform.affine_inverse()
+	var points:=PackedVector2Array()
+	for corner: Vector2 in [rect.position,Vector2(rect.end.x,rect.position.y),rect.end,Vector2(rect.position.x,rect.end.y)]: points.append(transform*(corner-anchor))
 	if family!="blink":
 		# Authored pixels, including chips, remain inside the actual hazard.
 		var footprint:=PackedVector2Array()
@@ -53,7 +58,7 @@ static func draw_frame(canvas: CanvasItem, family: String, index: int, origin: V
 		points=intersections[0]
 	var uv:=PackedVector2Array()
 	for point: Vector2 in points:
-		uv.append((Vector2(pose.region.position)+(point-rect.position)/rect.size*Vector2(pose.region.size))/Vector2(pose.source))
+		uv.append((Vector2(pose.region.position)+((inverse*point+anchor)-rect.position)/rect.size*Vector2(pose.region.size))/Vector2(pose.source))
 	canvas.draw_polygon(points,PackedColorArray([Color(1,1,1,alpha)]),uv,pose.texture)
 
 static func timeline(active: bool, progress: float, ending: bool=false) -> Dictionary:
@@ -67,8 +72,8 @@ static func timeline(active: bool, progress: float, ending: bool=false) -> Dicti
 	return {"index":frames[index],"next":frames[mini(index+1,frames.size()-1)],"blend":smoothstep(.80,1.0,local) if index<frames.size()-1 else 0.0}
 
 static func _draw_timeline(canvas: CanvasItem,family: String,origin: Vector2,radius: float,sample: Dictionary,alpha: float=1.0) -> void:
-	draw_frame(canvas,family,int(sample.index),origin,radius,alpha*(1.0-float(sample.blend)))
-	if float(sample.blend)>.005: draw_frame(canvas,family,int(sample.next),origin,radius,alpha*float(sample.blend))
+	draw_frame(canvas,family,int(sample.index),origin,radius,alpha*(1.0-float(sample.blend)),17.0,sample.get("motion",{}))
+	if float(sample.blend)>.005: draw_frame(canvas,family,int(sample.next),origin,radius,alpha*float(sample.blend),17.0,sample.get("motion",{}))
 
 static func draw_area(canvas: CanvasItem, origin: Vector2, sample: Dictionary) -> void:
 	var family: String="spore" if str(sample.family).begins_with("spore") else "stone"
@@ -76,10 +81,14 @@ static func draw_area(canvas: CanvasItem, origin: Vector2, sample: Dictionary) -
 	var active: bool=bool(sample.active)
 	var radius: float=float(sample.radius)
 	if active: canvas.draw_circle(origin,radius,Color("8e9b5f",.12) if family=="spore" else Color("a18c72",.12),true,-1,true)
-	_draw_timeline(canvas,family,origin,radius,timeline(active,progress))
+	var material: Dictionary=timeline(active,progress)
+	material["motion"]=Clips.fx(family,"active" if active else "ready",progress)
+	_draw_timeline(canvas,family,origin,radius,material)
 
 static func draw_recovery(canvas: CanvasItem,family: String,origin: Vector2,radius: float,progress: float) -> void:
-	_draw_timeline(canvas,family,origin,radius,timeline(false,progress,true),1.0-smoothstep(.55,1,progress))
+	var material: Dictionary=timeline(false,progress,true)
+	material["motion"]=Clips.fx(family,"ending",progress)
+	_draw_timeline(canvas,family,origin,radius,material,1.0-smoothstep(.55,1,progress))
 
 static func blink_timeline(progress: float, ending: bool=false, departing: bool=false) -> Dictionary:
 	var p: float=clampf(progress,0,1)
@@ -93,19 +102,21 @@ static func blink_timeline(progress: float, ending: bool=false, departing: bool=
 
 static func draw_blink(canvas: CanvasItem, origin: Vector2, progress: float, ending: bool=false, departing: bool=false) -> void:
 	var sample: Dictionary=blink_timeline(progress,ending,departing)
-	draw_frame(canvas,"blink",int(sample.index),origin,58.0,float(sample.alpha))
+	var motion: Dictionary=Clips.fx("blink","ready" if not ending else ("depart" if departing else "arrive"),progress)
+	draw_frame(canvas,"blink",int(sample.index),origin,58.0,float(sample.alpha),17.0,motion)
 
-static func draw_seed(canvas: CanvasItem, origin: Vector2, direction: Vector2, radius: float) -> void:
+static func draw_seed(canvas: CanvasItem, origin: Vector2, direction: Vector2, radius: float,progress: float=0.0) -> void:
 	prepare()
 	var frame: Dictionary=_data.spore.frames[0]
 	var values: Array=frame.region
 	var region:=Rect2(values[0],values[1],values[2],values[3])
 	var source:=Vector2(_data.spore.source_size[0],_data.spore.source_size[1])
+	var cycle: Dictionary=Clips.sample("projectile/seed",progress,func(t: float): return {"lean":sin(TAU*t)*.025,"breadth":1.0+sin(TAU*t-.6)*.045},true)
 	var scale_value: float=radius*2.0/maxf(region.size.x,region.size.y)
 	var points:=PackedVector2Array()
 	var uv:=PackedVector2Array()
 	for corner: Vector2 in [Vector2.ZERO,Vector2(region.size.x,0),region.size,Vector2(0,region.size.y)]:
-		points.append(origin+((corner-region.size*.5)*scale_value).rotated(direction.angle()+PI*.5))
+		points.append(origin+((corner-region.size*.5)*Vector2(float(cycle.breadth),1.0)*scale_value).rotated(direction.angle()+PI*.5+float(cycle.lean)))
 		uv.append((region.position+corner)/source)
 	canvas.draw_polygon(points,PackedColorArray([Color.WHITE]),uv,_textures.spore)
 
