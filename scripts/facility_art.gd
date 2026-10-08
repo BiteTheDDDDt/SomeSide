@@ -6,7 +6,7 @@ extends RefCounted
 const Style = preload("res://scripts/art_style.gd")
 const KINDS: Array[String] = ["cache", "choice", "blood", "combat", "equipment"]
 const BOUNDS := Rect2(-32,-54,64,64)
-const MAX_TEXTURES: int = 16
+const MAX_TEXTURES: int = 22
 static var _textures: Dictionary = {}
 static var _bytes: int = 0
 
@@ -23,13 +23,14 @@ static func accent(kind: String) -> Color:
 		"equipment": return Color("8dc8ed")
 	return Color("ffc176")
 
-static func texture(kind: String, state: String="idle") -> Texture2D:
+static func texture(kind: String, state: String="idle", tier: String="small") -> Texture2D:
 	if kind not in KINDS: kind="cache"
 	if state not in ["idle","open","locked"] and not (kind=="combat" and state=="active"): state="idle"
-	var key: String=kind+":"+state
+	tier=preload("res://scripts/chest_rules.gd").tier({"tier":tier})
+	var key: String=kind+":"+state+(":"+tier if kind=="cache" else "")
 	if _textures.has(key): return _textures[key]
 	var tint: Color=Color("617a78") if state in ["open","locked"] else accent(kind)
-	var drawing: String=Style.svg(_drawing(kind,state)).replace("ACCENT","#"+tint.to_html(false))
+	var drawing: String=Style.svg(Style.cache(tier,state) if kind=="cache" else _drawing(kind,state)).replace("ACCENT","#"+tint.to_html(false))
 	var svg: String='<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="-32 -54 64 64" shape-rendering="geometricPrecision"><g stroke-linejoin="round">'+drawing+'</g></svg>'
 	var image:=Image.new()
 	if image.load_svg_from_string(svg,4.0)!=OK:

@@ -10,6 +10,7 @@ const Procs = preload("res://scripts/proc_rules.gd")
 const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const BeamEnvelope = preload("res://scripts/beam_envelope.gd")
+const ChestRules = preload("res://scripts/chest_rules.gd")
 
 ## Authoritative, scene-independent game rules. State contains only serializable
 ## values. All positions are centers; platforms are one-way from above.
@@ -1869,6 +1870,7 @@ func _interaction_record(kind: String, target: Dictionary, player: Dictionary) -
 			result["warning"] = Locale.format("将替换「%s」，旧装备会落地；换装保留未结束的冷却。", [Locale.text(str(old.get("name", "当前装备")))])
 		return result
 	var facility: String = str(target.get("type", "cache"))
+	if facility!="choice": result["warning"]=""
 	result["facility_type"] = facility
 	var price: int = int(target.get("cost", 0))
 	match facility:
@@ -1893,6 +1895,13 @@ func _interaction_record(kind: String, target: Dictionary, player: Dictionary) -
 				result["description"] = Locale.text("同组三个终端仅可购买一个。\n") + str(result["description"])
 			result["prompt"] = Locale.format("E · 支付 %d 金币", [price])
 			result["affordable"] = int(player["coins"]) >= price
+	if facility!="choice":
+		result["title"]=Locale.text(ChestRules.label(target))
+		result["item"]=""
+		result["category"]=""
+		result["description"]=Locale.text("奖励将在开启后揭晓，掉落后可查看效果并选择拾取。")
+		if facility=="cache":
+			result["description"]+= "\n"+Locale.text("高级补给箱更容易开出稀有物品。")
 	return result
 
 
@@ -2198,6 +2207,7 @@ func _build_stage(stage: int) -> void:
 		facility_counts[type] = number + 1
 		var cost: int = 25 + (stage - 1) * 8 + mini(number, 4) * 3
 		var item: String = ""
+		var cache_tier: String="small" if bool(site.get("starter",false)) else ["small","medium","small","large"][number%4]
 		match type:
 			"choice":
 				var local_group: int = int(site.get("group", 0))
@@ -2219,8 +2229,10 @@ func _build_stage(stage: int) -> void:
 				cost = 38 + stage * 6
 				item = _random_equipment()
 			_:
-				item = _random_item(false, "cache") if bool(site.get("starter", false)) else _random_loot("cache")
+				item = _random_item(false, "cache_small") if bool(site.get("starter", false)) else _random_loot("cache_"+cache_tier)
+				cost=int(round(cost*({"small":1.0,"medium":1.8,"large":3.2}[cache_tier])))
 		var chest: Dictionary = _make_chest(type, site["pos"], cost, item)
+		if type=="cache": chest["tier"]=cache_tier
 		if type == "choice":
 			chest["group"] = groups[int(site.get("group", 0))]
 		chests.append(chest)
@@ -2266,7 +2278,7 @@ func _build_stage(stage: int) -> void:
 
 func _make_chest(type: String, position: Vector2, cost: int, item: String) -> Dictionary:
 	return {"id": _id(), "pos": position, "cost": cost, "opened": false, "item": item,
-		"type": type, "group": -1, "locked": false, "status": "idle", "remaining": 0}
+		"type": type, "tier":"small", "group": -1, "locked": false, "status": "idle", "remaining": 0}
 
 func _surface_below(x: float, from_y: float) -> float:
 	var surface: float = _floor_y()
@@ -2384,6 +2396,7 @@ func _gear_candidates(category: String, respect_recent: bool) -> Array:
 
 func rarity_weights(source: String = "ambient") -> Array:
 	var stage: int = clampi(int(state.get("stage", 1)), 1, 3)
+	if source.begins_with("cache_"): return ChestRules.weights(source.trim_prefix("cache_"),stage)
 	if source in ["boss"]:
 		return [maxf(2.0, 12.0 - stage * 3.0), 35.0 - stage * 2.0, 41.0, 12.0 + stage * 5.0]
 	if source in ["trial", "combat", "equipment"]:

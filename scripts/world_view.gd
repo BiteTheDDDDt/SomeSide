@@ -1195,6 +1195,7 @@ func _draw_gate() -> void:
 		_key_hint(p + Vector2(0.0, -128.0), glow_color)
 
 
+const ChestRules = preload("res://scripts/chest_rules.gd")
 const FacilityArt = preload("res://scripts/facility_art.gd")
 const FacilityContent = preload("res://scripts/content.gd")
 
@@ -1250,7 +1251,7 @@ func facility_label_data(chest: Dictionary) -> Dictionary:
 		currency = "challenge"
 		cost_text = Locale.format("剩余 %d", [int(chest.get("remaining", 0))]) if state == "active" else Locale.text("挑战")
 		affordable = state != "active"
-	return {"name": Locale.text(str(definition.get("name", id))), "item": id, "cost_text": cost_text, "currency": currency, "state": state, "affordable": affordable}
+	return {"name": Locale.text(str(definition.get("name", id))) if kind=="choice" else Locale.text(ChestRules.label(chest)), "item": id if kind=="choice" else "", "cost_text": cost_text, "currency": currency, "state": state, "affordable": affordable}
 
 
 func _facility_label_size(chest: Dictionary) -> Vector2:
@@ -1265,7 +1266,7 @@ func facility_label_rect(p: Vector2, chest: Dictionary, kind: String) -> Rect2:
 	var size_value: Vector2 = _facility_label_size(chest)
 	var used: bool = FacilityArt.state_for(chest) in ["open","locked"]
 	var top: float = -89.0
-	if kind == "cache": top = -102.0
+	if kind == "cache": top = -({"small":22.0,"medium":30.0,"large":37.0}[ChestRules.tier(chest)]+45.0)
 	elif kind == "blood": top = -121.0
 	elif kind == "combat": top = -111.0
 	elif kind == "equipment": top = -87.0
@@ -1328,7 +1329,7 @@ func _facility_label_obstruction(rect: Rect2, p: Vector2, chest: Dictionary) -> 
 		if int(other.get("id",0))==int(chest.get("id",0)): continue
 		var relative: Vector2=Vector2(other.get("pos",Vector2.ZERO))-Vector2(chest.get("pos",Vector2.ZERO))
 		var body:=Rect2(p+relative+FacilityArt.BOUNDS.position,FacilityArt.BOUNDS.size)
-		if FacilityArt.state_for(other) not in ["open","locked"]:
+		if str(other.get("type","cache"))=="choice" and FacilityArt.state_for(other) not in ["open","locked"]:
 			body=body.merge(facility_icon_rect(p+relative,other,str(other.get("type","cache"))))
 		var intersection: Rect2=rect.intersection(body.grow(4))
 		area+=intersection.get_area()
@@ -1336,8 +1337,8 @@ func _facility_label_obstruction(rect: Rect2, p: Vector2, chest: Dictionary) -> 
 
 
 func _draw_facility(p: Vector2, chest: Dictionary, kind: String, accent: Color, depleted: bool) -> void:
-	draw_texture_rect(FacilityArt.texture(kind, FacilityArt.state_for(chest)), Rect2(p + FacilityArt.BOUNDS.position, FacilityArt.BOUNDS.size), false)
-	if not depleted:
+	draw_texture_rect(FacilityArt.texture(kind, FacilityArt.state_for(chest),ChestRules.tier(chest)), Rect2(p + FacilityArt.BOUNDS.position, FacilityArt.BOUNDS.size), false)
+	if not depleted and kind=="choice":
 		var icon_rect: Rect2 = facility_icon_rect(p, chest, kind)
 		if kind == "choice":
 			draw_line(p + Vector2(-7,-18), icon_rect.position + Vector2(2,24), Color(accent,.18),1.0,true)
@@ -1356,7 +1357,7 @@ func _draw_facility_label(p: Vector2, chest: Dictionary, kind: String) -> void:
 	var used: bool = info.state in ["open", "locked"]
 	var accent: Color = Color("617a78") if used else FacilityArt.accent(kind)
 	if not used:
-		var target: Vector2 = facility_icon_rect(p,chest,kind).get_center()
+		var target: Vector2 = facility_icon_rect(p,chest,kind).get_center() if kind=="choice" else p+Vector2(0,-30)
 		if rect.position.y > p.y:
 			draw_line(Vector2(rect.get_center().x,rect.position.y),p+Vector2(0,13),Color(accent,.22),1.0)
 		else:

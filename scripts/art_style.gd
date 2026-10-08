@@ -70,6 +70,37 @@ static func weapon(id: String) -> String:
 			result+=path("M29-5H32L30 0L32 5H29L27 0Z","d2b787")
 	return result
 
+static func cache(tier: String,state: String) -> String:
+	var w: float={"small":17.0,"medium":23.0,"large":28.0}.get(tier,17.0)
+	var h: float={"small":22.0,"medium":30.0,"large":37.0}.get(tier,22.0)
+	var result: String=path("M%f %fQ%f %f %f %fH%fQ%f %f %f %fV5L%f 9H%fL%f 5Z"%[-w,-h+6,-w,-h,-w+6,-h,w-6,w,-h,w,-h+6,w-4,-w+4,-w],"58676a")
+	result+=path("M%f %fH%fV4L%f 6H%fL%f 3Z"%[-w+3,-h+10,w-3,w-7,-w+6,-w+3],"8a8c79")
+	result+=path("M%f %fQ%f %f %f %fH%fQ%f %f %f %fZ"%[-w+2,-h+9,-w+2,-h+2,-w+7,-h+2,w-7,w-2,-h+2,w-2,-h+9],"c5c7b0")
+	# The lid seam, inset front panel and lower rail carry volume at 1x.
+	result+='<path d="M%f %fH%fM%f 4H%f" fill="none" stroke="#657576" stroke-width="2"/>'%[-w+2,-h+10,w-2,-w+5,w-5]
+	result+=path("M%f %fH%fV1H%fZ"%[-w+7,-h+14,w-7,-w+7],"778374")
+	for side: float in [-1.0,1.0]:
+		var x: float=side*(w-5)
+		result+='<path d="M%f %fV4" stroke="#b6bba5" stroke-width="3"/>'%[x,-h+11]
+		for y: float in [-h+13,2.0]: result+='<circle cx="%f" cy="%f" r=".9" fill="#505f63"/>'%[x,y]
+	result+=path("M-4 %fH4V-1L0 2L-4-1Z"%(-h+7),"56666a")
+	result+='<path d="M-2 %fH2V-3H-2Z" fill="ACCENT"/>'%(-h+10)
+	# Distinct physical hardware for each grade, rather than scaling one box.
+	if tier!="small":
+		for side: float in [-1.0,1.0]:
+			var x: float=side*w*.50
+			result+='<path d="M%f %fV%fM%f %fV%f" stroke="#7c8f90" stroke-width="3"/>'%[x,-h+3,-h+8,x,-h+12,-2]
+		result+='<path d="M-7 %fV%fQ0 %f 7 %fV%f" fill="none" stroke="#6b7b7c" stroke-width="2"/>'%[-h+4,-h+1,-h-3,-h+1,-h+4]
+	if tier=="large":
+		result+='<path d="M-12 -8L-8-12L-4-8M4-8L8-12L12-8" fill="none" stroke="#c7b488" stroke-width="1.5"/>'
+		result+=path("M-26-8L-23-5V4H-26ZM26-8L23-5V4H26Z","b6bca9")
+	if state=="open":
+		result+=path("M%f %fL%f %fQ0 %f %f %fL%f %fZ"%[-w+2,-h+9,-w+3,-h-9,-h-17,w-3,-h-9,w-2,-h+9],"849795")
+		result+=path("M%f %fQ0 %f %f %fV%fH%fZ"%[-w+7,-h-6,-h-12,w-7,-h-6,-h+2,-w+7],"56676b")
+		result+=path("M%f %fH%fV%fH%fZ"%[-w+3,-h+7,w-3,-h+12,-w+3],"56676b")
+	elif state=="locked": result+='<path d="M-3-6V-10Q0-14 3-10V-6M-4-6H4V0H-4Z" fill="#8a9892" stroke="#c6cbb4" stroke-width="1.5"/>'
+	return result
+
 static func facility(kind: String,state: String) -> String:
 	var dark: String="424e55"
 	var mid: String="829796"

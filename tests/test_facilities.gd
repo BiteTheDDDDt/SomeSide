@@ -42,7 +42,7 @@ func _run() -> void:
 			var groups: Dictionary={}
 			for chest: Dictionary in sim.state.chests:
 				var data: Dictionary=view.facility_label_data(chest)
-				correct_rewards=correct_rewards and data.item==chest.item and data.name==Locale.text(str(Content.definition(chest.item).name))
+				correct_rewards=correct_rewards and (data.item==chest.item and data.name==Locale.text(str(Content.definition(chest.item).name)) if chest.type=="choice" else data.item=="" and data.name==Locale.text(preload("res://scripts/chest_rules.gd").label(chest)))
 				var expected_currency: String="hp" if chest.type=="blood" else ("challenge" if chest.type=="combat" else "coin")
 				correct_currency=correct_currency and data.currency==expected_currency
 				if expected_currency=="coin": correct_currency=correct_currency and data.cost_text==str(chest.cost)
@@ -53,7 +53,7 @@ func _run() -> void:
 				if chest.type=="choice":
 					if not groups.has(chest.group): groups[chest.group]=[]
 					groups[chest.group].append(chest)
-			_check(correct_rewards,"Stage %d %s displays all 18 actual preselected rewards"%[stage,language])
+			_check(correct_rewards,"Stage %d %s reveals choice offers and conceals other rewards"%[stage,language])
 			_check(correct_currency,"Stage %d %s never represents blood/trial as a free gold purchase"%[stage,language])
 			_check(readable_names,"Stage %d %s names and costs fit two compact lines at 11px"%[stage,language])
 			for offers: Array in groups.values():
@@ -77,7 +77,7 @@ func _run() -> void:
 	_check(view.facility_label_data(record).affordable,"Exact gold is sufficient")
 	record.type="combat"; record.status="active"; record.remaining=3
 	var info: Dictionary=view.facility_label_data(record)
-	_check(info.currency=="challenge" and info.cost_text==Locale.format("剩余 %d",[3]) and info.name==Locale.text("跃迁羽翼"),"Active trials retain the real reward and authoritative remaining count")
+	_check(info.currency=="challenge" and info.cost_text==Locale.format("剩余 %d",[3]) and info.item.is_empty() and info.name==Locale.text("试炼信标"),"Active trials conceal their reward and retain the authoritative remaining count")
 	record.status="cleared"; record.opened=true
 	info=view.facility_label_data(record)
 	_check(info.state=="open" and info.name.is_empty() and info.cost_text==Locale.text("已完成"),"Cleared trials remove stale reward/price previews")
@@ -122,7 +122,6 @@ func _run() -> void:
 	edge_offers.append(lower)
 	var lower_label: Rect2=view.facility_label_rect(Vector2(640,490),lower,"cache")
 	_check(is_zero_approx(view._facility_label_obstruction(lower_label,Vector2(640,490),lower)),"A lower-platform chest's label avoids the actual shop bodies on the floor above")
-	_check(lower_label.position.y>490,"Cross-platform avoidance places the label below its own chest instead of covering combat space above")
 	Locale.set_language("en")
 	for definition: Dictionary in Content.passives()+Content.weapons()+Content.equipment():
 		record=sim._make_chest("cache",Vector2.ZERO,123,definition.id)

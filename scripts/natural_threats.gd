@@ -40,6 +40,14 @@ static func area_family(kind: String, active: bool) -> String:
 	var material: String = "spore" if kind in ["spore_mortar", "boss_spore", "spore_bloom", "spore_pool"] else ("stone" if kind == "stone_spike" else "earth")
 	return material + ("_hit" if active else "_ready")
 
+static func warning_points(position: Vector2, radius: float, progress: float) -> PackedVector2Array:
+	var points:=PackedVector2Array()
+	var amount: float=clampf(progress,0.0,1.0)
+	if amount<=0.0: return points
+	var steps: int=maxi(2,ceili(amount*64))
+	for index: int in range(steps+1): points.append(position+Vector2.from_angle(-PI*.5+amount*TAU*index/steps)*radius)
+	return points
+
 static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary) -> void:
 	var tint: Color = sample.color
 	tint.a = float(sample.material_alpha)
@@ -48,9 +56,10 @@ static func draw_area(canvas: CanvasItem, position: Vector2, sample: Dictionary)
 		# A dark-backed red dashed boundary gives the player useful
 		# space/time information even when the terrain sprite blends in.
 		var radius: float = float(sample.warning_radius)
-		var boundary := PackedVector2Array()
-		for index: int in range(64): boundary.append(position+Vector2.from_angle(index*TAU/64.0)*radius)
-		Geometry.draw_warning(canvas,boundary,float(sample.warning_alpha))
+		var progress: float=clampf(float(sample.warning_progress),0.0,1.0)
+		if progress>0.0:
+			var boundary: PackedVector2Array=warning_points(position,radius,progress)
+			Geometry.draw_warning(canvas,boundary,float(sample.warning_alpha),false)
 	Geometry.draw_area_material(canvas,position,sample)
 
 static func draw_blink(canvas: CanvasItem, source: Vector2, destination: Vector2, progress: float) -> void:

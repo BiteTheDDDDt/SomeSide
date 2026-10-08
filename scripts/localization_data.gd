@@ -2,6 +2,11 @@ extends RefCounted
 
 ## Chinese source text is a stable display key, never a replacement pattern.
 const TEXTS: Dictionary = {
+	"小型补给箱":"Small Cache",
+	"中型补给箱":"Medium Cache",
+	"大型补给箱":"Large Cache",
+	"奖励将在开启后揭晓，掉落后可查看效果并选择拾取。":"The reward is revealed on opening. Inspect the drop before choosing to pick it up.",
+	"高级补给箱更容易开出稀有物品。":"Higher-tier caches have better odds of rare loot.",
 	"应急装甲": "Reactive Plating",
 	"追猎协议": "Pursuit Protocol",
 	"蜂群弹舱": "Swarm Pod",

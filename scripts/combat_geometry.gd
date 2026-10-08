@@ -120,12 +120,12 @@ static func draw_ammunition(c: CanvasItem, origin: Vector2, direction: Vector2, 
 		for i: int in range(32):
 			var angle: float=TAU*i/32.0
 			var x: float=cos(angle)
-			var y: float=sin(angle)*( .72+.24*(x+1.0)*.5 )
+			var y: float=sin(angle)*(.62+.35*(x+1.0)*.5)
 			shell.append(origin+direction*x*radius+across*y*radius)
 			inset.append(origin+direction*(x*.68+.12)*radius+across*(y*.60-.18)*radius)
-		polygon(c,shell,Color("717951"),0)
+		polygon(c,shell,Color("788653"),0)
 		polygon(c,inset,colors.base,0)
-		FX.ribbon(c,origin-across*radius*.13,radius*.64,direction.angle()-2.5,direction.angle()-.3,radius*.25,colors.light)
+		FX.ribbon(c,origin-across*radius*.13,radius*.64,direction.angle()-2.35,direction.angle()-.6,radius*.27,colors.light)
 		if not preparing:
 			for i: int in range(2):
 				var point: Vector2=origin-direction*radius*(1.25+i*.65)+across*radius*(.18 if i==0 else -.23)
@@ -204,23 +204,31 @@ static func draw_area_material(c: CanvasItem, center: Vector2, sample: Dictionar
 	# cloud and no warning/dashed perimeter is rendered during damage.
 	var disk:=PackedVector2Array()
 	for i: int in range(48): disk.append(center+Vector2.from_angle(i*TAU/48.0)*radius)
-	c.draw_colored_polygon(disk,Color(colors.attack,.22))
+	c.draw_colored_polygon(disk,Color(colors.base,.18) if organic else Color(colors.attack,.22))
 	if organic:
-		# Broad asymmetric acid lobes and rising seeds, with the underlying
-		# full footprint retained. No concentric emblems or orbiting rings.
-		for i: int in range(4):
-			var angle: float=-2.5+i*1.7
-			var offset: Vector2=Vector2.from_angle(angle)*radius*(.34+.05*sin(phase*PI))
-			var lobe:=PackedVector2Array()
-			var extent: float=radius*(.35 if i%2==0 else .28)
-			for j: int in range(28):
-				var a: float=TAU*j/28.0
-				lobe.append(center+offset+Vector2(cos(a),sin(a)*.76)*extent*(1.0+.08*sin(a*3+i)))
-			polygon(c,lobe,colors.shade,0)
-			FX.ribbon(c,center+offset,extent*.7,angle-1.1,angle+.65,extent*.35,colors.base)
-			FX.ribbon(c,center+offset,extent*.65,angle-.95,angle-.05,extent*.13,colors.light)
-			var point: Vector2=center+offset*.95+Vector2(0,-radius*.12*phase)
-			draw_ammunition(c,point,Vector2.from_angle(angle),maxf(3,radius*.065),true)
+		# Two split fleshy pod walls flare outward as one burst, rather than
+		# four isolated circular decorations. Stretched seeds carry its motion.
+		var open: float=smoothstep(0.0,.55,phase)
+		for side: float in [-1.0,1.0]:
+			var petal:=PackedVector2Array()
+			var shift: Vector2=Vector2(side*radius*(.10+.15*open),-radius*.05)
+			for j: int in range(25):
+				var t: float=j/24.0
+				petal.append(center+shift+Vector2(side*sin(PI*t)*radius*.48,(t-.5)*radius*1.25))
+			for j: int in range(24,-1,-1):
+				var t: float=j/24.0
+				petal.append(center+shift+Vector2(side*sin(PI*t)*radius*.24,(t-.5)*radius*1.25))
+			polygon(c,petal,colors.base,0)
+			var rib:=PackedVector2Array()
+			for j: int in range(15):
+				var t: float=.15+j/14.0*.6
+				rib.append(center+shift+Vector2(side*sin(PI*t)*radius*.41,(t-.5)*radius*1.25))
+			c.draw_polyline(rib,colors.light,2.0,true)
+		for i: int in range(5):
+			var angle: float=-2.8+i*1.25
+			var ray: Vector2=Vector2.from_angle(angle)
+			var travel: float=radius*(.35+open*.3)
+			draw_ammunition(c,center+ray*travel,ray,maxf(3,radius*(.075 if i%2==0 else .05)),true)
 
 	else:
 		# Ground-launched uneven shards: tall top facets and small underground
