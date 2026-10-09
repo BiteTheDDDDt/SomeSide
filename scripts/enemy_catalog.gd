@@ -12,6 +12,7 @@ static func catalog() -> Array:
 		_entry("sentinel", "棱镜哨卫", "ruins", "beam", 58.0, 23.0, 55.0, 740.0, 0.9, 3.4, false, "a4c3fa"),
 		_entry("skirmisher", "折跃猎手", "ruins", "blink", 42.0, 20.0, 102.0, 620.0, 0.7, 4.2, false, "bf9be7"),
 		_entry("conductor", "修复导引者", "ruins", "mend", 52.0, 22.0, 88.0, 620.0, 0.85, 4.0, true, "8ed8b7"),
+		_entry("crystal_moth", "巡猎晶蛾", "canyon", "hunt", 34.0, 19.0, 92.0, 620.0, .65, 4.3, true, "b2a4bb"),
 	]
 
 static func _entry(id: String, title: String, biome: String, attack: String, hp: float, radius: float, speed: float, reach: float, windup: float, cooldown: float, flying: bool, color: String) -> Dictionary:
@@ -37,7 +38,7 @@ static func definition(id: String) -> Dictionary:
 
 static func pool(biome: String) -> Array[String]:
 	match biome:
-		"canyon": return ["charger", "burrower", "drone"]
+		"canyon": return ["charger", "burrower", "drone", "crystal_moth"]
 		"ruins": return ["sentinel", "skirmisher", "conductor"]
 		_: return ["crawler", "spitter", "spore_moth"]
 

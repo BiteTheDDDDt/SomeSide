@@ -62,7 +62,7 @@ func _land(sim, held_ticks: int = 80, use_prediction: bool = false) -> int:
 	return first_wave
 
 func _test_catalog_and_drops() -> void:
-	_check(Content.passives().size() == 27 and Content.weapons().size() == 8 and Content.equipment().size() == 8, "The live catalog contains 27 relics and 8+8 equipment entries")
+	_check(Content.passives().size() == 27 and Content.weapons().size() == 10 and Content.equipment().size() == 9, "The live catalog contains 27 relics and 10+9 equipment entries")
 	var ranger: Dictionary = Content.character_passive("ranger")
 	var vanguard: Dictionary = Content.character_passive("vanguard")
 	_check(ranger.id == "pursuit_protocol" and vanguard.id == "reactive_plating" and ranger.id != vanguard.id, "Both character-owned passive abilities have distinct stable IDs")

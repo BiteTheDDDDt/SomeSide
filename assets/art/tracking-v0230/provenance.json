@@ -1,0 +1,11 @@
+{
+  "tool": "built-in image_gen",
+  "reference": "assets/art/unified-v0206/players.png",
+  "source": "weaver-poses.png",
+  "size": [
+    1536,
+    1024
+  ],
+  "alpha": "Original generated RGBA, copied unchanged. Atlas regions/anchors calibrated at runtime.",
+  "prompt": "Use case: stylized-concept. Asset type: transparent production sprite atlas for SomeSide's NEW class Trajectory Weaver. The provided image is STYLE AND PROPORTION REFERENCE ONLY, do not edit its Ranger or Vanguard. Generate ONE atlas of the SAME new slender explorer in SEVEN distinct poses, arranged four evenly spaced cells in row 1 and three in row 2, final bottom-right cell completely empty. Wide 1536x1024 canvas, true transparent background, no cell dividers, text, ground, drop shadows or weapons. All characters face RIGHT in side-view. Match reference's elegant low-saturation illustrated style exactly: clean sculpted rounded contours, broad geometric armor panels, two or three hard shading planes, charcoal-gray undersuit (not black), restrained details, same head/body/limb proportions. New identity: light steel blue-gray armor, pale warm gray highlights, short asymmetric muted slate-blue shoulder mantle, tapered calf armor, a compact hood-like side helmet with tiny horizontal mint visor, one small diamond emitter at the left wrist and waist. NO pointy giant horns, glowing outline, glossy metal, pixel texture, busy seams. Body should be gracefully articulated with deliberate weight, distinct from reference characters but belongs in same world. Keep head identity, light direction upper-left, anatomy, color, local scale CONSISTENT throughout all seven poses. Arms are tucked/bent and hold no object so the game can draw independently aimed weapons. Pose order: top row 1 standing relaxed with both feet on baseline, 2 rising jump knee raised, 3 falling jump balanced legs below torso, 4 quick forward lean with legs extended; bottom row 1 takeoff extension pushing off toes, 2 apex slightly folded knees calm torso, 3 compressed landing knees bent feet planted. Ground poses feet touch each cell's same baseline, airborne poses body/shoulder remains at comparable height. Full bodies completely visible, generous gutters, no overlaps. Primary use at roughly 42 pixels tall so focus on a beautiful readable silhouette, not tiny detail."
+}

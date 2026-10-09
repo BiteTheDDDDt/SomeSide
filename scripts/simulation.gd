@@ -11,6 +11,7 @@ const EnemyCatalog = preload("res://scripts/enemy_catalog.gd")
 const Locale = preload("res://scripts/localization.gd")
 const BeamEnvelope = preload("res://scripts/beam_envelope.gd")
 const ChestRules = preload("res://scripts/chest_rules.gd")
+const Tracking = preload("res://scripts/tracking_rules.gd")
 
 ## Authoritative, scene-independent game rules. State contains only serializable
 ## values. All positions are centers; platforms are one-way from above.
@@ -47,7 +48,14 @@ static func character_catalog() -> Array:
 	return [
 		{"id": "ranger", "name": "游侠", "description": "初始：脉冲步枪 + 震荡手雷\n100生命；Shift专属相位闪身。武器与主动装备可替换，角色技能保持不变。", "color": Color("65e2d6")},
 		{"id": "vanguard", "name": "先锋", "description": "初始：共鸣弧刃 + 裂地冲击\n145生命；Shift专属铁壁反击，减伤蓄能后释放周围冲击。武器与主动装备可替换，角色技能保持不变。", "color": Color("ffa66a")},
+		{"id":"weaver", "name":"织轨者", "description":"初始：弧针枪 + 追猎信标\n100生命；Shift刻印并发射3枚飞刃，循迹让自己的新追踪攻击优先锁定刻印。没有闪身或架盾。", "color":Color("9fb7d0")},
 	]
+
+static func valid_character(id: String) -> bool:
+	return id in ["ranger", "vanguard", "weaver"]
+
+static func character_name(id: String) -> String:
+	return {"ranger":"游侠", "vanguard":"先锋", "weaver":"织轨者"}.get(id,"游侠")
 
 static func movement_ability(player: Dictionary) -> Dictionary:
 	var definition: Dictionary = Content.movement_ability(str(player.get("character", "ranger")))
@@ -115,7 +123,7 @@ func add_player(id: int, player_name: String, character: String) -> void:
 	var players: Dictionary = state.get("players", {})
 	if players.has(id) or players.size() >= 4:
 		return
-	var chosen: String = character if character in ["ranger", "vanguard"] else "ranger"
+	var chosen: String = character if valid_character(character) else "ranger"
 	var health: float = 145.0 if chosen == "vanguard" else 100.0
 	var position: Vector2 = Vector2(state.get("spawn", Vector2(210.0, WORLD_SIZE.y - 101.0))) + Vector2(players.size() * 42.0, 0.0)
 	for other_value in players.values():
@@ -125,8 +133,8 @@ func add_player(id: int, player_name: String, character: String) -> void:
 			break
 	players[id] = {
 		"id": id, "name": player_name.left(24), "character": chosen,
-		"weapon": "arc_blade" if chosen == "vanguard" else "pulse_rifle",
-		"equipment": "shockwave" if chosen == "vanguard" else "grenade",
+		"weapon": {"ranger":"pulse_rifle", "vanguard":"arc_blade", "weaver":"arc_needle"}[chosen],
+		"equipment": {"ranger":"grenade", "vanguard":"shockwave", "weaver":"hunting_beacon"}[chosen],
 		"pos": position, "vel": Vector2.ZERO, "aim": Vector2.RIGHT,
 		"hp": health, "max_hp": health, "shield": 0.0, "coins": 35,
 		"items": {}, "dead": false, "grounded": false, "fire_cd": 0.0,
@@ -145,15 +153,22 @@ func add_player(id: int, player_name: String, character: String) -> void:
 
 func remove_player(id: int) -> void:
 	var players: Dictionary = state.get("players", {})
+	if players.has(id): _clear_tracking_owner(players[id])
 	players.erase(id)
 
 
 func get_snapshot() -> Dictionary:
-	return state.duplicate(true)
+	var snapshot: Dictionary=state.duplicate(true)
+	snapshot["spawn_cursor"]={"next_id":_next_id,"rng_state":_rng.state,"spawn_clock":_spawn_clock}
+	return snapshot
 
 
 func apply_snapshot(snapshot: Dictionary) -> void:
 	state = snapshot.duplicate(true)
+	var cursor: Dictionary=state.get("spawn_cursor",{})
+	if not cursor.is_empty():
+		_next_id=int(cursor.next_id); _rng.state=int(cursor.rng_state); _spawn_clock=float(cursor.spawn_clock)
+	state.erase("spawn_cursor")
 	events.clear()
 
 
@@ -204,6 +219,8 @@ func step(delta: float, commands: Dictionary) -> void:
 
 
 func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
+	Tracking.set_view(player, command)
+	_step_trace(player,dt)
 	Procs.tick(player, dt)
 	for key in ["fire_cd", "skill_cd", "invuln", "hurt_timer", "interact_cd", "nova_cd"]:
 		player[key] = maxf(0.0, float(player.get(key, 0.0)) - dt)
@@ -212,6 +229,7 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 		if float(player["shield_timer"]) <= 0.0:
 			player["shield"] = 0.0
 	if bool(player["dead"]):
+		_clear_tracking_owner(player)
 		Procs.cancel(player)
 		_cancel_movement_ability(player)
 		_cancel_guard(player)
@@ -242,6 +260,11 @@ func _step_player(player: Dictionary, command: Dictionary, dt: float) -> void:
 	var previous_dash_id: int = int(player.get("dash_id", 0))
 	var controlled: bool = float(player.get("stun_timer", 0.0)) > 0.0
 	var stored_charge: float = float(player.get("guard_absorbed", 0.0))
+	if str(player.character)=="weaver" and not controlled and bool(command.get("dash",false)) and float(player.dash_cd)<=0.0:
+		# Host-only ability dispatch; movement replay must never spawn blades.
+		var ability_command: Dictionary=command.duplicate()
+		player.aim=WeaponPose.normalized_aim(ability_command.get("aim",player.aim))
+		_engrave(player)
 	var guard_finished: bool = _move_player(player, command, dt, true)
 	if int(player.get("dash_id", 0)) > previous_dash_id:
 		var ability: Dictionary = movement_ability(player)
@@ -341,7 +364,7 @@ func _move_player(player: Dictionary, command: Dictionary, dt: float, report_eve
 			player["jump_rising"] = true
 			jumped = true
 			double_jump = true
-	if not controlled and bool(command.get("dash", false)) and float(player["dash_cd"]) <= 0.0:
+	if str(player.get("character","ranger"))!="weaver" and not controlled and bool(command.get("dash", false)) and float(player["dash_cd"]) <= 0.0:
 		var ability: Dictionary = movement_ability(player)
 		var dash_direction: Vector2 = Vector2(move, 0.0)
 		if absf(move) < 0.1:
@@ -470,12 +493,20 @@ func _fire_weapon(player: Dictionary) -> void:
 	var shoulder: Vector2 = WeaponPose.shoulder_position(position)
 	var muzzle: Vector2 = WeaponPose.muzzle_position(player, aim)
 	var weapon: String = str(player.get("weapon", "pulse_rifle"))
+	if weapon=="star_seeker" and _tracking_count("star_seeker",int(player.id))>=3:
+		player.fire_cd=.16
+		_notice(player,"追踪弹已达上限")
+		_emit("tracking",muzzle,{"kind":"limit", "owner":player.id, "aim":aim})
+		return
 	player["fire_cd"] = attack_interval(player)
 	player["attack_count"] = int(player.get("attack_count", 0)) + 1
 	if weapon != "arc_blade":
 		player["attack_pose"] = {"id":int(player.attack_count), "weapon":weapon, "elapsed":0.0,
 			"duration":WeaponAction.duration(weapon, float(player.fire_cd)), "aim":aim, "interval":float(player.fire_cd)}
 	match weapon:
+		"arc_needle", "star_seeker":
+			_launch_tracking(player,muzzle,aim,weapon,7.0 if weapon=="arc_needle" else 38.0,1100.0 if weapon=="arc_needle" else 360.0, .7 if weapon=="arc_needle" else 2.8, false, {}, shoulder)
+			_emit("shoot",muzzle,{"aim":aim, "player":player.id, "kind":weapon, "weapon":weapon})
 		"arc_blade":
 			var duration: float = WeaponPose.melee_duration(float(player.fire_cd))
 			player["melee"] = {"id": int(player.attack_count), "elapsed": 0.0, "duration": duration,
@@ -518,6 +549,203 @@ func _fire_weapon(player: Dictionary) -> void:
 		_fire_echo(player)
 
 
+func _tracking_count(kind: String, owner: int=-1, target: int=-1) -> int:
+	var count: int=0
+	for shot: Dictionary in Array(state["projectiles"])+_pending_projectiles:
+		if str(shot.kind)!=kind or float(shot.ttl)<=0.0: continue
+		if owner>=0 and int(shot.owner)!=owner: continue
+		if target>=0 and int(shot.get("locked_player",-1))!=target: continue
+		count+=1
+	return count
+
+func _tracking_target(id: int) -> Dictionary:
+	for enemy: Dictionary in state["enemies"]:
+		if int(enemy.id)==id: return enemy
+	return {}
+
+func _launch_tracking(player: Dictionary, origin: Vector2, aim: Vector2, kind: String, damage: float, speed: float, ttl: float, secondary: bool, forced: Dictionary={}, sweep: Vector2=Vector2(INF,INF)) -> Dictionary:
+	var preset: Dictionary=Tracking.profile(kind)
+	var lock: Dictionary=forced
+	if lock.is_empty(): lock=Tracking.acquire(origin,aim,state["enemies"],preset,state.get("solid_cover",[]),Tracking.owner_mark(player))
+	var shot: Dictionary=_spawn_projectile(origin,aim*speed,"player",kind,damage*_damage_scale(player),int(player.id),ttl,2.5 if kind=="arc_needle" else 5.0,sweep)
+	if shot.is_empty(): return {}
+	shot.merge({"guidance":lock.duplicate(),"pierce":1,"max_pierce":1,"tracking_source":kind,"source_id":int(player.id),"trail":[origin],"trail_clock":0.0},true)
+	if secondary: shot.merge({"proc":true,"proc_source":kind,"proc_epoch":int(player.get("proc_epoch",0))},true)
+	return shot
+
+func _engrave(player: Dictionary) -> void:
+	if bool(player.get("dead",false)) or float(player.get("dash_cd",0))>0: return
+	var origin: Vector2=Vector2(player.pos)+Vector2(0,-14)
+	var lock: Dictionary=Tracking.acquire(origin,player.aim,state.enemies,Guidance.BLADE,state.get("solid_cover",[]))
+	if lock.is_empty():
+		_notice(player,"瞄准范围内没有可刻印的目标")
+		_emit("tracking",origin,{"kind":"no_target","owner":player.id,"aim":player.aim})
+		return
+	player.trace_mark={"target_id":int(lock.target_id),"remaining":4.0}
+	player.trace_burst={"target_id":int(lock.target_id),"elapsed":0.0,"next":0,"id":_id()}
+	player.trace_pose={"elapsed":0.0}
+	player.dash_cd=movement_ability(player).cooldown
+	player.momentum_timer=1.2
+	_emit("tracking",origin,{"kind":"engrave","owner":player.id,"aim":player.aim,"duration":.34})
+
+func _step_trace(player: Dictionary,dt: float) -> void:
+	if bool(player.get("dead",false)): return
+	if player.has("trace_pose"):
+		player.trace_pose.elapsed=float(player.trace_pose.elapsed)+dt
+		if float(player.trace_pose.elapsed)>=.34: player.erase("trace_pose")
+	var mark: Dictionary=player.get("trace_mark",{})
+	if not mark.is_empty():
+		mark.remaining=maxf(0,float(mark.remaining)-dt)
+		if mark.remaining<=0 or not Guidance._living(_tracking_target(int(mark.target_id))): player.erase("trace_mark")
+	var burst: Dictionary=player.get("trace_burst",{})
+	if burst.is_empty(): return
+	var target: Dictionary=_tracking_target(int(burst.target_id))
+	if not Guidance._living(target) or not bool(target.get("hittable",true)):
+		player.erase("trace_burst")
+		return
+	burst.elapsed=float(burst.elapsed)+dt
+	# Exactly three launch nodes. Invalid target cancels; no replacement or refund.
+	if int(burst.next)<3 and float(burst.elapsed)+.000001>=.12+.10*int(burst.next):
+		var origin: Vector2=Vector2(player.pos)+Tracking.hand_offset(player.aim,float(burst.elapsed))
+		var aim: Vector2=WeaponPose.normalized_aim(Vector2(target.pos)-origin)
+		if Tracking.cover_time(origin,target.pos,state.get("solid_cover",[]))<=1.0:
+			player.erase("trace_burst")
+			return
+		var lock: Dictionary=Guidance.lock(origin,aim,[target],Guidance.BLADE)
+		if lock.is_empty():
+			player.erase("trace_burst")
+			return
+		_launch_tracking(player,origin,aim,"engraved_blade",12.0,560.0,1.1,true,lock)
+		burst.next=int(burst.next)+1
+		_emit("tracking",origin,{"kind":"blade_release","owner":player.id,"aim":aim})
+	if int(burst.next)>=3: player.erase("trace_burst")
+
+func _clear_tracking_owner(player: Dictionary) -> void:
+	player.erase("trace_mark"); player.erase("trace_burst"); player.erase("trace_pose"); player.erase("tracking_view")
+	var id: int=int(player.id)
+	state["deployables"]=Array(state.get("deployables",[])).filter(func(d: Dictionary)->bool: return str(d.kind)!="hunting_beacon" or int(d.owner)!=id)
+	state["projectiles"]=Array(state.get("projectiles",[])).filter(func(p: Dictionary)->bool: return str(p.kind) not in Tracking.KINDS or str(p.team)!="player" or int(p.owner)!=id)
+	_pending_projectiles=_pending_projectiles.filter(func(p: Dictionary)->bool: return str(p.kind) not in Tracking.KINDS or str(p.team)!="player" or int(p.owner)!=id)
+
+func _beacon_position(player: Dictionary) -> Vector2:
+	if not bool(player.get("grounded",false)): return Vector2.INF
+	var support: Rect2=_enemy_support_surface(player.pos,PLAYER_HALF)
+	if support.size==Vector2.ZERO: return Vector2.INF
+	var x: float=clampf(Vector2(player.pos).x+signf(Vector2(player.aim).x)*26.0,support.position.x+12.0,support.end.x-12.0)
+	var pos:=Vector2(x,support.position.y-12.0)
+	if absf(x-Vector2(player.pos).x)>40 or absf(pos.y-Vector2(player.pos).y)>30: return Vector2.INF
+	if Tracking.cover_time(Vector2(player.pos),pos,state.get("solid_cover",[]),6)<=1: return Vector2.INF
+	for rect: Rect2 in state.get("solid_cover",[]):
+		if rect.intersects(Rect2(pos-Vector2(10,11),Vector2(20,22))): return Vector2.INF
+	return pos
+
+func _deploy_beacon(player: Dictionary) -> void:
+	if bool(player.get("dead",false)) or float(player.get("skill_cd",0))>0: return
+	var pos: Vector2=_beacon_position(player)
+	var devices: Array=state.get("deployables",[])
+	var owned: bool=false
+	var beacon_count: int=0
+	for d: Dictionary in devices:
+		if str(d.kind)=="hunting_beacon":
+			beacon_count+=1
+			if int(d.owner)==int(player.id): owned=true
+	if not pos.is_finite() or owned or beacon_count>=Tracking.MAX_BEACONS or devices.size()>=8:
+		_notice(player,"无法在脚边部署信标")
+		return
+	player.skill_cd=12.0*maxf(.35,1.0/(1.0+_stacks(player,"coolant")*.16))
+	devices.append({"id":_id(),"kind":"hunting_beacon","owner":int(player.id),"team":"player","source_id":int(player.id),"pos":pos,"ttl":3.6,"elapsed":0.0,"next":0,"damage":18.0*_damage_scale(player),"aim":Vector2(player.aim)})
+	state.deployables=devices
+	_emit("tracking",pos,{"kind":"beacon_deploy","owner":player.id,"aim":player.aim})
+
+func _step_beacon(device: Dictionary,dt: float) -> bool:
+	var player: Dictionary=Dictionary(state.players).get(int(device.owner),{})
+	if player.is_empty() or bool(player.get("dead",false)): return false
+	var before: float=float(device.elapsed)
+	device.elapsed=before+dt; device.ttl=3.6-float(device.elapsed)
+	# Crossing a missed node skips it: no accumulated salvo after a stall.
+	while int(device.next)<3 and Tracking.BEACON_TIMES[int(device.next)]<=float(device.elapsed)+.000001:
+		var at: float=Tracking.BEACON_TIMES[int(device.next)]
+		device.next=int(device.next)+1
+		if at<before-.000001 or float(device.elapsed)-at>.050001: continue
+		var origin: Vector2=Vector2(device.pos)+Vector2(0,-9)
+		var lock: Dictionary=Tracking.acquire(origin,Vector2.RIGHT,state.enemies,Guidance.BEACON,state.get("solid_cover",[]),Tracking.owner_mark(player))
+		if lock.is_empty(): continue
+		var target: Dictionary=_tracking_target(int(lock.target_id))
+		var aim: Vector2=WeaponPose.normalized_aim(Vector2(target.pos)-origin)
+		device.aim=aim
+		# Damage was frozen at deployment, so changing gear cannot multiply it.
+		var shot: Dictionary=_launch_tracking(player,origin,aim,"beacon_dart",float(device.damage)/_damage_scale(player),470.0,1.25,true,lock)
+		if not shot.is_empty(): shot.source_id=int(device.id)
+		_emit("tracking",origin,{"kind":"beacon_fire","owner":player.id,"aim":aim})
+	return float(device.ttl)>.000001
+
+func _step_tracking_shot(shot: Dictionary,dt: float,index: Dictionary) -> bool:
+	var friendly: bool=str(shot.team)=="player"
+	var owner: Dictionary=Dictionary(state.players).get(int(shot.owner),{}) if friendly else index.get(int(shot.owner),{})
+	if not Guidance._living(owner): return false
+	if shot.has("sweep_origin"):
+		var barrel: Vector2=shot.sweep_origin
+		shot.erase("sweep_origin")
+		var cover: float=Tracking.cover_time(barrel,shot.pos,state.get("solid_cover",[]),float(shot.radius))
+		var body_hit: Dictionary={}
+		for body: Dictionary in state.enemies:
+			if not Guidance._living(body): continue
+			var t: float=_segment_circle(barrel,shot.pos,body.pos,_enemy_radius(body)+float(shot.radius))
+			if t>=0 and t<cover: cover=t; body_hit=body
+		if cover<=1:
+			shot.pos=barrel.lerp(shot.pos,cover)
+			if not body_hit.is_empty(): _projectile_damage(shot,body_hit)
+			_tracking_end(shot,shot.pos,true)
+			return false
+	var duration: float=minf(dt,maxf(0,float(shot.ttl)))
+	var slices: int=maxi(1,int(ceil(duration/(1.0/120.0))))
+	var slice: float=duration/slices
+	for iteration: int in range(slices):
+		var before: Vector2=shot.pos
+		if not friendly:
+			var seen: bool=false
+			for player: Dictionary in Dictionary(state.players).values():
+				if Guidance._living(player) and Tracking.visible(player,before): seen=true; break
+			if not seen:
+				_tracking_end(shot,before,false)
+				return false
+		var lock: Dictionary=shot.get("guidance",{})
+		var target_id: int=int(lock.get("target_id",-1))
+		var target: Dictionary=index.get(target_id,{}) if friendly else Dictionary(state.players).get(target_id,{})
+		shot.vel=Guidance.steer(shot,target,slice)
+		var after: Vector2=before+Vector2(shot.vel)*slice
+		var first: float=Tracking.cover_time(before,after,state.get("solid_cover",[]),float(shot.radius))
+		var victim: Dictionary={}
+		var bodies: Array=Array(state.enemies) if friendly else Dictionary(state.players).values()
+		for body: Dictionary in bodies:
+			if not Guidance._living(body) or not bool(body.get("hittable",true)): continue
+			var t: float=_segment_circle(before,after,body.pos,(_enemy_radius(body) if friendly else 17.0)+float(shot.radius))
+			if t>=0 and t<first:
+				first=t; victim=body
+		if first<=1.0:
+			shot.pos=before.lerp(after,first)
+			if not victim.is_empty():
+				if friendly: _projectile_damage(shot,victim)
+				else: _damage_player(victim,float(shot.damage),before,{"attack_kind":"hunt","enemy_id":shot.owner,"aim":Vector2(shot.vel).normalized()})
+			_tracking_end(shot,shot.pos,true)
+			return false
+		shot.pos=after; shot.age=float(shot.age)+slice; shot.ttl=float(shot.ttl)-slice
+		shot.travel_distance=float(shot.travel_distance)+before.distance_to(after)
+		shot.trail_clock=float(shot.get("trail_clock",0))+slice
+		if float(shot.trail_clock)>=.035:
+			shot.trail_clock=0.0
+			var trail: Array=shot.get("trail",[])
+			trail.append(after)
+			while trail.size()>10 or (trail.size()>1 and Vector2(trail.front()).distance_to(after)>100.0): trail.pop_front()
+			shot.trail=trail
+	if float(shot.ttl)<=.000001:
+		_tracking_end(shot,shot.pos,false)
+		return false
+	return true
+
+func _tracking_end(shot: Dictionary,pos: Vector2,impact: bool) -> void:
+	_emit("tracking",pos,{"kind":"impact" if impact else "disperse","ammunition":shot.kind,"owner":shot.owner,"team":shot.team,"aim":Vector2(shot.vel).normalized()})
+
 func _fire_echo(player: Dictionary) -> void:
 	var target: Dictionary = _nearest_enemy(Vector2(player.pos), 650.0)
 	if not target.is_empty():
@@ -556,6 +784,9 @@ func _use_skill(player: Dictionary) -> void:
 	var position: Vector2 = player["pos"]
 	var equipment: String = str(player.get("equipment", "grenade"))
 	var definition: Dictionary = loot_definition(equipment)
+	if equipment=="hunting_beacon":
+		_deploy_beacon(player)
+		return
 	var cooldown_scale: float = maxf(0.35, 1.0 / (1.0 + _stacks(player, "coolant") * 0.16))
 	player["skill_cd"] = float(definition.get("cooldown", 5.0)) * cooldown_scale
 	match equipment:
@@ -593,8 +824,13 @@ func _use_skill(player: Dictionary) -> void:
 			_emit("explosion", center, {"radius": 300.0, "owner": player["id"], "kind": "graviton", "team": "player"})
 		"turret":
 			var turrets: Array = state.get("deployables", [])
-			if turrets.size() >= 4:
-				turrets.pop_front()
+			# Keep the established four-turret limit without evicting a teammate's
+			# new beacon from the shared device array.
+			var turret_indices: Array[int] = []
+			for device_index: int in range(turrets.size()):
+				if str(turrets[device_index].kind) == "turret": turret_indices.append(device_index)
+			if turret_indices.size() >= 4:
+				turrets.remove_at(turret_indices.front())
 			var turret_pos: Vector2 = position + Vector2(aim.x * 60.0, 0.0)
 			turret_pos.y = _surface_below(turret_pos.x, position.y - 30.0) - 16.0
 			turrets.append({"id": _id(), "kind": "turret", "pos": turret_pos, "ttl": 8.0, "fire_cd": 0.0, "owner": player["id"], "damage": 14.0 * _damage_scale(player)})
@@ -657,6 +893,12 @@ func _step_projectiles(dt: float) -> void:
 	for projectile_value in projectiles:
 		var projectile: Dictionary = projectile_value
 		if not _proc_projectile_valid(projectile): continue
+		if str(projectile.kind) in Tracking.KINDS:
+			if not guidance_index_ready:
+				for enemy: Dictionary in state["enemies"]: guidance_enemies[int(enemy.id)]=enemy
+				guidance_index_ready=true
+			if _step_tracking_shot(projectile,dt,guidance_enemies): kept.append(projectile)
+			continue
 		var previous: Vector2 = projectile["pos"]
 		var sweep_origin: Vector2 = projectile.get("sweep_origin", previous)
 		var launch_sweep: bool = projectile.has("sweep_origin")
@@ -780,6 +1022,9 @@ func _step_projectiles(dt: float) -> void:
 
 
 func _proc_projectile_valid(projectile: Dictionary) -> bool:
+	if str(projectile.get("kind","")) in Tracking.KINDS and str(projectile.get("team",""))=="player":
+		var actor: Dictionary=Dictionary(state.players).get(int(projectile.owner),{})
+		if not Guidance._living(actor): return false
 	if not bool(projectile.get("proc", false)): return true
 	var owner: Dictionary = Dictionary(state["players"]).get(int(projectile["owner"]), {})
 	return not owner.is_empty() and not bool(owner.get("dead", false)) and int(projectile.get("proc_epoch", -1)) == int(owner.get("proc_epoch", 0))
@@ -1149,6 +1394,7 @@ func _damage_player(player: Dictionary, amount: float, source: Vector2, visual: 
 	feedback.merge(visual)
 	_emit("hit", player["pos"], feedback)
 	if float(player["hp"]) <= 0.0:
+		_clear_tracking_owner(player)
 		_cancel_owner_procs(player)
 		Procs.cancel(player)
 		_cancel_guard(player)
@@ -1187,6 +1433,11 @@ func _step_enemies(dt: float) -> void:
 			enemy["vel"] = Vector2.ZERO
 			continue
 		var target: Dictionary = _nearest_player(enemy["pos"])
+		if str(enemy.get("primary_attack",""))=="hunt" and float(enemy.get("telegraph",0))>0.0:
+			target=Dictionary(state.players).get(int(enemy.get("hunt_target_id",-1)),{})
+			if not _hunt_target_legal(enemy,target,false):
+				_cancel_enemy_attack(enemy)
+				continue
 		if target.is_empty():
 			continue
 		if float(enemy.get("telegraph", 0.0)) > 0.0:
@@ -1356,6 +1607,9 @@ func _begin_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 	if float(enemy["hp"]) <= 0.0:
 		return
 	var kind: String = str(enemy.get("primary_attack", "spit"))
+	if kind=="hunt":
+		if not _hunt_target_legal(enemy,target,true) or _tracking_count("hunting_crystal",int(enemy.id))>=1 or _hunt_quota(int(target.get("id",-1)))>=2: return
+		enemy["hunt_target_id"]=int(target.id)
 	if kind == "beam" and not bool(enemy.get("grounded", false)):
 		return
 	if str(enemy["kind"]) == "boss":
@@ -1377,6 +1631,9 @@ func _begin_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 	# Lock the target and danger geometry once. Dodging after the warning
 	# starts must work; attacks never re-aim at the release frame.
 	match kind:
+		"hunt":
+			# This lock decoration is harmless; damage exists only in the launched crystal.
+			_emit("tracking",enemy.pos,{"kind":"moth_lock","owner":enemy.id,"target_id":target.id,"team":"enemy","duration":windup,"aim":enemy.attack_dir})
 		"mortar":
 			_spawn_hazard(enemy, "spore_mortar", target["pos"], "circle", Vector2.RIGHT, 0.0, 48.0, windup, 12.0)
 		"burrow":
@@ -1409,6 +1666,16 @@ func _release_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 	var kind: String = str(enemy.get("attack_kind", ""))
 	enemy["attack_cd"] = float(enemy.get("attack_cooldown", 3.0))
 	match kind:
+		"hunt":
+			var locked: Dictionary=Dictionary(state.players).get(int(enemy.get("hunt_target_id",-1)),{})
+			if not _hunt_target_legal(enemy,locked,false) or _tracking_count("hunting_crystal",int(enemy.id))>=1 or _hunt_quota(int(locked.get("id",-1)))>=2: return
+			var origin: Vector2=Vector2(enemy.pos)+aim*(float(enemy.radius)+3.0)
+			var guide: Dictionary=Tracking.acquire(origin,aim,[locked],Guidance.MOTH,state.get("solid_cover",[]))
+			if guide.is_empty(): return
+			var crystal: Dictionary=_spawn_projectile(origin,aim*250.0,"enemy","hunting_crystal",8.0*_enemy_damage_scale(),int(enemy.id),3.0,5.0)
+			if not crystal.is_empty():
+				crystal.merge({"guidance":guide,"locked_player":int(locked.id),"source_id":int(enemy.id),"pierce":1,"max_pierce":1,"trail":[origin],"trail_clock":0.0,"enemy_id":int(enemy.id)},true)
+				_emit("tracking",origin,{"kind":"moth_release","owner":enemy.id,"aim":aim,"team":"enemy"})
 		"pounce":
 			enemy["vel"] = Vector2(signf(aim.x) * 320.0, -330.0)
 			enemy["charge_timer"] = 0.35
@@ -1464,12 +1731,25 @@ func _release_enemy_attack(enemy: Dictionary, target: Dictionary) -> void:
 
 
 func _cancel_enemy_attack(enemy: Dictionary) -> void:
+	enemy.erase("hunt_target_id")
 	enemy["telegraph"] = 0.0
 	enemy["charge_timer"] = 0.0
 	enemy["attack_cd"] = maxf(0.6, float(enemy.get("attack_cd", 0.0)))
 	var owner: int = int(enemy["id"])
 	state["hazards"] = Array(state.get("hazards", [])).filter(func(hazard: Dictionary) -> bool: return int(hazard["owner"]) != owner)
 
+
+func _hunt_quota(player_id: int) -> int:
+	var used: int=_tracking_count("hunting_crystal",-1,player_id)
+	for enemy: Dictionary in state.enemies:
+		if float(enemy.hp)>0 and str(enemy.get("primary_attack",""))=="hunt" and float(enemy.get("telegraph",0))>0 and int(enemy.get("hunt_target_id",-1))==player_id: used+=1
+	return used
+
+func _hunt_target_legal(enemy: Dictionary,target: Dictionary,begin: bool) -> bool:
+	if not Guidance._living(target) or not Tracking.visible(target,enemy.pos,50): return false
+	var direction: Vector2=WeaponPose.normalized_aim(Vector2(target.pos)-Vector2(enemy.pos)) if begin else Vector2(enemy.get("attack_dir",Vector2.RIGHT))
+	var origin: Vector2=Vector2(enemy.pos)+direction*(float(enemy.radius)+3.0)
+	return Tracking.legal_target(origin,direction,target,Guidance.MOTH,state.get("solid_cover",[]))
 
 func _spawn_hazard(enemy: Dictionary, kind: String, position: Vector2, shape: String, direction: Vector2, length: float, radius: float, delay: float, damage: float) -> Dictionary:
 	var hazards: Array = state.get("hazards", [])
@@ -1685,7 +1965,11 @@ func _step_director(dt: float) -> void:
 	var pool: Array[String] = EnemyCatalog.pool(str(state.get("biome", "rainforest")))
 	var kind: String = pool[0]
 	var roll: float = _rng.randf()
-	if roll > 0.77:
+	var new_moth: bool=pool.size()>3 and roll>=.88
+	if pool.size()>3 and not new_moth: roll/=.88
+	if new_moth:
+		kind=pool[3]
+	elif roll > 0.77:
 		kind = pool[1]
 	elif roll > 0.52:
 		kind = pool[2]
@@ -2195,6 +2479,8 @@ func _build_stage(stage: int) -> void:
 	var layout: Dictionary = StageLayouts.build(stage)
 	for key in ["world_size", "floor_y", "spawn", "stage_name", "biome", "platforms", "landmarks"]:
 		state[key] = layout[key]
+	# Floating platforms are one-way; only actual floor material is solid.
+	state["solid_cover"]=layout.get("solid_cover",[Rect2(0,float(layout.floor_y),Vector2(layout.world_size).x,200.0)])
 	state["gate"] = {"pos": layout["gate"], "active": false, "charge": 0.0, "ready": false}
 	var chests: Array = []
 	var groups: Dictionary = {}
@@ -2242,6 +2528,7 @@ func _build_stage(stage: int) -> void:
 	var slot: int = 0
 	for player_value in Dictionary(state["players"]).values():
 		var player: Dictionary = player_value
+		_clear_tracking_owner(player)
 		player["pos"] = Vector2(state["spawn"]) + Vector2(slot * 44.0, 0.0)
 		player["vel"] = Vector2.ZERO
 		player["hp"] = float(player["max_hp"])
@@ -2413,6 +2700,9 @@ func _weighted_loot(candidates: Array, source: String) -> String:
 	for entry_value in candidates:
 		var entry: Dictionary = entry_value
 		var rank: int = Content.rarity_rank(str(entry["rarity"]))
+		# New IDs add probability mass; never renormalize OLD raw weights by
+		# a larger tier count (which would change old cross-rarity ratios).
+		if str(entry.id) in ["arc_needle","star_seeker","hunting_beacon"]: continue
 		tier_counts[rank] = int(tier_counts[rank]) + 1
 	var history: Array = Dictionary(state.get("loot_history", {})).get("passive", [])
 	var sums: Array = []
@@ -2520,6 +2810,9 @@ func _step_deployables(dt: float) -> void:
 	var kept: Array = []
 	for turret_value in Array(state.get("deployables", [])):
 		var turret: Dictionary = turret_value
+		if str(turret.kind)=="hunting_beacon":
+			if _step_beacon(turret,dt): kept.append(turret)
+			continue
 		turret["ttl"] = float(turret["ttl"]) - dt
 		if float(turret["ttl"]) <= 0.0 or not Dictionary(state["players"]).has(int(turret["owner"])):
 			continue

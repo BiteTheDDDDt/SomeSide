@@ -127,6 +127,9 @@ func _run() -> void:
 	_check(material_signatures.size() >= 7 and envelope_signatures.size() >= 6, "Weapons differ in synthesis materials AND measured temporal envelopes, not just pitch")
 	for definition: Dictionary in Content.equipment():
 		player.equipment = definition.id
+		if str(definition.id)=="hunting_beacon":
+			player.pos=Vector2(640,float(sim.state.floor_y)-Simulation.PLAYER_HALF.y)
+			player.grounded=true
 		player.skill_cd = 0.0
 		sim.events.clear()
 		sim._use_skill(player)

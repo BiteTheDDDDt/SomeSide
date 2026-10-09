@@ -28,6 +28,8 @@ static func shoulder_position(position: Vector2) -> Vector2:
 
 static func muzzle_length(weapon: String) -> float:
 	match weapon:
+		"arc_needle": return 41.0
+		"star_seeker": return 49.0
 		"scattergun": return 38.0
 		"railgun": return 52.0
 		"flamethrower": return 46.0

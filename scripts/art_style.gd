@@ -36,6 +36,15 @@ static func weapon(id: String) -> String:
 	var dark: String="424e55"
 	var result: String=""
 	match id:
+		"arc_needle":
+			result=path("M-4-3L3-5L9-2L12-5H23L27-2H41V2H24L20 4H12L9 10H5L6 3L-4 3Z",dark)
+			result+=path("M2-3L7-2L12-3H22L26-1H38V0H11L8 2H2Z",light)+path("M16-1H25L28 1H16Z","94cabb")
+			result+=path("M28-2H40V-1H28ZM29 1H40V2H29Z",base)+path("M10 2H14L12 6H9Z",base)
+		"star_seeker":
+			result=path("M-5-4L2-6L9-3L14-10H31L38-7H49V5H37L31 8H19L16 11H10L11 4L-5 4Z",dark)
+			result+=path("M9-2L16-8H30L35-5H46V-1H20L17 3H10Z",base)+path("M15-6H28L33-3H17Z",light)
+			result+=path("M23-1H46V3H24Z","667d8c")+path("M39-5H48V-2H39ZM39 3H48V5H39Z",light)
+			result+=path("M18-1L22-3L26-1L22 2Z","a2c7bd")+path("M1-3L6-1V2H0Z",base)
 		"pulse_rifle":
 			result=path("M-4-4Q0-6 7-3L12-6H27L30-3H36V3H27L23 5H13L10 10H6L7 3L-4 4Z",dark)
 			result+=path("M3-3Q12-8 25-4L28-2H35V0H12L8 2H3Z",base)+path("M7-4Q16-6 25-3H13L9-1H5Z",light)

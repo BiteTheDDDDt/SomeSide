@@ -16,10 +16,10 @@ const IllustratedPlayers = preload("res://scripts/illustrated_player_renderer.gd
 const AttackFxSprites = preload("res://scripts/attack_fx_sprites.gd")
 const UIArt = preload("res://scripts/ui_art.gd")
 const UITheme = preload("res://scripts/ui_theme.gd")
-const VERSION: String = "0.22.0"
+const VERSION: String = "0.23.0"
 const DEFAULT_PORT: int = 27841
 const MAX_PENDING_STAGE_EVENTS: int = 192
-const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "proc", "coin_drop", "equipment", "drop"]
+const TRANSIENT_EVENT_TYPES: Array[String] = ["shoot", "slash", "hit", "explosion", "death", "jump", "land", "dash", "ability_hit", "ability", "proc", "coin_drop", "equipment", "drop", "tracking"]
 const WINDOWS_DOWNLOAD_URL: String = "https://bitetheddddt.itch.io/someside"
 const WEB_COOP_MESSAGE: String = "浏览器版支持单人游玩。2–4 人合作请下载 Windows 版。"
 const INK := Color("0b1e27")
@@ -99,6 +99,7 @@ var _inventory_filter: String = "owned"
 var _inventory_grid: GridContainer
 var _inventory_filters: Dictionary = {}
 var _advanced_observed: Dictionary = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "proc_effects": false, "projectile_kinds": []}
+var _tracking_observed: Dictionary={"roles":[],"projectiles":[],"marks":[],"beacons":[],"moth":false,"safe":true}
 var _biome_observed: Dictionary = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 var _biome_smoke_stage: int = 0
 var _settings_in_game: bool = false
@@ -168,6 +169,8 @@ func _ready() -> void:
 	elif _smoke == "client":
 		_join_lobby(str(_options.get("address", "127.0.0.1")))
 	elif _options.has("demo"):
+		if _options.has("character") and Simulation.valid_character(str(_options.character)):
+			profile.character=str(_options.character)
 		_start_solo()
 	print("SOMESIDE_READY version=", VERSION, " mode=", _smoke if not _smoke.is_empty() else "interactive")
 
@@ -276,7 +279,7 @@ func _physics_process(delta: float) -> void:
 		_event_buffer.clear()
 
 func _get_command() -> Dictionary:
-	var command: Dictionary = {"move": 0.0, "jump": false, "jump_held": false, "drop": false, "aim": Vector2.RIGHT, "fire": false, "skill": false, "dash": false, "interact": false}
+	var command: Dictionary = {"move": 0.0, "jump": false, "jump_held": false, "drop": false, "aim": Vector2.RIGHT, "fire": false, "skill": false, "dash": false, "interact": false, "view_rect":Rect2(world.camera_position-world.screen_size*.5,world.screen_size)}
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
 	if player.is_empty():
 		return command
@@ -296,7 +299,9 @@ func _get_command() -> Dictionary:
 			command.skill = _tick >= 240 and _tick % 120 == 0
 		if _options.has("smoke-biomes"):
 			command.merge({"move": 0.0, "jump": false, "fire": false, "skill": false, "dash": false, "interact": false}, true)
-		if _options.has("demo"):
+		if _options.has("smoke-tracking"):
+			command.merge({"move":0.0,"jump":false,"drop":false,"interact":false,"aim":Vector2.RIGHT,"fire":true,"skill":_tick%480==15,"dash":_tick%500==30},true)
+		if _options.has("demo") and not _options.has("smoke-tracking"):
 			var gate_position: Vector2 = sim.state.get("gate", {}).get("pos", Vector2(2800, 999))
 			command.move = signf(gate_position.x - position.x) if absf(gate_position.x - position.x) > 90.0 else sin(_elapsed * 1.6) * 0.45
 		return command
@@ -536,7 +541,7 @@ func _register(player_name: String, character: String) -> void:
 	player_name = player_name.strip_edges().substr(0, 18)
 	if player_name.is_empty():
 		player_name = "Traveller"
-	character = character if character in ["ranger", "vanguard"] else "ranger"
+	character = character if Simulation.valid_character(character) else "ranger"
 	roster.append({"id": id, "name": player_name, "character": character, "ready": not _smoke.is_empty()})
 	_broadcast_lobby()
 
@@ -606,7 +611,7 @@ func _set_member(character: String, ready: bool) -> void:
 	var id: int = multiplayer.get_remote_sender_id()
 	for member in roster:
 		if int(member.id) == id:
-			member.character = character if character in ["ranger", "vanguard"] else "ranger"
+			member.character = character if Simulation.valid_character(character) else "ranger"
 			member.ready = ready
 	_broadcast_lobby()
 
@@ -623,6 +628,8 @@ func _start_match() -> void:
 			_notify("等待所有队员准备完毕。")
 			return
 	var seed_value: int = randi() & 0x7fffffff
+	if _options.has("smoke-tracking"):
+		for i: int in range(roster.size()): roster[i].character=["weaver","weaver","ranger","vanguard"][i]
 	_broadcast("_begin_run", [roster, seed_value])
 	_begin_local(roster, seed_value)
 
@@ -633,8 +640,22 @@ func _begin_run(members: Array, seed_value: int) -> void:
 
 func _begin_local(members: Array, seed_value: int) -> void:
 	sim.start_run(members, seed_value)
+	if _options.has("smoke-tracking"):
+		sim._spawn_clock=99999.0
+		var base:=Vector2(1400,float(sim.state.floor_y)-Simulation.PLAYER_HALF.y)
+		sim.state.platforms=[Rect2(0,float(sim.state.floor_y),sim.state.world_size.x,200)]
+		for i: int in range(members.size()):
+			var actor: Dictionary=sim.state.players[int(members[i].id)]
+			actor.pos=base+Vector2(i*14,0); actor.grounded=true; actor.invuln=1000
+			actor.weapon=["arc_needle","star_seeker","star_seeker","pulse_rifle"][i]
+			actor.equipment="hunting_beacon"
+		for data: Array in [["crawler",220.0,-8.0],["crystal_moth",240.0,-130.0]]:
+			var enemy: Dictionary=sim._spawn_enemy(data[0],base+Vector2(data[1],data[2]))
+			enemy.hp=100000; enemy.max_hp=100000; enemy.move_speed=0
+			if data[0]=="crawler": enemy.attack_cd=9999
 	sound.reset_game_audio()
 	_advanced_observed = {"deployables": false, "effects": false, "chrono": false, "guided_projectiles": false, "proc_effects": false, "projectile_kinds": []}
+	_tracking_observed = {"roles":[],"projectiles":[],"marks":[],"beacons":[],"moth":false,"safe":true}
 	_biome_observed = {"biomes": [], "enemy_kinds": [], "boss_styles": [], "hazard_shapes": [], "attack_kinds": []}
 	_biome_smoke_stage = 0
 	if _smoke in ["host", "client"] and _options.has("smoke-advanced"):
@@ -671,7 +692,7 @@ func _begin_local(members: Array, seed_value: int) -> void:
 	world.menu_preview = false
 	_build_hud()
 	_notify(Locale.format("%s · M 地图 · Alt 详情 · 时间会提高威胁", [Locale.text(str(sim.state.get("stage_name", "远征开始")))]), 4.0)
-	print("SOMESIDE_RUN_STARTED peers=", members.size(), " local=", local_id)
+	print("SOMESIDE_RUN_STARTED peers=", members.size(), " local=", local_id, " character=", str(sim.state.players[local_id].character))
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 1)
 func _submit_inputs(batch: Array) -> void:
@@ -694,6 +715,7 @@ func _submit_inputs(batch: Array) -> void:
 			movement = 0.0
 		# Held state is the latest sample, not an accumulated button edge.
 		var command: Dictionary = {"move": clampf(movement, -1.0, 1.0), "aim": aim.normalized(), "fire": bool(record.get("fire", false)), "jump_held": bool(record.get("jump_held", true))}
+		if record.get("view_rect") is Rect2: command["view_rect"]=record.view_rect
 		# Preserve the exact displayed target for the first pending E press.
 		# Later movement samples must not retarget a deliberate loot choice.
 		if bool(_commands.get(id, {}).get("interact", false)):
@@ -723,6 +745,7 @@ func _receive_snapshot(snapshot: Dictionary) -> void:
 	_last_snapshot_tick = tick
 	_snapshots_received += 1
 	_observe_advanced_state(snapshot)
+	_observe_tracking_state(snapshot)
 	_observe_biome_state(snapshot)
 	var previous: Vector2 = sim.state.get("players", {}).get(local_id, {}).get("pos", Vector2.ZERO)
 	var old_stage: int = int(sim.state.get("stage", 1))
@@ -886,7 +909,7 @@ func _load_profile() -> void:
 	profile.show_fps = bool(profile.get("show_fps", true))
 	if _is_web():
 		profile.fullscreen = false
-	profile.character = profile.character if profile.character in ["ranger", "vanguard"] else "ranger"
+	profile.character = profile.character if Simulation.valid_character(str(profile.character)) else "ranger"
 	profile.name = str(profile.name).substr(0, 18)
 	profile.language = Locale.choose_language(str(profile.get("language", "")), OS.get_locale())
 	var requested_language: String = str(_options.get("language", ""))
@@ -960,7 +983,7 @@ func _step_biome_smoke() -> void:
 	var biome: String = str(sim.state.biome)
 	var index: int = 0
 	for kind: String in EnemyCatalog.pool(biome):
-		var horizontal: float = [-250.0, 300.0, 460.0][index]
+		var horizontal: float = [-250.0, 300.0, 460.0, 220.0][index]
 		sim._spawn_enemy(kind, anchor + Vector2(horizontal, -160.0 if bool(EnemyCatalog.definition(kind).get("flying", false)) else -80.0))
 		index += 1
 	sim._spawn_enemy("boss", anchor + Vector2(570.0, -90.0))
@@ -1004,9 +1027,12 @@ func _observe_advanced_state(snapshot: Dictionary) -> void:
 			_advanced_observed.projectile_kinds.append(kind)
 
 func _process_automation() -> void:
+	if _options.has("demo") and _options.has("smoke-tracking") and _tick>=240 and sim.state.get("players",{}).has(local_id):
+		sim.state.players[local_id].weapon="star_seeker"
 	if _smoke_finished:
 		return
 	_observe_advanced_state(sim.state)
+	_observe_tracking_state(sim.state)
 	_observe_biome_state(sim.state)
 	if _smoke == "host" and screen == "lobby" and roster.size() >= int(_options.get("expected-players", 2)) and _elapsed > 2.0:
 		_start_match()
@@ -1042,12 +1068,27 @@ func _finish_automation() -> void:
 	report["observed"] = _advanced_observed.duplicate(true)
 	report["biomes"] = _options.has("smoke-biomes")
 	report["biome_observed"] = _biome_observed.duplicate(true)
+	report["tracking_observed"]=_tracking_observed.duplicate(true)
 	if _options.has("report"):
 		var file := FileAccess.open(str(_options.report), FileAccess.WRITE)
 		if file != null:
 			file.store_string(JSON.stringify(report, "\t"))
 	print("SOMESIDE_AUTOMATION ", JSON.stringify(report))
 	_quit_game(0 if passed else 1)
+
+func _observe_tracking_state(snapshot: Dictionary) -> void:
+	if not _options.has("smoke-tracking") or snapshot.is_empty(): return
+	var players: Dictionary=snapshot.get("players",{})
+	for player: Dictionary in players.values():
+		if str(player.character) not in _tracking_observed.roles: _tracking_observed.roles.append(str(player.character))
+		if player.has("trace_mark") and int(player.id) not in _tracking_observed.marks: _tracking_observed.marks.append(int(player.id))
+	for d: Dictionary in snapshot.get("deployables",[]):
+		if str(d.kind)=="hunting_beacon" and int(d.owner) not in _tracking_observed.beacons: _tracking_observed.beacons.append(int(d.owner))
+	for shot: Dictionary in snapshot.get("projectiles",[]):
+		if str(shot.kind) not in _tracking_observed.projectiles: _tracking_observed.projectiles.append(str(shot.kind))
+		if str(shot.kind)=="hunting_crystal": _tracking_observed.moth=true
+		if str(shot.kind) in Simulation.Tracking.KINDS:
+			_tracking_observed.safe=_tracking_observed.safe and Vector2(shot.pos).is_finite() and int(shot.pierce)==1 and Array(shot.get("trail",[])).size()<=10
 
 func _style(color: Color, border: Color = Color.TRANSPARENT, radius: int = 6) -> StyleBoxFlat:
 	return UITheme.panel(color, border, radius)
@@ -1259,21 +1300,25 @@ func _show_menu(message: String = "") -> void:
 
 func _show_characters() -> void:
 	screen = "characters"
-	var page_width: float = 670
+	var page_width: float = 1120
 	var column: VBoxContainer = _page("选择职业", "选择本次出发的职业，然后开始游戏。", page_width)
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation", 6)
+	var cards:=HBoxContainer.new()
+	cards.add_theme_constant_override("separation",12)
+	column.add_child(cards)
 	for definition in Simulation.character_catalog():
 		var selected: bool = str(profile.character) == str(definition.id)
 		var panel := PanelContainer.new()
 		var character_style: StyleBoxFlat = _style(SURFACE, AMBER if selected else EDGE, 7)
 		character_style.border_width_left = 3 if selected else 1
 		panel.add_theme_stylebox_override("panel", character_style)
-		column.add_child(panel)
-		var row := HBoxContainer.new()
+		panel.custom_minimum_size=Vector2(365,438)
+		cards.add_child(panel)
+		var row := VBoxContainer.new()
 		row.add_theme_constant_override("separation", 18)
 		panel.add_child(row)
 		var portrait := TextureRect.new()
-		portrait.custom_minimum_size = Vector2(76, 88)
+		portrait.custom_minimum_size = Vector2(76, 112)
 		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -1289,21 +1334,22 @@ func _show_characters() -> void:
 		portrait.add_child(portrait_frame)
 		var content := VBoxContainer.new()
 		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		content.add_theme_constant_override("separation", 6)
+		content.add_theme_constant_override("separation", 3)
 		row.add_child(content)
 		_label(content, str(definition.name), 22, PAPER)
-		var description: Label = _label(content, "脉冲步枪 + 震荡手雷 · 100 生命" if str(definition.id) == "ranger" else "共鸣弧刃 + 裂地冲击 · 145 生命", 14, MUTED)
+		var description: Label = _label(content, {"ranger":"脉冲步枪 + 震荡手雷 · 100 生命", "vanguard":"共鸣弧刃 + 裂地冲击 · 145 生命", "weaver":"弧针枪 + 追猎信标 · 100 生命"}[str(definition.id)], 14, MUTED)
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		description.custom_minimum_size.x = page_width - 130
+		description.custom_minimum_size.x = 327
 		var character_id: String = str(definition.id)
 		var active: Dictionary = Content.movement_ability(character_id)
 		var passive: Dictionary = Content.character_passive(character_id)
 		_label(content, Locale.format("Shift 主动 · %s", [Locale.text(str(active.name))]), 14, TEAL)
-		var passive_label: Label = _label(content, Locale.format("自动被动 · %s", [Locale.text(str(passive.name))]) + "\n" + Locale.text("持续命中后追加追击弹。" if character_id == "ranger" else "累计失血后获得临时护盾。"), 14, AMBER)
+		var passive_label: Label = _label(content, Locale.format("自动被动 · %s", [Locale.text(str(passive.name))]) + " · " + Locale.text({"ranger":"持续命中后追加追击弹。", "vanguard":"累计失血后获得临时护盾。", "weaver":"新的追踪攻击优先锁定自己的刻印。"}[character_id]), 14, AMBER)
 		passive_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		passive_label.custom_minimum_size.x = page_width - 130
+		passive_label.custom_minimum_size.x = 327
+		_label(content,Locale.text("没有位移技能，保持距离并组织火力。") if character_id=="weaver" else Locale.text("武器与主动装备可在远征中替换。"),14,MUTED).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 		var select: Button = _button(content, "已选中" if selected else "选择", func(): profile.character = character_id; _save_profile(); _show_characters(), selected)
-		select.custom_minimum_size.y = 38
+		select.custom_minimum_size.y = 30
 		select.disabled = selected
 	_gap(column, 2)
 	var actions := HBoxContainer.new()
@@ -1382,7 +1428,7 @@ func _show_lobby() -> void:
 			var member: Dictionary = roster[index]
 			if int(member.id) == local_id:
 				me = member
-			var role: String = "游侠" if member.character == "ranger" else "先锋"
+			var role: String = Simulation.character_name(str(member.character))
 			var state_text: String = "准备就绪" if member.get("ready", false) else "等待准备"
 			var identity := VBoxContainer.new()
 			identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1417,7 +1463,7 @@ func _show_lobby() -> void:
 	_label(column, "每人独立镜头 · 合作救援 · 三段远征", 13, MUTED)
 
 func _lobby_choose_character(character_id: String) -> void:
-	if not character_id in ["ranger", "vanguard"]: return
+	if not Simulation.valid_character(character_id): return
 	profile.character = character_id
 	_save_profile()
 	if hosting:
@@ -1539,7 +1585,7 @@ func _show_guide() -> void:
 		["S + Space", "穿过脚下的平台"],
 		["鼠标左键", "使用当前主武器，跟随鼠标瞄准"],
 		["鼠标右键 / Q", "使用当前主动装备；下方显示冷却"],
-		["Shift", "职业主动：游侠闪身，先锋架盾反击"],
+		["Shift", "职业主动：游侠闪身，先锋架盾反击，织轨者刻印"],
 		["自动触发", "职业被动与遗物无需按键；Tab 查看触发条件"],
 		["E", "拾取 / 使用设施 / 激活裂隙门 / 救援"],
 		["F   /   按住 Alt", "切换附近目标 / 展开道具与装备详情"],
@@ -2146,7 +2192,7 @@ func _show_inventory() -> void:
 	overlay.add_child(content)
 	_label(content, "背包与图鉴", 30, PAPER)
 	var player: Dictionary = sim.state.get("players", {}).get(local_id, {})
-	_label(content, Locale.format("%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s", [Locale.text("游侠" if player.get("character", "ranger") == "ranger" else "先锋"), ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), Locale.text("合作远征仍在继续" if online else "远征已暂停")]), 14, MUTED)
+	_label(content, Locale.format("%s · %d/%d HP · %d 段跳 · 威胁 %.1f · %d 击破   /   %s", [Locale.text(Simulation.character_name(str(player.get("character", "ranger")))), ceili(float(player.get("hp", 0))), ceili(float(player.get("max_hp", 0))), 1 + int(player.get("items", {}).get("feather", 0)), float(sim.state.get("difficulty", 1)), int(sim.state.get("kills", 0)), Locale.text("合作远征仍在继续" if online else "远征已暂停")]), 14, MUTED)
 	var innate: Dictionary = Simulation.movement_ability(player)
 	var passive: Dictionary = Content.character_passive(str(player.get("character", "ranger")))
 	var innate_description: Label = _label(content, Locale.format("Shift 主动 · %s", [Locale.text(str(innate.name))]) + "   /   " + Locale.format("自动被动 · %s", [Locale.text(str(passive.name))]), 13, MUTED)

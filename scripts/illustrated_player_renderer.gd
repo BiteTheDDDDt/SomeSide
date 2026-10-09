@@ -5,6 +5,7 @@ const Pixels=preload("res://scripts/pixel_actor_renderer.gd")
 const Gait=preload("res://scripts/player_gait.gd")
 const Keys=preload("res://scripts/actor_key_poses.gd")
 const Body=preload("res://scripts/player_body_motion.gd")
+const TrackingArt=preload("res://scripts/tracking_art.gd")
 const PATH="res://assets/art/unified-v0206/players.png"
 const REGIONS: Dictionary={
 	"ranger":[Rect2(77,53,298,371),Rect2(481,20,309,408),Rect2(895,59,290,374),Rect2(1371,120,326,303)],
@@ -13,6 +14,7 @@ static var _sheet: CanvasTexture
 static var _frames: Dictionary={}
 
 static func frame(character: String,index: int=0) -> Dictionary:
+	if character=="weaver": return TrackingArt.weaver_frame(index)
 	if not REGIONS.has(character): return {}
 	if _sheet==null:
 		_sheet=CanvasTexture.new(); _sheet.diffuse_texture=load(PATH)
@@ -33,6 +35,7 @@ static func portrait(c: CanvasItem,character: String) -> void:
 	if not f.is_empty(): c.draw_texture_rect(f.texture,f.target,false)
 
 static func pose_frame(character: String, index: int) -> Dictionary:
+	if character=="weaver": return TrackingArt.weaver_frame(index)
 	return frame(character,index) if index<4 else Keys.frame(character,index-4)
 
 static func sample_pose(c: CanvasItem, player: Dictionary, clock: float, action: Dictionary={}) -> Dictionary:
@@ -74,7 +77,7 @@ static func _draw_plate(c: CanvasItem, f: Dictionary, pose: Dictionary, tint: Co
 
 static func draw(c: Node2D,player: Dictionary,clock: float) -> bool:
 	var character: String=str(player.get("character","ranger"))
-	if not REGIONS.has(character): return false
+	if character!="weaver" and not REGIONS.has(character): return false
 	var tracked: Dictionary=Pixels.tracked_frame_for(c,character,player,clock,true)
 	var tint: Color=tracked.get("tint",Color.WHITE)
 	var action: Dictionary=player.get("_melee_pose",{})

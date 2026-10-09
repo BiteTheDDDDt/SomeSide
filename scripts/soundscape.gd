@@ -119,8 +119,10 @@ static func event_sound(event: Dictionary) -> String:
 	var type: String = str(event.get("type", ""))
 	var kind: String = str(event.get("kind", ""))
 	if type in ["shoot", "slash"] and event.has("weapon"):
-		return "weapon_" + str(event.weapon) if str(event.weapon) in ["pulse_rifle", "arc_blade", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance"] else ""
+		return "weapon_" + str(event.weapon) if str(event.weapon) in ["pulse_rifle", "arc_blade", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance", "arc_needle", "star_seeker"] else ""
 	match type:
+		"tracking":
+			return {"engrave":"trace_lock", "blade_release":"trace_blade", "beacon_deploy":"equipment_hunting_beacon", "beacon_fire":"beacon_fire", "moth_lock":"moth_lock", "moth_release":"moth_release", "impact":"trace_impact", "limit":"ui_error", "no_target":"ui_error"}.get(kind,"")
 		"proc":
 			match kind:
 				"missile_pod", "pursuit_protocol": return "proc_missile"
@@ -239,6 +241,15 @@ static func _notes(notes: Array, step: float, duration: float, shape: String = "
 
 static func _prepare_samples() -> void:
 	if not _sample_cache.is_empty(): return
+	_add("weapon_arc_needle", [_layer("fm",.065,.5,1450,650,0,2.8,1.5),_layer("metal",.05,.2,2600,1400)],1,45,"shots",24)
+	_add("weapon_star_seeker", [_layer("sine",.18,.65,185,60),_layer("air",.22,.55,2200,700),_layer("fm",.17,.3,560,210,0,2,3)],1,130,"shots",24)
+	_add("trace_lock",_notes([660,880],.055,.15),2,160)
+	_add("trace_blade",[_layer("air",.12,.5,1500,3600),_layer("metal",.09,.3,950,600)],2,60)
+	_add("equipment_hunting_beacon",[_layer("metal",.05,.4,900,400),_layer("bell",.25,.35,590,880,.07)],2,180)
+	_add("beacon_fire",[_layer("fm",.10,.4,720,340,0,2,2),_layer("air",.09,.3,1800,600)],1,100)
+	_add("moth_lock",[_layer("swell",.58,.35,220,660),_layer("bell",.42,.22,440,660,.15)],2,300)
+	_add("moth_release",[_layer("metal",.16,.45,820,320),_layer("air",.15,.3,2400,900)],2,200)
+	_add("trace_impact",[_layer("metal",.08,.35,1300,430)],1,55)
 	# Distinct material AND timing: electronic snap, sweeping blade, pellet
 	# blast, ringing rail, gas/flutter, rotating metal, crackle, solar chord.
 	_add("weapon_pulse_rifle", [_layer("fm", .10, .65, 980, 310, 0, 2.4, 2.5), _layer("sine", .075, .5, 175, 80), _layer("noise", .015, .3, 6000, 2200)], 1, 45, "shots", 24)

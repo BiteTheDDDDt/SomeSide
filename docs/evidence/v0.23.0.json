@@ -1,0 +1,1951 @@
+{
+  "version": "0.23.0",
+  "date": "2026-10-09",
+  "baseline": "fa47fff / v0.22.0",
+  "scope": "Actual local runtime evidence, not public Internet multiplayer or manual balance approval",
+  "regression": {
+    "suites": 59,
+    "passed": true,
+    "checks": 6610,
+    "results": [
+      {
+        "name": "test_tracking_content.gd",
+        "passed": true,
+        "checks": 107,
+        "seconds": 1.13,
+        "errors": []
+      },
+      {
+        "name": "test_procs.gd",
+        "passed": true,
+        "checks": 61,
+        "seconds": 1.22,
+        "errors": []
+      },
+      {
+        "name": "test_proc_feedback.gd",
+        "passed": true,
+        "checks": 23,
+        "seconds": 0.94,
+        "errors": []
+      },
+      {
+        "name": "test_projectile_guidance.gd",
+        "passed": true,
+        "checks": 54,
+        "seconds": 5.24,
+        "errors": []
+      },
+      {
+        "name": "test_simulation.gd",
+        "passed": true,
+        "checks": 61,
+        "seconds": 0.75,
+        "errors": []
+      },
+      {
+        "name": "test_movement.gd",
+        "passed": true,
+        "checks": 62,
+        "seconds": 29.07,
+        "errors": []
+      },
+      {
+        "name": "test_input.gd",
+        "passed": true,
+        "checks": 68,
+        "seconds": 0.41,
+        "errors": []
+      },
+      {
+        "name": "test_controls.gd",
+        "passed": true,
+        "checks": 63,
+        "seconds": 1.88,
+        "errors": []
+      },
+      {
+        "name": "test_character_abilities.gd",
+        "passed": true,
+        "checks": 55,
+        "seconds": 0.5,
+        "errors": []
+      },
+      {
+        "name": "test_ability_feedback.gd",
+        "passed": true,
+        "checks": 58,
+        "seconds": 2.35,
+        "errors": []
+      },
+      {
+        "name": "test_loot.gd",
+        "passed": true,
+        "checks": 77,
+        "seconds": 0.78,
+        "errors": []
+      },
+      {
+        "name": "test_shop_motion.gd",
+        "passed": true,
+        "checks": 35,
+        "seconds": 0.78,
+        "errors": []
+      },
+      {
+        "name": "test_facilities.gd",
+        "passed": true,
+        "checks": 112,
+        "seconds": 0.88,
+        "errors": []
+      },
+      {
+        "name": "test_chest_tiers.gd",
+        "passed": true,
+        "checks": 237,
+        "seconds": 1.18,
+        "errors": []
+      },
+      {
+        "name": "test_content.gd",
+        "passed": true,
+        "checks": 65,
+        "seconds": 0.69,
+        "errors": []
+      },
+      {
+        "name": "test_rewards.gd",
+        "passed": true,
+        "checks": 20,
+        "seconds": 7.49,
+        "errors": []
+      },
+      {
+        "name": "test_coin_rewards.gd",
+        "passed": true,
+        "checks": 34,
+        "seconds": 0.99,
+        "errors": []
+      },
+      {
+        "name": "test_action_feedback.gd",
+        "passed": true,
+        "checks": 22,
+        "seconds": 0.54,
+        "errors": []
+      },
+      {
+        "name": "test_audio.gd",
+        "passed": true,
+        "checks": 77,
+        "seconds": 1.33,
+        "errors": []
+      },
+      {
+        "name": "test_audio_integration.gd",
+        "passed": true,
+        "checks": 21,
+        "seconds": 1.8,
+        "errors": []
+      },
+      {
+        "name": "test_melee_audio.gd",
+        "passed": true,
+        "checks": 19,
+        "seconds": 1.05,
+        "errors": []
+      },
+      {
+        "name": "test_melee_integration.gd",
+        "passed": true,
+        "checks": 36,
+        "seconds": 2.25,
+        "errors": []
+      },
+      {
+        "name": "test_event_stages.gd",
+        "passed": true,
+        "checks": 33,
+        "seconds": 2.36,
+        "errors": []
+      },
+      {
+        "name": "test_melee_pose.gd",
+        "passed": true,
+        "checks": 50,
+        "seconds": 0.97,
+        "errors": []
+      },
+      {
+        "name": "test_weapon_actions.gd",
+        "passed": true,
+        "checks": 35,
+        "seconds": 0.22,
+        "errors": []
+      },
+      {
+        "name": "test_ranged_actions.gd",
+        "passed": true,
+        "checks": 150,
+        "seconds": 2.36,
+        "errors": []
+      },
+      {
+        "name": "test_enemies.gd",
+        "passed": true,
+        "checks": 72,
+        "seconds": 1.15,
+        "errors": []
+      },
+      {
+        "name": "test_hazard_timing.gd",
+        "passed": true,
+        "checks": 52,
+        "seconds": 0.59,
+        "errors": []
+      },
+      {
+        "name": "test_enemy_navigation.gd",
+        "passed": true,
+        "checks": 26,
+        "seconds": 0.78,
+        "errors": []
+      },
+      {
+        "name": "test_stress.gd",
+        "passed": true,
+        "checks": 46,
+        "seconds": 39.53,
+        "errors": []
+      },
+      {
+        "name": "test_director.gd",
+        "passed": true,
+        "checks": 28,
+        "seconds": 1.53,
+        "errors": []
+      },
+      {
+        "name": "test_weapon_pose.gd",
+        "passed": true,
+        "checks": 49,
+        "seconds": 0.7,
+        "errors": []
+      },
+      {
+        "name": "test_weapon_art.gd",
+        "passed": true,
+        "checks": 66,
+        "seconds": 0.32,
+        "errors": []
+      },
+      {
+        "name": "test_item_icons.gd",
+        "passed": true,
+        "checks": 210,
+        "seconds": 1.61,
+        "errors": []
+      },
+      {
+        "name": "test_weapon_feedback.gd",
+        "passed": true,
+        "checks": 9,
+        "seconds": 2.27,
+        "errors": []
+      },
+      {
+        "name": "test_appearance.gd",
+        "passed": true,
+        "checks": 69,
+        "seconds": 1.43,
+        "errors": []
+      },
+      {
+        "name": "test_enemy_visuals.gd",
+        "passed": true,
+        "checks": 12,
+        "seconds": 2.47,
+        "errors": []
+      },
+      {
+        "name": "test_enemy_attack_visuals.gd",
+        "passed": true,
+        "checks": 129,
+        "seconds": 1.34,
+        "errors": []
+      },
+      {
+        "name": "test_combat_geometry.gd",
+        "passed": true,
+        "checks": 72,
+        "seconds": 1.71,
+        "errors": []
+      },
+      {
+        "name": "test_beam_envelope.gd",
+        "passed": true,
+        "checks": 16,
+        "seconds": 0.78,
+        "errors": []
+      },
+      {
+        "name": "test_natural_warnings.gd",
+        "passed": true,
+        "checks": 157,
+        "seconds": 3.85,
+        "errors": []
+      },
+      {
+        "name": "test_selected_enemy_fx.gd",
+        "passed": true,
+        "checks": 54,
+        "seconds": 1.33,
+        "errors": []
+      },
+      {
+        "name": "test_motion_weight.gd",
+        "passed": true,
+        "checks": 183,
+        "seconds": 0.41,
+        "errors": []
+      },
+      {
+        "name": "test_motion_clips_24.gd",
+        "passed": true,
+        "checks": 2777,
+        "seconds": 1.63,
+        "errors": []
+      },
+      {
+        "name": "test_attack_fx_sprites.gd",
+        "passed": true,
+        "checks": 129,
+        "seconds": 1.43,
+        "errors": []
+      },
+      {
+        "name": "test_visuals.gd",
+        "passed": true,
+        "checks": 16,
+        "seconds": 1.33,
+        "errors": []
+      },
+      {
+        "name": "test_render_cache.gd",
+        "passed": true,
+        "checks": 24,
+        "seconds": 2.36,
+        "errors": []
+      },
+      {
+        "name": "test_sprite_atlas.gd",
+        "passed": true,
+        "checks": 20,
+        "seconds": 0.88,
+        "errors": []
+      },
+      {
+        "name": "test_ui.gd",
+        "passed": true,
+        "checks": 172,
+        "seconds": 3.99,
+        "errors": []
+      },
+      {
+        "name": "test_localization.gd",
+        "passed": true,
+        "checks": 248,
+        "seconds": 3.21,
+        "errors": []
+      },
+      {
+        "name": "test_fps.gd",
+        "passed": true,
+        "checks": 48,
+        "seconds": 2.18,
+        "errors": []
+      },
+      {
+        "name": "test_combat_fx.gd",
+        "passed": true,
+        "checks": 23,
+        "seconds": 1.24,
+        "errors": []
+      },
+      {
+        "name": "test_pixel_actors.gd",
+        "passed": true,
+        "checks": 22,
+        "seconds": 1.26,
+        "errors": []
+      },
+      {
+        "name": "test_illustrated_players.gd",
+        "passed": true,
+        "checks": 39,
+        "seconds": 0.41,
+        "errors": []
+      },
+      {
+        "name": "test_actor_motion.gd",
+        "passed": true,
+        "checks": 51,
+        "seconds": 1.52,
+        "errors": []
+      },
+      {
+        "name": "test_actor_animation.gd",
+        "passed": true,
+        "checks": 74,
+        "seconds": 1.06,
+        "errors": []
+      },
+      {
+        "name": "test_player_gait.gd",
+        "passed": true,
+        "checks": 25,
+        "seconds": 1.8,
+        "errors": []
+      },
+      {
+        "name": "test_web_runtime.gd",
+        "passed": true,
+        "checks": 33,
+        "seconds": 2.08,
+        "errors": []
+      },
+      {
+        "name": "test_web_background.gd",
+        "passed": true,
+        "checks": 24,
+        "seconds": 0.78,
+        "errors": []
+      }
+    ]
+  },
+  "compatibility": {
+    "content.gd": {
+      "old_records_unchanged": 43,
+      "new_records": 3
+    },
+    "enemy_catalog.gd": {
+      "old_records_unchanged": 9,
+      "new_records": 1
+    },
+    "old_assets_unchanged": true,
+    "baseline": "fa47fff (v0.22.0)"
+  },
+  "web": {
+    "browser_version": "154.0.8037.93",
+    "checks": [
+      {
+        "name": "Cross-origin iframe runs without isolation headers",
+        "passed": true
+      },
+      {
+        "name": "Loading screen dismisses after startup",
+        "passed": true
+      },
+      {
+        "name": "Settings button enters fullscreen from a real click",
+        "passed": true
+      },
+      {
+        "name": "Language and FPS preference reach IndexedDB",
+        "passed": true
+      },
+      {
+        "name": "Gesture unlocks Web Audio with a nonzero output signal",
+        "passed": true
+      },
+      {
+        "name": "Saved preferences survive page reload",
+        "passed": true
+      },
+      {
+        "name": "Reload does not automatically enter fullscreen",
+        "passed": true
+      },
+      {
+        "name": "Single Player opens class choice before starting gameplay",
+        "passed": true
+      },
+      {
+        "name": "Real class confirmation starts a run",
+        "passed": true
+      },
+      {
+        "name": "Third class is selectable through the real browser entry",
+        "passed": true
+      },
+      {
+        "name": "Canvas fits 960x540 embed",
+        "passed": true
+      },
+      {
+        "name": "Canvas fits 1920x1080 embed",
+        "passed": true
+      },
+      {
+        "name": "Browser simulation advances beyond 300 ticks",
+        "passed": true
+      },
+      {
+        "name": "First launch detects the browser Chinese locale",
+        "passed": true
+      },
+      {
+        "name": "All 14 pixel actor definitions load",
+        "passed": true
+      },
+      {
+        "name": "All 18 attack families share 8 sheets within the texture budget",
+        "passed": true
+      },
+      {
+        "name": "Live browser animation clips contain 24 reusable poses each",
+        "passed": true
+      },
+      {
+        "name": "Live Web Weaver owns its mark, blades and beacon",
+        "passed": true
+      },
+      {
+        "name": "All five new projectile types execute in the browser",
+        "passed": true
+      },
+      {
+        "name": "Web tracking state stays finite and bounded while the real moth attacks",
+        "passed": true
+      },
+      {
+        "name": "No browser, network or Godot runtime errors",
+        "passed": true
+      }
+    ],
+    "errors": [],
+    "tracking_tick": 541,
+    "tracking": {
+      "beacons": [
+        1
+      ],
+      "marks": [
+        1
+      ],
+      "moth": true,
+      "projectiles": [
+        "arc_needle",
+        "engraved_blade",
+        "beacon_dart",
+        "hunting_crystal",
+        "star_seeker"
+      ],
+      "roles": [
+        "weaver"
+      ],
+      "safe": true
+    }
+  },
+  "network_normal": {
+    "passed": true,
+    "exported": true,
+    "clients": 3,
+    "mixed_languages": true,
+    "impaired": false,
+    "proxy": null,
+    "peers": [
+      {
+        "name": "host",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "en",
+        "tracking": {
+          "beacons": [
+            1,
+            1557490736,
+            1413605311,
+            667068086
+          ],
+          "marks": [
+            1,
+            1413605311
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      },
+      {
+        "name": "client-1",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "zh",
+        "tracking": {
+          "beacons": [
+            1,
+            1557490736,
+            1413605311,
+            667068086
+          ],
+          "marks": [
+            1,
+            1413605311
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      },
+      {
+        "name": "client-2",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "zh",
+        "tracking": {
+          "beacons": [
+            1,
+            1557490736,
+            1413605311,
+            667068086
+          ],
+          "marks": [
+            1,
+            1413605311
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      },
+      {
+        "name": "client-3",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "zh",
+        "tracking": {
+          "beacons": [
+            1,
+            1557490736,
+            1413605311,
+            667068086
+          ],
+          "marks": [
+            1,
+            1413605311
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      }
+    ]
+  },
+  "network_impaired": {
+    "passed": true,
+    "exported": true,
+    "clients": 3,
+    "mixed_languages": true,
+    "impaired": true,
+    "proxy": {
+      "passed": true,
+      "clients": 3,
+      "elapsed": 22.009940500021912,
+      "delay_ms_per_direction": 50.0,
+      "jitter_ms": 10.0,
+      "configured_loss_rate": 0.02,
+      "seed": 20261004,
+      "directions": {
+        "client_to_host": {
+          "received": 5468,
+          "forwarded": 5376,
+          "dropped": 92,
+          "bytes": 3901593,
+          "max_datagram_bytes": 1390,
+          "max_delay_ms": 74.52020002529025,
+          "mean_delay_ms": 54.043,
+          "observed_loss_rate": 0.01683
+        },
+        "host_to_client": {
+          "received": 4367,
+          "forwarded": 4277,
+          "dropped": 90,
+          "bytes": 3491260,
+          "max_datagram_bytes": 1392,
+          "max_delay_ms": 74.56530001945794,
+          "mean_delay_ms": 53.642,
+          "observed_loss_rate": 0.02061
+        }
+      },
+      "pending_at_shutdown": 0,
+      "socket_resets_after_exit": 30,
+      "errors": []
+    },
+    "peers": [
+      {
+        "name": "host",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "en",
+        "tracking": {
+          "beacons": [
+            1,
+            1520687624,
+            171558444,
+            1998448877
+          ],
+          "marks": [
+            1,
+            1520687624
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal",
+            "spit"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      },
+      {
+        "name": "client-1",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "zh",
+        "tracking": {
+          "beacons": [
+            1,
+            1520687624,
+            171558444,
+            1998448877
+          ],
+          "marks": [
+            1,
+            1520687624
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal",
+            "spit"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      },
+      {
+        "name": "client-2",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "zh",
+        "tracking": {
+          "beacons": [
+            1,
+            1520687624,
+            171558444,
+            1998448877
+          ],
+          "marks": [
+            1,
+            1520687624
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal",
+            "spit"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      },
+      {
+        "name": "client-3",
+        "passed": true,
+        "exit_code": 0,
+        "runtime_errors": 0,
+        "language": "zh",
+        "tracking": {
+          "beacons": [
+            1,
+            1520687624,
+            171558444,
+            1998448877
+          ],
+          "marks": [
+            1,
+            1520687624
+          ],
+          "moth": true,
+          "projectiles": [
+            "arc_needle",
+            "star_seeker",
+            "bullet",
+            "engraved_blade",
+            "beacon_dart",
+            "hunting_crystal",
+            "spit"
+          ],
+          "roles": [
+            "weaver",
+            "ranger",
+            "vanguard"
+          ],
+          "safe": true
+        }
+      }
+    ]
+  },
+  "native_capture": {
+    "frames": [
+      {
+        "devices": 1,
+        "moth_windup": 0.316666666666666,
+        "projectiles": 4,
+        "stage": "charge",
+        "time": 0.35
+      },
+      {
+        "devices": 1,
+        "moth_windup": 0.0,
+        "projectiles": 1,
+        "stage": "release",
+        "time": 0.916666666666668
+      },
+      {
+        "devices": 0,
+        "moth_windup": 0.0,
+        "projectiles": 0,
+        "stage": "recovery",
+        "time": 3.76666666666666
+      }
+    ],
+    "size": [
+      1280,
+      720
+    ],
+    "version": "0.23.0"
+  },
+  "weaver_motion": {
+    "frames": 360,
+    "seconds": 6,
+    "size": [
+      1280,
+      720
+    ],
+    "actual_simulation": true,
+    "stderr_empty": true
+  },
+  "balance": {
+    "accuracy": [
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 488.0,
+        "effective_dps": 40.6666666666667,
+        "hit_rate": 0.983333333333333,
+        "hits": 59,
+        "peak_projectiles": 1,
+        "scenario": "single_boss",
+        "seconds": 12,
+        "shots": 60,
+        "target_hp": 100000,
+        "weapon": "pulse_rifle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 980.0,
+        "effective_dps": 81.6666666666667,
+        "hit_rate": 1.0,
+        "hits": 12,
+        "peak_projectiles": 1,
+        "scenario": "single_boss",
+        "seconds": 12,
+        "shots": 12,
+        "target_hp": 100000,
+        "weapon": "railgun"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 406.0,
+        "effective_dps": 33.8333333333333,
+        "hit_rate": 0.982142857142857,
+        "hits": 55,
+        "peak_projectiles": 1,
+        "scenario": "single_boss",
+        "seconds": 12,
+        "shots": 56,
+        "target_hp": 100000,
+        "weapon": "arc_needle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 418.0,
+        "effective_dps": 34.8333333333333,
+        "hit_rate": 1.0,
+        "hits": 10,
+        "peak_projectiles": 1,
+        "scenario": "single_boss",
+        "seconds": 12,
+        "shots": 10,
+        "target_hp": 100000,
+        "weapon": "star_seeker"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 0.0,
+        "effective_dps": 0.0,
+        "hit_rate": 0.0,
+        "hits": 0,
+        "peak_projectiles": 7,
+        "scenario": "crowd",
+        "seconds": 12,
+        "shots": 60,
+        "target_hp": 100000,
+        "weapon": "pulse_rifle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 0.0,
+        "effective_dps": 0.0,
+        "hit_rate": 0.0,
+        "hits": 0,
+        "peak_projectiles": 1,
+        "scenario": "crowd",
+        "seconds": 12,
+        "shots": 12,
+        "target_hp": 100000,
+        "weapon": "railgun"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 399.0,
+        "effective_dps": 33.25,
+        "hit_rate": 0.982142857142857,
+        "hits": 55,
+        "peak_projectiles": 1,
+        "scenario": "crowd",
+        "seconds": 12,
+        "shots": 56,
+        "target_hp": 100000,
+        "weapon": "arc_needle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 418.0,
+        "effective_dps": 34.8333333333333,
+        "hit_rate": 1.0,
+        "hits": 10,
+        "peak_projectiles": 1,
+        "scenario": "crowd",
+        "seconds": 12,
+        "shots": 10,
+        "target_hp": 100000,
+        "weapon": "star_seeker"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 144.0,
+        "effective_dps": 12.0,
+        "hit_rate": 0.3,
+        "hits": 18,
+        "peak_projectiles": 7,
+        "scenario": "moving",
+        "seconds": 12,
+        "shots": 60,
+        "target_hp": 100000,
+        "weapon": "pulse_rifle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 140.0,
+        "effective_dps": 11.6666666666667,
+        "hit_rate": 0.166666666666667,
+        "hits": 2,
+        "peak_projectiles": 1,
+        "scenario": "moving",
+        "seconds": 12,
+        "shots": 12,
+        "target_hp": 100000,
+        "weapon": "railgun"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 252.0,
+        "effective_dps": 21.0,
+        "hit_rate": 0.589285714285714,
+        "hits": 33,
+        "peak_projectiles": 4,
+        "scenario": "moving",
+        "seconds": 12,
+        "shots": 56,
+        "target_hp": 100000,
+        "weapon": "arc_needle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 380.0,
+        "effective_dps": 31.6666666666667,
+        "hit_rate": 0.9,
+        "hits": 9,
+        "peak_projectiles": 2,
+        "scenario": "moving",
+        "seconds": 12,
+        "shots": 10,
+        "target_hp": 100000,
+        "weapon": "star_seeker"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 504.0,
+        "effective_dps": 42.0,
+        "hit_rate": 1.0,
+        "hits": 60,
+        "peak_projectiles": 1,
+        "scenario": "close_orbit",
+        "seconds": 12,
+        "shots": 60,
+        "target_hp": 100000,
+        "weapon": "pulse_rifle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 980.0,
+        "effective_dps": 81.6666666666667,
+        "hit_rate": 1.0,
+        "hits": 12,
+        "peak_projectiles": 1,
+        "scenario": "close_orbit",
+        "seconds": 12,
+        "shots": 12,
+        "target_hp": 100000,
+        "weapon": "railgun"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 406.0,
+        "effective_dps": 33.8333333333333,
+        "hit_rate": 0.982142857142857,
+        "hits": 55,
+        "peak_projectiles": 1,
+        "scenario": "close_orbit",
+        "seconds": 12,
+        "shots": 56,
+        "target_hp": 100000,
+        "weapon": "arc_needle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 418.0,
+        "effective_dps": 34.8333333333333,
+        "hit_rate": 1.0,
+        "hits": 10,
+        "peak_projectiles": 1,
+        "scenario": "close_orbit",
+        "seconds": 12,
+        "shots": 10,
+        "target_hp": 100000,
+        "weapon": "star_seeker"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 0.0,
+        "effective_dps": 0.0,
+        "hit_rate": 0.0,
+        "hits": 0,
+        "peak_projectiles": 7,
+        "scenario": "platform_height",
+        "seconds": 12,
+        "shots": 60,
+        "target_hp": 100000,
+        "weapon": "pulse_rifle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 0.0,
+        "effective_dps": 0.0,
+        "hit_rate": 0.0,
+        "hits": 0,
+        "peak_projectiles": 1,
+        "scenario": "platform_height",
+        "seconds": 12,
+        "shots": 12,
+        "target_hp": 100000,
+        "weapon": "railgun"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 399.0,
+        "effective_dps": 33.25,
+        "hit_rate": 0.964285714285714,
+        "hits": 54,
+        "peak_projectiles": 2,
+        "scenario": "platform_height",
+        "seconds": 12,
+        "shots": 56,
+        "target_hp": 100000,
+        "weapon": "arc_needle"
+      },
+      {
+        "ai": false,
+        "aim_error_degrees": 5,
+        "control": "Weaver without marks, skills, equipment or relics; weapon-only; ordinary crit chance remains",
+        "damage": 418.0,
+        "effective_dps": 34.8333333333333,
+        "hit_rate": 1.0,
+        "hits": 10,
+        "peak_projectiles": 1,
+        "scenario": "platform_height",
+        "seconds": 12,
+        "shots": 10,
+        "target_hp": 100000,
+        "weapon": "star_seeker"
+      }
+    ],
+    "loot_weights": [
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "weapon",
+        "eligible_ids": [
+          "scattergun",
+          "railgun",
+          "flamethrower",
+          "boomerang",
+          "storm_staff",
+          "sun_lance",
+          "arc_needle",
+          "star_seeker"
+        ],
+        "new_conditional_probabilities": {
+          "arc_needle": 0.25,
+          "star_seeker": 0.0769230769230769
+        },
+        "new_raw_mass": 17.0,
+        "old_probability_multiplier": 0.673076923076923,
+        "old_raw_mass": 35.0,
+        "old_relative_weights_unchanged": true,
+        "source": "ambient",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "weapon",
+        "eligible_ids": [
+          "scattergun",
+          "railgun",
+          "flamethrower",
+          "boomerang",
+          "storm_staff",
+          "sun_lance",
+          "arc_needle",
+          "star_seeker"
+        ],
+        "new_conditional_probabilities": {
+          "arc_needle": 0.18348623853211,
+          "star_seeker": 0.128440366972477
+        },
+        "new_raw_mass": 34.0,
+        "old_probability_multiplier": 0.688073394495413,
+        "old_raw_mass": 75.0,
+        "old_relative_weights_unchanged": true,
+        "source": "equipment",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "weapon",
+        "eligible_ids": [
+          "scattergun",
+          "railgun",
+          "flamethrower",
+          "boomerang",
+          "storm_staff",
+          "sun_lance",
+          "arc_needle",
+          "star_seeker"
+        ],
+        "new_conditional_probabilities": {
+          "arc_needle": 0.12890625,
+          "star_seeker": 0.16015625
+        },
+        "new_raw_mass": 37.0,
+        "old_probability_multiplier": 0.7109375,
+        "old_raw_mass": 91.0,
+        "old_relative_weights_unchanged": true,
+        "source": "boss",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "equipment",
+        "eligible_ids": [
+          "repair_field",
+          "aegis",
+          "graviton",
+          "turret",
+          "meteor",
+          "time_warp",
+          "hunting_beacon"
+        ],
+        "new_conditional_probabilities": {
+          "hunting_beacon": 0.0707964601769911
+        },
+        "new_raw_mass": 2.66666666666667,
+        "old_probability_multiplier": 0.929203539823009,
+        "old_raw_mass": 35.0,
+        "old_relative_weights_unchanged": true,
+        "source": "ambient",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "equipment",
+        "eligible_ids": [
+          "repair_field",
+          "aegis",
+          "graviton",
+          "turret",
+          "meteor",
+          "time_warp",
+          "hunting_beacon"
+        ],
+        "new_conditional_probabilities": {
+          "hunting_beacon": 0.110671936758893
+        },
+        "new_raw_mass": 9.33333333333333,
+        "old_probability_multiplier": 0.889328063241107,
+        "old_raw_mass": 75.0,
+        "old_relative_weights_unchanged": true,
+        "source": "equipment",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "equipment",
+        "eligible_ids": [
+          "repair_field",
+          "aegis",
+          "graviton",
+          "turret",
+          "meteor",
+          "time_warp",
+          "hunting_beacon"
+        ],
+        "new_conditional_probabilities": {
+          "hunting_beacon": 0.130573248407643
+        },
+        "new_raw_mass": 13.6666666666667,
+        "old_probability_multiplier": 0.869426751592357,
+        "old_raw_mass": 91.0,
+        "old_relative_weights_unchanged": true,
+        "source": "boss",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "mixed_gear",
+        "eligible_ids": [
+          "scattergun",
+          "railgun",
+          "flamethrower",
+          "boomerang",
+          "storm_staff",
+          "sun_lance",
+          "arc_needle",
+          "star_seeker",
+          "repair_field",
+          "aegis",
+          "graviton",
+          "turret",
+          "meteor",
+          "time_warp",
+          "hunting_beacon"
+        ],
+        "new_conditional_probabilities": {
+          "arc_needle": 0.184921763869132,
+          "hunting_beacon": 0.0341394025604552,
+          "star_seeker": 0.0341394025604552
+        },
+        "new_raw_mass": 11.8666666666667,
+        "old_probability_multiplier": 0.746799431009957,
+        "old_raw_mass": 35.0,
+        "old_relative_weights_unchanged": true,
+        "source": "ambient",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "mixed_gear",
+        "eligible_ids": [
+          "scattergun",
+          "railgun",
+          "flamethrower",
+          "boomerang",
+          "storm_staff",
+          "sun_lance",
+          "arc_needle",
+          "star_seeker",
+          "repair_field",
+          "aegis",
+          "graviton",
+          "turret",
+          "meteor",
+          "time_warp",
+          "hunting_beacon"
+        ],
+        "new_conditional_probabilities": {
+          "arc_needle": 0.133958472873409,
+          "hunting_beacon": 0.0562625586068319,
+          "star_seeker": 0.0562625586068319
+        },
+        "new_raw_mass": 24.5333333333333,
+        "old_probability_multiplier": 0.753516409912927,
+        "old_raw_mass": 75.0,
+        "old_relative_weights_unchanged": true,
+        "source": "equipment",
+        "stage": 1
+      },
+      {
+        "assumptions": "Ranger solo, starter IDs excluded, no ground rewards, no gear history",
+        "category": "mixed_gear",
+        "eligible_ids": [
+          "scattergun",
+          "railgun",
+          "flamethrower",
+          "boomerang",
+          "storm_staff",
+          "sun_lance",
+          "arc_needle",
+          "star_seeker",
+          "repair_field",
+          "aegis",
+          "graviton",
+          "turret",
+          "meteor",
+          "time_warp",
+          "hunting_beacon"
+        ],
+        "new_conditional_probabilities": {
+          "arc_needle": 0.0929054054054054,
+          "hunting_beacon": 0.0692567567567567,
+          "star_seeker": 0.0692567567567567
+        },
+        "new_raw_mass": 27.4,
+        "old_probability_multiplier": 0.768581081081081,
+        "old_raw_mass": 91.0,
+        "old_relative_weights_unchanged": true,
+        "source": "boss",
+        "stage": 1
+      }
+    ],
+    "step_hz": 60,
+    "survival": [
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 10.0,
+        "elapsed": 1.71666666666667,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 2,
+        "remaining_hp": 90.0,
+        "role": "ranger",
+        "scenario": "close_pressure",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 0.0,
+        "elapsed": 3.89999999999999,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 0,
+        "remaining_hp": 145.0,
+        "role": "vanguard",
+        "scenario": "close_pressure",
+        "starting_hp": 145.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 20.0,
+        "elapsed": 4.24999999999999,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 3,
+        "remaining_hp": 90.0,
+        "role": "weaver",
+        "scenario": "close_pressure",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 44.0,
+        "elapsed": 16.616666666667,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 10,
+        "remaining_hp": 91.0,
+        "role": "ranger",
+        "scenario": "spore_boss",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 50.4,
+        "elapsed": 18.0166666666669,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 7,
+        "remaining_hp": 133.0,
+        "role": "vanguard",
+        "scenario": "spore_boss",
+        "starting_hp": 145.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 64.0,
+        "elapsed": 24.2666666666666,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 8,
+        "remaining_hp": 71.0,
+        "role": "weaver",
+        "scenario": "spore_boss",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 268.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 100.0,
+        "elapsed": 16.466666666667,
+        "items": {},
+        "outcome": "dead",
+        "peak_projectiles": 5,
+        "remaining_hp": 0.0,
+        "role": "ranger",
+        "scenario": "stone_boss",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 33.0,
+        "elapsed": 18.0166666666669,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 0,
+        "remaining_hp": 145.0,
+        "role": "vanguard",
+        "scenario": "stone_boss",
+        "starting_hp": 145.0
+      },
+      {
+        "boss_hp": 336.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 100.0,
+        "elapsed": 18.5166666666669,
+        "items": {},
+        "outcome": "dead",
+        "peak_projectiles": 4,
+        "remaining_hp": 0.0,
+        "role": "weaver",
+        "scenario": "stone_boss",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 71.0,
+        "elapsed": 30.6666666666662,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 5,
+        "remaining_hp": 82.0,
+        "role": "ranger",
+        "scenario": "prism_boss",
+        "starting_hp": 100.0
+      },
+      {
+        "boss_hp": 0.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 67.2,
+        "elapsed": 35.3666666666659,
+        "items": {},
+        "outcome": "cleared",
+        "peak_projectiles": 0,
+        "remaining_hp": 124.35,
+        "role": "vanguard",
+        "scenario": "prism_boss",
+        "starting_hp": 145.0
+      },
+      {
+        "boss_hp": 160.0,
+        "control": "scripted kiting, jump every 95 ticks, own skills/equipment; no invulnerability",
+        "damage_received": 118.0,
+        "elapsed": 27.4833333333331,
+        "items": {},
+        "outcome": "dead",
+        "peak_projectiles": 8,
+        "remaining_hp": 0.0,
+        "role": "weaver",
+        "scenario": "prism_boss",
+        "starting_hp": 100.0
+      }
+    ],
+    "version": "0.23.0"
+  },
+  "windows_package": {
+    "version": "0.23.0",
+    "engine": "4.7.2.stable.official.ed1daf0bf",
+    "built_at_utc": "2026-10-09T13:38:16.7545342Z",
+    "package": "E:\\workplaces\\opensource\\gamedev\\SomeSide\\dist\\SomeSide-v0.23.0-windows-x64.zip",
+    "package_bytes": 75166650,
+    "package_sha256": "1DE4FAF430035F135C14D91139D3E27B514D0E2AF1EA407975D89ADBA34D15A9",
+    "executable": "E:\\workplaces\\opensource\\gamedev\\SomeSide\\dist\\v0.23.0\\SomeSide.exe",
+    "executable_bytes": 145371168,
+    "executable_sha256": "732F0DA6C237ACA0FD28C16C6D723879A44E486BCF57F80023AC70E32E0DF7E5"
+  },
+  "web_package": {
+    "version": "0.23.0",
+    "engine": "4.7.2.stable.official.ed1daf0bf",
+    "built_at_utc": "2026-10-09T13:26:34.7467526Z",
+    "package": "E:\\workplaces\\opensource\\gamedev\\SomeSide\\dist\\SomeSide-v0.23.0-web.zip",
+    "package_bytes": 46320842,
+    "package_sha256": "77ED1286BE82C7970C607A19EA68F1C9FBA80BD1B5BAA8B49816F600393B19D7",
+    "platform": "Web",
+    "directory": "E:\\workplaces\\opensource\\gamedev\\SomeSide\\dist\\v0.23.0-web",
+    "entrypoint": "index.html",
+    "files": [
+      {
+        "name": "FONT-OFL.txt",
+        "bytes": 4388,
+        "sha256": "1C05C68C34F9708415AADA51F17E1B0092D2CEA709BF4A94CD38114F9E73D7D9"
+      },
+      {
+        "name": "GODOT-LICENSE.txt",
+        "bytes": 1149,
+        "sha256": "B0435E3B3E4E55238F05F4B306F30524A1B2E20147810D436EAA554FA6855C80"
+      },
+      {
+        "name": "index.apple-touch-icon.png",
+        "bytes": 4648,
+        "sha256": "35FA206C299C3762C86FE686EA1A4D1D0F88A058A3C197788DB3B77A19F9C9A5"
+      },
+      {
+        "name": "index.audio.position.worklet.js",
+        "bytes": 2973,
+        "sha256": "BE33985BC7160D6BF9646F259CD86B259CD67B02CCB297EE5C44F8AC84327BC8"
+      },
+      {
+        "name": "index.audio.worklet.js",
+        "bytes": 7298,
+        "sha256": "5B476A9C9CE642C0EE4256436D1BC31D9C38F868ACA0F9A8E2A57C18D2DEC2A3"
+      },
+      {
+        "name": "index.html",
+        "bytes": 7292,
+        "sha256": "58BDDE6E08D5FB9EA94F532D64B99EA45B6775E6640110B2E87382B60843BB87"
+      },
+      {
+        "name": "index.icon.png",
+        "bytes": 5905,
+        "sha256": "46F90333E6BCE4708F203ECFC7B381266F211C1DEFFAAA466F9F91B627535BBA"
+      },
+      {
+        "name": "index.js",
+        "bytes": 279815,
+        "sha256": "33C94CB3175F3333B82E2A3BE5E8E86F77986F0AA2042B1631F6367A4E5BB6BA"
+      },
+      {
+        "name": "index.pck",
+        "bytes": 36227632,
+        "sha256": "D9B6A43C68682D999D40260431E77A83E250D44F1E1FC8FB36C99902F55CFD79"
+      },
+      {
+        "name": "index.png",
+        "bytes": 21443,
+        "sha256": "3CB4495C0B98DFBE4B663CBF2B6836473572339BEB66D902367893162A70BE0E"
+      },
+      {
+        "name": "index.wasm",
+        "bytes": 39514754,
+        "sha256": "FC74679E3B97F76878947FCD4FBE1268CBFA6188182A2E33BBC3F5DC9BFA57D0"
+      }
+    ],
+    "file_count": 11,
+    "uncompressed_bytes": 76077297.0
+  },
+  "web_artifact_audit": {
+    "path": "E:\\workplaces\\opensource\\gamedev\\SomeSide\\dist\\SomeSide-v0.23.0-web.zip",
+    "files": 11,
+    "uncompressed_bytes": 76077297,
+    "largest_file": "index.wasm",
+    "executable": "index",
+    "config": {
+      "args": [],
+      "canvasResizePolicy": 2,
+      "emscriptenPoolSize": 8,
+      "ensureCrossOriginIsolationHeaders": false,
+      "executable": "index",
+      "experimentalVK": false,
+      "fileSizes": {
+        "index.pck": 36227632,
+        "index.wasm": 39514754
+      },
+      "focusCanvas": true,
+      "gdextensionLibs": [],
+      "godotPoolSize": 4
+    },
+    "issues": [],
+    "warnings": [],
+    "scope": "Offline links, file sizes, headers and itch.io limits; no browser was launched."
+  },
+  "not_verified": [
+    "Manual long-run and co-op balance",
+    "Public Internet clients on different computers",
+    "Firefox/Safari gameplay",
+    "Low-end hardware FPS",
+    "itch.io production upload"
+  ],
+  "network_biomes": {
+    "passed": true,
+    "exported": true,
+    "clients": 3,
+    "stages": 3,
+    "peers": [
+      {
+        "name": "host",
+        "passed": true,
+        "runtime_errors": 0,
+        "biomes": {
+          "attack_kinds": [
+            "spore_volley",
+            "mortar",
+            "spit",
+            "pounce",
+            "spore_bloom",
+            "burrow",
+            "triple",
+            "hunt",
+            "charge",
+            "stone_spikes",
+            "stone_charge",
+            "prism_beam",
+            "mend",
+            "blink",
+            "beam",
+            "salvo",
+            "prism_cross"
+          ],
+          "biomes": [
+            "rainforest",
+            "canyon",
+            "ruins"
+          ],
+          "boss_styles": [
+            "spore",
+            "stone",
+            "prism"
+          ],
+          "enemy_kinds": [
+            "crawler",
+            "spitter",
+            "spore_moth",
+            "boss",
+            "charger",
+            "burrower",
+            "drone",
+            "crystal_moth",
+            "sentinel",
+            "skirmisher",
+            "conductor"
+          ],
+          "hazard_shapes": [
+            "circle",
+            "line"
+          ]
+        }
+      },
+      {
+        "name": "client-1",
+        "passed": true,
+        "runtime_errors": 0,
+        "biomes": {
+          "attack_kinds": [
+            "spore_volley",
+            "mortar",
+            "spit",
+            "pounce",
+            "spore_bloom",
+            "burrow",
+            "triple",
+            "hunt",
+            "charge",
+            "stone_spikes",
+            "stone_charge",
+            "prism_beam",
+            "mend",
+            "blink",
+            "beam",
+            "salvo",
+            "prism_cross"
+          ],
+          "biomes": [
+            "rainforest",
+            "canyon",
+            "ruins"
+          ],
+          "boss_styles": [
+            "spore",
+            "stone",
+            "prism"
+          ],
+          "enemy_kinds": [
+            "crawler",
+            "spitter",
+            "spore_moth",
+            "boss",
+            "charger",
+            "burrower",
+            "drone",
+            "crystal_moth",
+            "sentinel",
+            "skirmisher",
+            "conductor"
+          ],
+          "hazard_shapes": [
+            "circle",
+            "line"
+          ]
+        }
+      },
+      {
+        "name": "client-2",
+        "passed": true,
+        "runtime_errors": 0,
+        "biomes": {
+          "attack_kinds": [
+            "spore_volley",
+            "mortar",
+            "spit",
+            "pounce",
+            "spore_bloom",
+            "burrow",
+            "triple",
+            "hunt",
+            "charge",
+            "stone_spikes",
+            "stone_charge",
+            "prism_beam",
+            "mend",
+            "blink",
+            "beam",
+            "salvo",
+            "prism_cross"
+          ],
+          "biomes": [
+            "rainforest",
+            "canyon",
+            "ruins"
+          ],
+          "boss_styles": [
+            "spore",
+            "stone",
+            "prism"
+          ],
+          "enemy_kinds": [
+            "crawler",
+            "spitter",
+            "spore_moth",
+            "boss",
+            "charger",
+            "burrower",
+            "drone",
+            "crystal_moth",
+            "sentinel",
+            "skirmisher",
+            "conductor"
+          ],
+          "hazard_shapes": [
+            "circle",
+            "line"
+          ]
+        }
+      },
+      {
+        "name": "client-3",
+        "passed": true,
+        "runtime_errors": 0,
+        "biomes": {
+          "attack_kinds": [
+            "spore_volley",
+            "mortar",
+            "spit",
+            "pounce",
+            "spore_bloom",
+            "burrow",
+            "triple",
+            "hunt",
+            "charge",
+            "stone_spikes",
+            "stone_charge",
+            "prism_beam",
+            "mend",
+            "blink",
+            "beam",
+            "salvo",
+            "prism_cross"
+          ],
+          "biomes": [
+            "rainforest",
+            "canyon",
+            "ruins"
+          ],
+          "boss_styles": [
+            "spore",
+            "stone",
+            "prism"
+          ],
+          "enemy_kinds": [
+            "crawler",
+            "spitter",
+            "spore_moth",
+            "boss",
+            "charger",
+            "burrower",
+            "drone",
+            "crystal_moth",
+            "sentinel",
+            "skirmisher",
+            "conductor"
+          ],
+          "hazard_shapes": [
+            "circle",
+            "line"
+          ]
+        }
+      }
+    ]
+  }
+}

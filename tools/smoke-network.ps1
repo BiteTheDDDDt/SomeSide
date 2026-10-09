@@ -5,6 +5,7 @@ param(
     [switch]$Exported,
     [switch]$Impaired,
     [switch]$Advanced,
+    [switch]$Tracking,
     [switch]$Biomes,
     [switch]$MixedLanguages,
     [ValidateRange(0, 12)][int]$FinishAfter = 0
@@ -12,6 +13,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($Biomes -and ($Advanced -or $FinishAfter -gt 0)) { throw 'Use -Biomes separately from -Advanced or -FinishAfter so all three stages can be observed.' }
+if ($Tracking -and ($Advanced -or $Biomes)) { throw 'Run tracking separately from other content fixtures.' }
 $projectDirectory = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $enginePath = Join-Path $PSScriptRoot 'runtime\Godot_v4.7.2-stable_win64_console.exe'
 if ($Exported) {
@@ -24,6 +26,7 @@ if ($Exported) {
 }
 $resultPrefix = if ($Exported) { 'network-export-' } else { 'network-' }
 if ($Impaired) { $resultPrefix += 'impaired-' }
+if ($Tracking) { $resultPrefix += 'tracking-' }
 if ($Biomes) { $resultPrefix += 'biomes-' }
 if ($MixedLanguages) { $resultPrefix += 'bilingual-' }
 $resultDirectory = Join-Path $PSScriptRoot ('results\' + $resultPrefix + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -48,6 +51,7 @@ function Start-SmokePeer([string]$Name, [string]$Role, [int]$Duration, [int]$Pee
     )
     if ($Role -eq 'host' -and $FinishAfter -gt 0) { $argumentList += "--finish-after=$FinishAfter" }
     if ($Advanced) { $argumentList += '--smoke-advanced' }
+    if ($Tracking) { $argumentList += '--smoke-tracking' }
     if ($Biomes) { $argumentList += '--smoke-biomes' }
     if ($MixedLanguages) { $argumentList += $(if ($Role -eq 'host') { '--language=en' } else { '--language=zh' }) }
     $process = Start-Process -FilePath $enginePath -ArgumentList $argumentList -WorkingDirectory $projectDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
@@ -120,7 +124,7 @@ try {
         if ($passed -and $Biomes) {
             $passed = $report.biomes -eq $true
             foreach ($biome in @('rainforest', 'canyon', 'ruins')) { $passed = $passed -and $biome -in $report.biome_observed.biomes }
-            foreach ($kind in @('crawler', 'spitter', 'spore_moth', 'drone', 'charger', 'burrower', 'sentinel', 'skirmisher', 'conductor', 'boss')) { $passed = $passed -and $kind -in $report.biome_observed.enemy_kinds }
+            foreach ($kind in @('crawler', 'spitter', 'spore_moth', 'drone', 'charger', 'burrower', 'sentinel', 'skirmisher', 'conductor', 'crystal_moth', 'boss')) { $passed = $passed -and $kind -in $report.biome_observed.enemy_kinds }
             foreach ($style in @('spore', 'stone', 'prism')) { $passed = $passed -and $style -in $report.biome_observed.boss_styles }
             foreach ($shape in @('line', 'circle')) { $passed = $passed -and $shape -in $report.biome_observed.hazard_shapes }
             $passed = $passed -and @($report.biome_observed.attack_kinds).Count -ge 6
@@ -128,6 +132,12 @@ try {
         if ($passed -and $MixedLanguages) {
             $expectedLanguage = if ($case.Role -eq 'host') { 'en' } else { 'zh' }
             $passed = $report.language -eq $expectedLanguage
+        }
+        if ($passed -and $Tracking) {
+            $observed = $report.tracking_observed
+            $passed = $observed.safe -eq $true -and $observed.moth -eq $true -and 'weaver' -in $observed.roles
+            foreach ($kind in @('arc_needle','star_seeker','engraved_blade','beacon_dart','hunting_crystal')) { $passed = $passed -and $kind -in $observed.projectiles }
+            $passed = $passed -and @($observed.marks).Count -ge 2 -and @($observed.beacons).Count -ge 2
         }
         $runtimeErrors = @()
         if (Test-Path -LiteralPath $case.Stderr) {
@@ -150,7 +160,7 @@ try {
         $allPassed = $allPassed -and $proxyPassed
         Write-Host ("UDP proxy: passed={0}, clients={1}" -f $proxyPassed, $proxyReport.clients)
     }
-    $summary = [pscustomobject]@{ passed = $allPassed; exported = [bool]$Exported; impaired = [bool]$Impaired; advanced = [bool]$Advanced; biomes = [bool]$Biomes; mixed_languages = [bool]$MixedLanguages; finish_after = $FinishAfter; clients = $Clients; port = $Port; proxy = $proxyReport; cases = $summaries }
+    $summary = [pscustomobject]@{ passed = $allPassed; exported = [bool]$Exported; impaired = [bool]$Impaired; advanced = [bool]$Advanced; tracking = [bool]$Tracking; biomes = [bool]$Biomes; mixed_languages = [bool]$MixedLanguages; finish_after = $FinishAfter; clients = $Clients; port = $Port; proxy = $proxyReport; cases = $summaries }
     $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $resultDirectory 'summary.json') -Encoding UTF8
     Write-Host "Reports: $resultDirectory"
     if (-not $allPassed) { exit 1 }

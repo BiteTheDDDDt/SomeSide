@@ -6,11 +6,14 @@ extends RefCounted
 const Geometry = preload("res://scripts/combat_geometry.gd")
 const Illustrated=preload("res://scripts/illustrated_enemy_renderer.gd")
 const Attack = preload("res://scripts/enemy_attack_visual.gd")
+const TrackingArt=preload("res://scripts/tracking_art.gd")
 
 static func supports(kind: String) -> bool:
+	if kind=="crystal_moth": return true
 	return kind in ["sentinel","crawler","spitter","spore_moth","drone","charger","burrower","skirmisher","conductor","boss"]
 
 static func bounds(enemy: Dictionary) -> Rect2:
+	if str(enemy.get("kind",""))=="crystal_moth": return Rect2(-53,-52,94,99)
 	var art_bounds: Rect2=Illustrated.bounds(enemy)
 	if art_bounds.size!=Vector2.ZERO: return art_bounds
 	match str(enemy.get("kind","")):
@@ -23,6 +26,9 @@ static func bounds(enemy: Dictionary) -> Rect2:
 	return Rect2(-35,-27,68,47)
 
 static func draw(c: CanvasItem, enemy: Dictionary, clock: float) -> bool:
+	if str(enemy.get("kind",""))=="crystal_moth":
+		TrackingArt.moth(c,enemy,clock)
+		return true
 	if Illustrated.draw(c,enemy,clock): return true
 	if not supports(str(enemy.get("kind", ""))): return false
 	var pose: Dictionary = Attack.attack_sample(enemy)

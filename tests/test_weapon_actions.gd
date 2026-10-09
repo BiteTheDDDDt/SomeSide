@@ -39,7 +39,7 @@ func _run() -> void:
 			var length: float = Motion.duration(weapon, speed_interval)
 			fits = fits and length > 0.0 and length <= speed_interval
 		_check(fits, weapon + " finishes before the next shot even at the maximum firing rate")
-	_check(signatures.size() == 7, "All seven ranged weapons have different movement trajectories and phases")
+	_check(signatures.size() == Motion.WEAPONS.size(), "All nine ranged weapons have different movement trajectories and phases")
 	_check(Motion.sample("scattergun", .55, 1.0).phase == "cycle" and Motion.sample("scattergun", .55, 1.0).mechanism > .5, "Shotgun follow-through operates its pump between shots")
 	_check(Motion.sample("boomerang", .30, 1.0).weapon_alpha == 0.0 and Motion.sample("boomerang", .30, 1.0).offset.x > 5.0, "Boomerang visibly leaves the forward-reaching hand during the throw")
 	_check(Motion.sample("sun_lance", .13, 1.0).offset.x > 10.0 and Motion.sample("railgun", .10, 1.0).offset.x < -10.0, "The lance thrusts forward while the railgun recoils backward")

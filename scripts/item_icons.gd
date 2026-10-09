@@ -16,6 +16,7 @@ static var _rasterizations: int = 0
 const Style = preload("res://scripts/art_style.gd")
 const Content = preload("res://scripts/content.gd")
 const WeaponArt = preload("res://scripts/weapon_art.gd")
+const TrackingArt=preload("res://scripts/tracking_art.gd")
 
 
 static func rarity_color(rarity: String) -> Color:
@@ -142,7 +143,9 @@ static func color(id: String) -> Color:
 
 
 static func _drawing(id: String) -> String:
-	if id in ["pulse_rifle","arc_blade","scattergun","railgun","flamethrower","boomerang","storm_staff","sun_lance"]:
+	if id=="hunting_beacon": return TrackingArt.beacon_svg()
+	if id in ["engrave","follow_trace"]: return '<path d="M32 8L43 23L36 34L45 49L32 56L19 49L28 34L21 23Z" fill="#424e55"/><path d="M32 13L38 23L32 32L26 23Z" fill="#a2c7bd"/><path d="M32 38L39 49L32 52L25 49Z" fill="#a8b7c4"/><path d="M11 24L16 29L11 34M53 24L48 29L53 34" fill="none" stroke="#cbd1bb" stroke-width="3"/>'
+	if id in ["pulse_rifle","arc_blade","scattergun","railgun","flamethrower","boomerang","storm_staff","sun_lance","arc_needle","star_seeker"]:
 		return WeaponArt.icon_drawing(id)
 	match id:
 		"overclock":

@@ -46,7 +46,7 @@ func _run() -> void:
 		_check(source_ok, str(record.id)+" uses bounded supersampling, mipmaps and a texture-owned linear sampler")
 		_check(cache_ok, str(record.id)+" reuses hot entries and keeps framed / transparent caches distinct")
 		_check(alpha_ok, str(record.id)+" has no opaque background in its transparent pickup texture")
-	_check(fingerprints.size() == 43, "All 43 physical item silhouettes remain distinct")
+	_check(fingerprints.size() == 46, "All 46 physical item silhouettes remain distinct")
 	var stats: Dictionary = Icons.cache_stats()
 	var measured: int = 0
 	for texture: Texture2D in Icons._textures.values():

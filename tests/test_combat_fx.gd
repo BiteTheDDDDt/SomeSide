@@ -41,7 +41,7 @@ func _run() -> void:
 			if effect.kind in ["muzzle","slash","flame"]: primary=effect
 		_check(not primary.is_empty() and primary.get("weapon","")==weapon.id and before==var_to_bytes(sim.events),"Real "+str(weapon.id)+" feedback keeps the weapon identity, muzzle and immutable authority event")
 		styles[primary.get("style",primary.get("kind",""))]=true
-	_check(styles.size()==8,"All eight real weapon attacks have distinct feedback styles")
+	_check(styles.size()==Content.weapons().size(),"All ten real weapon attacks have distinct feedback styles")
 	world._effects.clear()
 	world.push_events([{"type":"hit","pos":player.pos+Vector2(80,0),"owner":1,"amount":8}])
 	var forward: int=0

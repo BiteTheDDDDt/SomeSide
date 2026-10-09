@@ -161,8 +161,8 @@ static var _parts: Dictionary = {}
 static func _part(character: String, kind: String) -> Texture2D:
 	var key: String=character+":"+kind
 	if _parts.has(key): return _parts[key]
-	var base: String="b4a798" if character=="vanguard" else "a5af95"
-	var light: String="d0c6b7" if character=="vanguard" else "d8d6b8"
+	var base: String="a3b3b4" if character=="weaver" else "b4a798" if character=="vanguard" else "a5af95"
+	var light: String="d4dbcd" if character=="weaver" else "d0c6b7" if character=="vanguard" else "d8d6b8"
 	var paths: Dictionary={
 		"thigh":'<path d="M2 0Q8-1 9 4L7 13Q4 15 1 12L0 4Z" fill="#424e55"/><path d="M2 1Q7 0 8 4L6 10L2 12L1 5Z" fill="BASE"/><path d="M2 2L5 1L5 5L2 9Z" fill="LIGHT"/>',
 		"shin":'<path d="M1 1Q5-1 8 2L6 11L7 14H1L0 11Z" fill="#424e55"/><path d="M2 2L6 1L7 3L4 12L1 11Z" fill="BASE"/><path d="M2 2L4 2L3 8L1 10Z" fill="LIGHT"/>',

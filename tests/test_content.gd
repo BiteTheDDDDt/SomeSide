@@ -22,7 +22,7 @@ func _initialize() -> void:
 	for definition in Simulation.item_catalog() + Simulation.weapon_catalog() + Simulation.equipment_catalog():
 		if not exercised.has(definition.id):
 			missing.append(definition.id)
-	_check(missing.is_empty(), "Every one of the 43 catalog IDs has an exercised gameplay effect: missing=%s" % [missing])
+	_check(missing.is_empty(), "Every one of the 46 catalog IDs has an exercised gameplay effect: missing=%s" % [missing])
 	print("CONTENT_TEST_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
 
@@ -261,7 +261,7 @@ func _test_proc_relics() -> void:
 func _test_advanced_weapons() -> void:
 	# The existing loot suite verifies aimed blade healing, six-pellet spread,
 	# rail piercing and basic rifle fire. Exercise each here through a real hit.
-	for id in ["pulse_rifle", "arc_blade", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance"]:
+	for id in ["pulse_rifle", "arc_blade", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance", "arc_needle", "star_seeker"]:
 		var simulation = _fresh()
 		var player: Dictionary = simulation.state.players[1]
 		player.weapon = id
@@ -333,7 +333,7 @@ func _test_advanced_weapons() -> void:
 func _test_advanced_equipment() -> void:
 	# More detailed delayed, support and crowd-control assertions are kept here
 	# alongside ordinary damage, so catalogue-only additions cannot pass.
-	for id in ["grenade", "shockwave", "repair_field", "aegis", "graviton", "turret", "meteor", "time_warp"]:
+	for id in ["grenade", "shockwave", "repair_field", "aegis", "graviton", "turret", "meteor", "time_warp", "hunting_beacon"]:
 		var simulation = _fresh("", 2)
 		var player: Dictionary = simulation.state.players[1]
 		player.equipment = id

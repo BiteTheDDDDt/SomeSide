@@ -38,7 +38,7 @@ func _run() -> void:
 			simulation._reset_exploration(player, true)
 		var index: int = 0
 		for kind: String in Catalog.pool(str(simulation.state.biome)):
-			var enemy: Dictionary = simulation._spawn_enemy(kind, center + Vector2([-230.0, 290.0, 430.0][index], -100.0))
+			var enemy: Dictionary = simulation._spawn_enemy(kind, center + Vector2([-230.0, 290.0, 430.0, 220.0][index], -100.0))
 			seen_enemies[kind] = true
 			if kind != "conductor": enemy.hp = float(enemy.max_hp) * 0.75
 			index += 1
@@ -70,7 +70,7 @@ func _run() -> void:
 		_check(readonly, "Biome %d real enemy attacks render without changing incoming snapshots or event payloads" % stage)
 		_check(bounded, "Biome %d boss and ordinary enemy effects stay within existing effect, number and shake budgets" % stage)
 		_check(finite, "Biome %d real telegraphs and hazards expose finite drawable geometry" % stage)
-	_check(seen_enemies.size() == 9, "The three real biome snapshots cover nine distinct ordinary enemy silhouettes")
+	_check(seen_enemies.size() == 10, "The three real biome snapshots cover ten distinct ordinary enemy silhouettes")
 	_check(seen_attacks.size() >= 9 and not seen_attacks.has(""), "The renderer consumes real windups from at least nine distinct enemy attack patterns")
 	_check(seen_hazards.has("circle") and seen_hazards.has("line"), "Real enemy AI produces both area and locked-line hazards for the threat overlay")
 	world.queue_free()

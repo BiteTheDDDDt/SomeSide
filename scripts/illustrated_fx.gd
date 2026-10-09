@@ -53,6 +53,10 @@ static func muzzle(c: CanvasItem,p: Vector2,angle: float,weapon: String,t: float
 	var length: float=float(frame.push)*(13+clampf(strength,0.5,3.3)*6)*(1-.55*t)
 	var tint: Color=Color(JADE,alpha)
 	match weapon:
+		"arc_needle":
+			shard(c,p+Vector2(length*.15,0).rotated(angle),angle,length*.27,.8,Color(JADE,alpha))
+		"star_seeker":
+			for side: int in [-1,1]: shard(c,p+Vector2(length*.2,side*2).rotated(angle),angle,length*.34,1.3,Color(ICE,alpha))
 		"scattergun":
 			for side: int in [-1,0,1]:
 				shard(c,p+Vector2(length*.38,0).rotated(angle+side*.36),angle+side*.36,length*(.62 if side==0 else .4),2.8,Color(GOLD,alpha))

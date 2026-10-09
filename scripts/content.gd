@@ -4,12 +4,16 @@ extends RefCounted
 static var _definitions: Dictionary = {}
 
 static func character_passive(character: String) -> Dictionary:
+	if character == "weaver":
+		return {"id":"follow_trace", "name":"循迹", "description":"新的追踪武器与追猎信标优先锁定自己的有效刻印；仍须满足该攻击的范围、瞄准锥与遮挡条件。不影响队友、旧武器或已发射的弹丸。", "color":Color("9fb7d0")}
 	if character == "vanguard":
 		return {"id": "reactive_plating", "name": "应急装甲", "description": "累计实际损失30生命后，获得10点独立护盾，持续3秒；冷却6秒，冷却期间不累积。护盾吸收、献祭和致死伤害不触发。角色专属，换装不重置。", "color": Color("ffa66a")}
 	return {"id": "pursuit_protocol", "name": "追猎协议", "description": "连续6次主武器命中发射8伤害追击弹；相邻命中间隔超过2秒清空，每次攻击最多计1次。冷却3秒，冷却期间不累积。角色专属，换装不重置。", "color": Color("65e2d6")}
 
 ## Character-owned Shift abilities are independent of replaceable equipment.
 static func movement_ability(character: String) -> Dictionary:
+	if character == "weaver":
+		return {"id":"engrave", "name":"刻印", "description":"Shift：刻印瞄准锥内600范围的一敌4秒，抬手后连续发射3枚有限导引飞刃，总基础伤害36。不暴击或触发连锁；冷却8秒。无目标不消耗冷却，目标失效取消剩余飞刃。没有位移或防御技能。", "speed":0.0, "duration":.34, "cooldown":8.0, "minimum_cooldown":3.0, "invuln":0.0, "damage":36.0, "stun":0.0, "boss_stun":0.0, "horizontal":false}
 	if character == "vanguard":
 		return {"id": "guard_burst", "name": "铁壁反击", "description": "架盾0.8秒，移速降至35%，正常跳跃；减伤80%并抵抗击退，最多吸收40伤害。结束时释放145范围冲击：基础12伤害，加上吸收量的75%，最高42；不暴击或触发连锁。基础冷却5.5秒。角色专属，不随换装改变；施放裂地冲击会取消架盾。",
 			"speed": 0.0, "duration": 0.8, "cooldown": 5.5, "minimum_cooldown": 2.0,
@@ -60,8 +64,10 @@ static func weapons() -> Array:
 		_record("boomerang", "回旋星刃", "投出返航刃：每次命中26伤害，往返各可穿透4个目标；间隔0.65秒。", "b49af5", "weapon", "rare"),
 		_record("storm_staff", "万雷权杖", "每0.48秒发射32伤害雷球，有限导引前方20°、520范围内的目标，最多转向22°；再向两个邻敌各弹射20伤害。", "ffd071", "weapon", "legendary"),
 		_record("sun_lance", "恒星长矛", "每0.85秒发射120伤害光矛，最多穿透6敌；每次命中另有70范围22伤害爆裂。", "ffd071", "weapon", "legendary"),
+		_record("arc_needle", "弧针枪", "每0.20秒发射7伤害细针。仅在前方12°、520范围内弱吸附0.20秒，最多转向12°；之后沿当前方向飞行。单次命中，不穿透。", "a0cabb", "weapon", "uncommon"),
+		_record("star_seeker", "寻星发射器", "每1.2秒发射38伤害追踪弹，初始锁定前方35°、650范围的一敌。速度360，最多存活2.8秒；自己最多同时3发。单次命中，无爆炸。", "a8b7cf", "weapon", "rare"),
 	]
-	var intervals: Array[float] = [0.19, 0.52, 0.60, 1.05, 0.12, 0.65, 0.48, 0.85]
+	var intervals: Array[float] = [0.19, 0.52, 0.60, 1.05, 0.12, 0.65, 0.48, 0.85, .20, 1.2]
 	for index in range(result.size()):
 		result[index]["fire_interval"] = intervals[index]
 	return result
@@ -76,8 +82,9 @@ static func equipment() -> Array:
 		_record("turret", "哨戒构装", "部署持续8秒炮台，每0.35秒自动向650范围最近敌人发射14伤害弹；最多同时4台。冷却18秒。", "b49af5", "equipment", "rare"),
 		_record("meteor", "天穹陨击", "朝瞄准方向300距离召来3次延迟陨击，每次150范围140伤害。冷却22秒。", "ffd071", "equipment", "legendary"),
 		_record("time_warp", "时序王冠", "让350范围内存活队友获得5秒时序加速：攻击速度+60%、移速+30%，并短暂无敌。冷却24秒。", "ffd071", "equipment", "legendary"),
+		_record("hunting_beacon", "追猎信标", "在脚边可达地面部署3.6秒信标，冷却12秒。在0.4、1.4、2.4秒各尝试发射一枚18伤害有限导引弹，范围500；无目标跳过。每人最多1台，不暴击或触发连锁。空中或无法放置时不消耗冷却。", "a0cabb", "equipment", "rare"),
 	]
-	var cooldowns: Array[float] = [8.0, 9.0, 14.0, 12.0, 13.0, 18.0, 22.0, 24.0]
+	var cooldowns: Array[float] = [8.0, 9.0, 14.0, 12.0, 13.0, 18.0, 22.0, 24.0, 12.0]
 	for index in range(result.size()):
 		result[index]["cooldown"] = cooldowns[index]
 	return result

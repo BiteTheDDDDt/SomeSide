@@ -52,17 +52,17 @@ func _spawn(simulation, id: String, distance: float = 300.0) -> Dictionary:
 
 func _test_catalog_and_stage_pools() -> void:
 	var seen: Dictionary = {}
-	var valid: bool = Catalog.catalog().size() == 9
+	var valid: bool = Catalog.catalog().size() == 10
 	for entry in Catalog.catalog():
 		valid = valid and not seen.has(entry.id) and float(entry.windup) >= 0.55 and float(entry.windup) <= 1.8 and float(entry.cooldown) >= 2.5
 		seen[entry.id] = true
-	_check(valid and seen.has("crawler") and seen.has("spitter") and seen.has("drone"), "Nine distinct enemies preserve the legacy IDs and provide bounded readable attack timing")
+	_check(valid and seen.has("crawler") and seen.has("spitter") and seen.has("drone"), "Ten distinct enemies preserve the legacy IDs and provide bounded readable attack timing")
 	var unique_styles: Dictionary = {}
 	for stage in range(1, 4):
 		var simulation = _fresh(stage)
 		var biome: String = simulation.state.biome
 		var pool: Array[String] = Catalog.pool(biome)
-		var owned: bool = pool.size() == 3
+		var owned: bool = pool.size() == (4 if biome=="canyon" else 3)
 		for kind in pool: owned = owned and str(Catalog.definition(kind).biome) == biome
 		owned = owned and Catalog.flying_kind(biome) in pool and bool(Catalog.definition(Catalog.flying_kind(biome)).flying)
 		_check(owned, "Stage %d has its own pool and an in-biome flying fallback" % stage)
@@ -76,7 +76,7 @@ func _test_catalog_and_stage_pools() -> void:
 			for enemy in simulation.state.enemies: generated[str(enemy.kind)] = true
 		var only_pool: bool = not generated.is_empty()
 		for id in generated: only_pool = only_pool and id in pool
-		_check(only_pool and generated.size() == 3, "Stage %d gate reinforcements sample all native enemies without foreign spawns" % stage)
+		_check(only_pool and generated.size() == pool.size(), "Stage %d gate reinforcements sample all native enemies without foreign spawns" % stage)
 		simulation.state.enemies.clear()
 		simulation.state.players[1].pos = Vector2(1000, 200)
 		simulation.state.gate.pos = Vector2(1000, 200)
@@ -97,7 +97,7 @@ func _test_catalog_and_stage_pools() -> void:
 func _test_telegraphs_and_attacks() -> void:
 	for entry in Catalog.catalog():
 		var simulation = _fresh()
-		var enemy: Dictionary = _spawn(simulation, str(entry.id), 110.0 if str(entry.id) in ["crawler", "charger"] else 300.0)
+		var enemy: Dictionary = _spawn(simulation, str(entry.id), 110.0 if str(entry.id) in ["crawler", "charger"] else (240.0 if entry.id=="crystal_moth" else 300.0))
 		simulation.step(DT, {})
 		var warned: bool = float(enemy.telegraph) >= 0.55 and str(enemy.attack_kind) == str(entry.attack_kind)
 		_advance(simulation, int((float(entry.windup) - 0.12) / DT))

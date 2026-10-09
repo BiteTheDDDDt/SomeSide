@@ -150,11 +150,12 @@ def main() -> None:
                 page.wait_for_timeout(500)
                 check(not any('SOMESIDE_RUN_STARTED' in row['text'] for row in report['logs']), 'Single Player opens class choice before starting gameplay')
                 shot('choose-class')
-                page.mouse.click(446, 577)  # Choose Vanguard for this run.
+                page.mouse.click(1000, 492)  # Choose the independent third class, Weaver (Chinese card).
                 page.wait_for_timeout(300)
-                page.mouse.click(228, 649)  # Confirm class and start.
+                page.mouse.click(341, 644)  # Confirm class and start.
                 page.wait_for_timeout(800)
                 check(any('SOMESIDE_RUN_STARTED' in row['text'] for row in report['logs']), 'Real class confirmation starts a run')
+                check(any('SOMESIDE_RUN_STARTED' in row['text'] and 'character=weaver' in row['text'] for row in report['logs']), 'Third class is selectable through the real browser entry')
                 page.keyboard.down('d')
                 page.mouse.move(900, 390)
                 page.mouse.down()
@@ -211,6 +212,32 @@ def main() -> None:
             check(sim.get('attack_fx', {}).get('textures') == 8 and sim['attack_fx']['families'] == 18 and sim['attack_fx']['bytes'] <= sim['attack_fx']['max_bytes'], 'All 18 attack families share 8 sheets within the texture budget')
             motion = sim['motion_clips_24']
             check(motion['clips'] > 5 and motion['frames'] == motion['clips'] * 24 and motion['clips'] <= motion['max_clips'], 'Live browser animation clips contain 24 reusable poses each')
+            context.close()
+            # Opt-in deterministic fixture uses real simulation/rendering. The
+            # original export is untouched; only test HTML supplies CLI args.
+            context = browser.new_context(viewport={'width': 1280, 'height': 720}, locale='en-US')
+            page = context.new_page()
+            page.on('console', log)
+            page.on('pageerror', lambda error: report['errors'].append(str(error)))
+            html = (args.export / 'index.html').read_text(encoding='utf-8')
+            html = html.replace('const engine = new Engine(GODOT_CONFIG);', 'GODOT_CONFIG.args = ["--", "--demo", "--smoke-tracking", "--character=weaver", "--duration=9"]; const engine = new Engine(GODOT_CONFIG);')
+            page.route(game_url, lambda route: route.fulfill(status=200, content_type='text/html', body=html))
+            count = sum('SOMESIDE_READY' in row['text'] for row in report['logs'])
+            previous_reports = sum('SOMESIDE_AUTOMATION ' in row['text'] for row in report['logs'])
+            page.goto(game_url, wait_until='domcontentloaded'); ready(count)
+            page.mouse.click(750, 420)
+            page.wait_for_timeout(1600); shot('tracking-charge-and-blades')
+            page.wait_for_timeout(2600); shot('tracking-seeker-and-moth')
+            deadline = time.monotonic() + 50
+            while sum('SOMESIDE_AUTOMATION ' in row['text'] for row in report['logs']) <= previous_reports:
+                if time.monotonic() > deadline: raise TimeoutError('Tracking fixture report missing')
+                page.wait_for_timeout(200)
+            payload = [row['text'].split('SOMESIDE_AUTOMATION ', 1)[1] for row in report['logs'] if 'SOMESIDE_AUTOMATION ' in row['text']][-1]
+            report['tracking_simulation'] = json.loads(payload)
+            tracking = report['tracking_simulation']['tracking_observed']
+            check('weaver' in tracking['roles'] and tracking['marks'] == [1] and tracking['beacons'] == [1], 'Live Web Weaver owns its mark, blades and beacon')
+            check(set(tracking['projectiles']) >= {'arc_needle', 'star_seeker', 'engraved_blade', 'beacon_dart', 'hunting_crystal'}, 'All five new projectile types execute in the browser')
+            check(tracking['safe'] and tracking['moth'] and report['tracking_simulation']['tick'] > 300, 'Web tracking state stays finite and bounded while the real moth attacks')
             check(not report['errors'], 'No browser, network or Godot runtime errors')
             browser.close()
     finally:

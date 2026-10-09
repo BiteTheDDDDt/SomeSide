@@ -4,9 +4,9 @@ extends RefCounted
 ## Presentation only. Ranged fire still happens immediately in Simulation;
 ## these profiles describe follow-through and recovery in local weapon space.
 const Clips=preload("res://scripts/motion_clips_24.gd")
-const WEAPONS: Array[String] = ["pulse_rifle", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance"]
+const WEAPONS: Array[String] = ["pulse_rifle", "scattergun", "railgun", "flamethrower", "boomerang", "storm_staff", "sun_lance", "arc_needle", "star_seeker"]
 const CAPS: Dictionary = {"pulse_rifle":0.17, "scattergun":0.52, "railgun":0.64,
-	"flamethrower":0.14, "boomerang":0.55, "storm_staff":0.42, "sun_lance":0.56}
+	"flamethrower":0.14, "boomerang":0.55, "storm_staff":0.42, "sun_lance":0.56, "arc_needle":.16, "star_seeker":.55}
 
 static func duration(weapon: String, interval: float) -> float:
 	if not CAPS.has(weapon):
@@ -42,6 +42,14 @@ static func _pose(weapon: String,progress: float) -> Dictionary:
 	pose.active = true
 	pose.phase = "recover"
 	match weapon:
+		"arc_needle", "star_seeker":
+			var heavy: bool=weapon=="star_seeker"
+			var kick: float=_pulse(t,.08,.82 if heavy else .70)
+			pose.offset=Vector2((-8.0 if heavy else -3.5)*kick,0)
+			pose.angle_offset=(-.12 if heavy else -.035)*kick
+			pose.body_angle=(-.065 if heavy else -.025)*kick
+			pose.energy=_pulse(t,.15,1.0)
+			pose.phase="recoil" if t<.25 else "recover"
 		"pulse_rifle":
 			var kick: float = _pulse(t, 0.07, 1.0)
 			pose.offset = Vector2(-5.5 * kick, 0.4 * kick)

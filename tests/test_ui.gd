@@ -41,7 +41,7 @@ func _run() -> void:
 	_check(str(game.get("screen")) == "characters", "Single player opens the pre-run class selection")
 	_check_page_bounds("characters")
 	var portraits: Array = _find_type(game.get("ui"), "TextureRect")
-	_check(portraits.size() == 2 and portraits[0].texture != null and portraits[1].texture != null, "Character selection shows both actual packaged character portraits")
+	_check(portraits.size() == 3 and portraits.all(func(p: TextureRect)->bool:return p.texture!=null), "Character selection shows all three actual character portraits")
 	await _press("选择", true)
 	_check(str(Dictionary(game.get("profile")).character) == "vanguard", "Selecting the second character changes the local profile")
 	await _press("返回", true)
@@ -162,7 +162,7 @@ func _run() -> void:
 				if label.text == str(definition.description):
 					found += 1
 					last_description = label
-		_check(found == 8 and game.get("_inventory_grid").get_child_count() == 8, "The %s filter exposes all eight actual item descriptions" % category)
+		_check(found == definitions.size() and game.get("_inventory_grid").get_child_count() == definitions.size(), "The %s filter exposes all actual item descriptions" % category)
 		var category_scroll: ScrollContainer = game.get("_inventory_grid").get_parent()
 		category_scroll.scroll_vertical = 100000
 		await _layout()
@@ -317,7 +317,7 @@ func _test_compact_hud(simulation) -> void:
 		var digest: int = hash(image.get_data())
 		icons_unique = icons_unique and not image.is_empty() and not hashes.has(digest)
 		hashes[digest] = definition.id
-	_check(icons_unique and definitions.size() == 43, "All 43 passive, weapon and active equipment IDs have distinct nonempty pictograms")
+	_check(icons_unique and definitions.size() == 46, "All 46 passive, weapon and active equipment IDs have distinct nonempty pictograms")
 
 func _test_owned_strip(simulation) -> void:
 	var player: Dictionary = simulation.state.players[1]

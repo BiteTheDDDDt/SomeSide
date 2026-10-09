@@ -6,7 +6,7 @@ extends RefCounted
 ## SVG is baked once at 4x resolution with filtered mipmaps. Animation moves
 ## cached parts at the same logical size; no vector rasterization runs per frame.
 const Style = preload("res://scripts/art_style.gd")
-const IDS: Array[String] = ["pulse_rifle","arc_blade","scattergun","railgun","flamethrower","boomerang","storm_staff","sun_lance"]
+const IDS: Array[String] = ["pulse_rifle","arc_blade","scattergun","railgun","flamethrower","boomerang","storm_staff","sun_lance","arc_needle","star_seeker"]
 const BOUNDS := Rect2(-6,-18,66,36)
 const RASTER_SCALE: float = 4.0
 static var _cache: Dictionary = {}
@@ -83,4 +83,4 @@ static func draw(canvas: CanvasItem, id: String, mechanism: float=0.0, energy: f
 			"sun_lance": canvas.draw_rect(Rect2(34,-1,9,1),Color(1,.9,.59,charge))
 
 static func cache_stats() -> Dictionary:
-	return {"textures":_cache.size(),"bytes":_cache_bytes,"maximum_textures":11}
+	return {"textures":_cache.size(),"bytes":_cache_bytes,"maximum_textures":13}

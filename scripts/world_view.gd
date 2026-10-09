@@ -33,6 +33,8 @@ const EnemyAttackArt = preload("res://scripts/enemy_attack_visual.gd")
 const NaturalThreats = preload("res://scripts/natural_threats.gd")
 const ProcFeedback = preload("res://scripts/proc_feedback.gd")
 const Locale = preload("res://scripts/localization.gd")
+const TrackingArt=preload("res://scripts/tracking_art.gd")
+const Tracking=preload("res://scripts/tracking_rules.gd")
 const MAX_EFFECTS: int = 384
 const MAX_DAMAGE_NUMBERS: int = 32
 const PARTICLE_KINDS: Array[String] = ["spark", "fragment", "ember", "smoke"]
@@ -506,7 +508,7 @@ func _cache_fixed_position(key: String, entity: Dictionary, tick: float, delta: 
 
 func _seed_projectile_motion(key: String, projectile: Dictionary) -> void:
 	var step: float = 1.0 / maxf(1.0, float(Engine.physics_ticks_per_second))
-	if str(projectile.get("team", "")) != "player" or str(projectile.get("kind", "")) not in ["bullet", "pellet", "rail", "boomerang", "storm", "lance"] or float(projectile.get("age", 1.0)) > step * 1.01:
+	if str(projectile.get("team", "")) != "player" or str(projectile.get("kind", "")) not in ["bullet", "pellet", "rail", "boomerang", "storm", "lance", "arc_needle", "star_seeker"] or float(projectile.get("age", 1.0)) > step * 1.01:
 		return
 	var owner: Dictionary = Dictionary(_frame.get("players", {})).get(int(projectile.get("owner", -1)), {})
 	if owner.is_empty() or bool(owner.get("dead", false)) or Vector2(projectile.get("origin", Vector2.INF)).distance_to(WeaponPose.muzzle_position(owner)) > 2.0:
@@ -770,6 +772,9 @@ func push_events(events: Array) -> void:
 		if direction.length_squared() < 0.001: direction = Vector2.RIGHT
 		direction = direction.normalized()
 		match kind:
+			"tracking":
+				if str(event.get("kind",""))=="moth_lock": continue
+				_add_effect({"kind":"tracking_fx","tracking_kind":str(event.get("kind","")),"pos":position_value,"aim":direction,"team":event.get("team","player"),"age":0.0,"life":.22,"owner":event.get("owner",-1)})
 			"proc":
 				var activation: Dictionary = ProcFeedback.activation(event)
 				if not activation.is_empty(): _add_effect(activation)
@@ -1503,6 +1508,11 @@ func _draw_deployables() -> void:
 	for device: Dictionary in _frame.get("deployables", []):
 		var p: Vector2 = world_to_screen(device.get("pos", Vector2.ZERO))
 		if not _visible(p,50.0): continue
+		if str(device.kind)=="hunting_beacon":
+			draw_texture_rect(TrackingArt.texture("beacon",TrackingArt.beacon_svg(),Vector2(64,64)),Rect2(p-Vector2(16,16),Vector2(32,32)),false)
+			var nodes: int=3-int(device.get("next",0))
+			for i: int in range(nodes): draw_line(p+Vector2(-4+i*4,-17),p+Vector2(-4+i*4,-19),TEAL,1.5,true)
+			continue
 		var angle: float = 0.0
 		var closest: float = 650.0 * 650.0
 		for enemy: Dictionary in _frame.get("enemies", []):
@@ -1613,6 +1623,11 @@ func _draw_players() -> void:
 			_draw_weapon(weapon)
 		draw_set_transform(Vector2.ZERO)
 		_draw_movement_ability(player, p)
+		if player.has("trace_pose"):
+			var raise: float=sin(PI*clampf(float(player.trace_pose.elapsed)/.34,0,1))
+			var hand: Vector2=p+Tracking.hand_offset(aim,float(player.trace_pose.elapsed))
+			draw_polyline(PackedVector2Array([p+Vector2(-facing*4,-4),p+Vector2(-facing*2,-12-raise*5),hand]),Color("81999d"),4,true)
+			TrackingArt.effect(self,hand,"engrave",aim,1-raise)
 		ProcFeedback.draw(self, ProcFeedback.shield_sample(player), p, fx_scale)
 		if float(player.get("chrono_timer", 0.0)) > 0.0:
 			var phase: float = _clock * 1.7
@@ -1682,7 +1697,7 @@ func _draw_weapon_arm(player: Dictionary, shoulder: Vector2, grip: Vector2, faci
 	if not bool(action.get("active",false)): action=weapon_action_pose(player)
 	var follow: float = float(action.get("elbow_follow",0.0))
 	var elbow: Vector2 = shoulder.lerp(grip, 0.5) + direction.orthogonal() * facing * (5.5+follow) + Vector2(0, 2)
-	var armor: Color = Color("b4a798") if str(player.get("character", "ranger")) == "vanguard" else Color("c6c7aa")
+	var armor: Color = Color("a3b3b4") if str(player.get("character",""))=="weaver" else Color("b4a798") if str(player.get("character", "ranger")) == "vanguard" else Color("c6c7aa")
 	armor.a = opacity
 	var outline: Color = Color("424e55",opacity)
 	draw_polyline(PackedVector2Array([shoulder, elbow, grip]), outline, 7.0, true)
@@ -1744,6 +1759,12 @@ func _draw_projectiles() -> void:
 		var p: Vector2 = world_to_screen(rendered)
 		# Long precision tails can remain on screen after their core leaves it.
 		if not _visible(p,120.0): continue
+		if str(projectile.kind) in Tracking.KINDS:
+			var display: Dictionary=projectile
+			if Dictionary(_fixed_samples.get("b"+str(projectile.id),{})).has("launch_origin"):
+				display=projectile.duplicate(false); display["trail"]=[]
+			TrackingArt.projectile(self,display,p,world_to_screen(Vector2.ZERO))
+			continue
 		var friendly: bool = str(projectile.get("team","player"))=="player"
 		var kind: String = str(projectile.get("kind","bullet"))
 		var strength: float = effect_strength(projectile) if friendly else 1.0
@@ -1755,6 +1776,13 @@ func _draw_projectiles() -> void:
 
 
 func _draw_threat_overlays() -> void:
+	for owner: Dictionary in Dictionary(_frame.get("players",{})).values():
+		var mark: Dictionary=owner.get("trace_mark",{})
+		if mark.is_empty(): continue
+		for target: Dictionary in _frame.get("enemies",[]):
+			if int(target.id)==int(mark.target_id) and float(target.hp)>0:
+				var marked: Vector2=world_to_screen(_entity_draw_position("e"+str(target.id),target.pos))
+				if _visible(marked,60): TrackingArt.mark(self,marked,int(owner.id)==_local_id,float(mark.remaining))
 	# Draw all dangerous material first, then ALL warning boundaries. An active
 	# beam must not erase another enemy's still-harmless warning at a crossing.
 	for value: Variant in _frame.get("hazards", []):
@@ -1772,6 +1800,10 @@ func _draw_threat_overlays() -> void:
 		var direction: Vector2 = WeaponPose.normalized_aim(enemy.get("attack_dir",Vector2.RIGHT))
 		var progress: float = clampf(1.0-remaining/maxf(0.01,float(enemy.get("telegraph_max",0.8))),0.0,1.0)
 		var attack: String = str(enemy.get("attack_kind",""))
+		if attack=="hunt":
+			var origin: Vector2=p+direction*(float(enemy.get("radius",19))+3)
+			_draw_hunt_warning(origin,direction,progress,enemy)
+			continue
 		var detail: bool = not reduced_motion and fx_scale>=.6
 		if attack not in ["beam","prism_beam","prism_cross"] and _visible(p,100.0):
 			EnemyAttackArt.draw_preparation(self,enemy,p,direction,progress,44.0 if str(enemy.get("kind",""))=="boss" else 17.0,detail)
@@ -1816,6 +1848,24 @@ func _draw_hazard(hazard: Dictionary) -> void:
 	NaturalThreats.draw_area(self,p,NaturalThreats.area_sample(hazard,fx_scale,reduced_motion))
 
 
+func _draw_hunt_warning(origin: Vector2,direction: Vector2,progress: float,enemy: Dictionary) -> void:
+	var across: Vector2=direction.orthogonal()
+	var tint: Color=EnemyAttackArt.Geometry.WARNING
+	# Hollow local charge, never a solid damage core or a predicted homing route.
+	var outline:=PackedVector2Array([origin+direction*6,origin+across*4,origin-direction*6,origin-across*4])
+	var lines: PackedVector2Array=EnemyAttackArt.Geometry.dashed_boundary(outline,true)
+	draw_multiline(lines,Color("424e55"),3.5,true)
+	draw_multiline(lines,tint,1.8,true)
+	for sign_value: int in [-1,1]:
+		draw_line(origin-direction*(16-8*progress)+across*sign_value*7,origin-direction*8+across*sign_value*4,Color(tint,.65),1,true)
+	var player: Dictionary=Dictionary(_frame.get("players",{})).get(int(enemy.get("hunt_target_id",-1)),{})
+	if player.is_empty(): return
+	var p: Vector2=world_to_screen(player.pos)+Vector2(0,-38)
+	if not _visible(p,30): return
+	for sign_value: int in [-1,1]:
+		var x: float=sign_value*(8-3*progress)
+		draw_polyline(PackedVector2Array([p+Vector2(x,-3),p+Vector2(x,3),p+Vector2(x-sign_value*3,3)]),tint,1.6,true)
+
 func _draw_effects() -> void:
 	_draw_particle_batches()
 	for effect: Dictionary in _effects:
@@ -1833,6 +1883,9 @@ func _draw_effects() -> void:
 		var color_value: Color = effect.get("color", TEAL)
 		color_value.a *= 1.0 - t
 		var strength: float = clampf(float(effect.get("strength", 1.0)), 0.5, 3.3)
+		if str(effect.kind)=="tracking_fx":
+			TrackingArt.effect(self,p,str(effect.tracking_kind),Vector2(effect.aim),t,str(effect.team)=="enemy")
+			continue
 		if str(effect.get("kind",""))=="area_recovery":
 			NaturalThreats.SelectedFX.draw_recovery(self,str(effect.family),p,float(effect.radius),t)
 			continue
